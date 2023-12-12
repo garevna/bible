@@ -1,43 +1,57 @@
 <template>
   <v-dialog
     v-model="dialog"
-    max-width="480"
+    max-width="600"
   >
     <template v-slot:activator="{ on, attrs }">
       <ButtonTooltip
-        :icon='buttonIcon'
+        :fab="fab"
+        :icon='icon || buttonIcon'
         :text="buttonTooltipText"
-        :small="true"
+        :small="small"
+        :large="large"
         v-bind="attrs"
         v-on="on"
         :clicked.sync="dialog"
       />
     </template>
 
-    <v-card flat class="homefone">
+    <v-card flat class="homefone pb-4">
       <v-toolbar flat dense class="transparent" height="48">
         <v-spacer />
-        <v-icon large @click="dialog = false">
+        <v-icon @click="dialog = false">
           $close
         </v-icon>
       </v-toolbar>
 
-      <v-card flat class="transparent pa-4" v-if="ready">
+      <v-card flat class="transparent px-5 pb-8" :key="ready">
         <v-autocomplete
           v-model="topic"
           :items="topics"
           item-text="title"
+          item-key="_id"
           return-object
-          prepend-icon="$add"
-          append-icon="$submit"
           dense
           outlined
+          autofocus
+          hide-selected
+          hide-details
           label="Тема"
-          no-data-text="Немає відповідних даних"
-          @click:append="saveTopic"
+          :no-data-text="noDataText"
           :search-input.sync="search"
         />
       </v-card>
+
+      <v-btn
+        outlined
+        :disabled="!topic.title"
+        color="buttons"
+        @click="saveTopic"
+        class="d-block mx-auto"
+        width="120"
+      >
+        OK
+      </v-btn>
     </v-card>
   </v-dialog>
 </template>
@@ -47,6 +61,8 @@
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import { menuItems } from '@/configs'
 
+const { getCommonText } = require('@/configs/language').default
+
 export default {
   name: 'TopicList',
 
@@ -54,13 +70,18 @@ export default {
     ButtonTooltip
   },
 
-  props: ['lineRef'],
+  props: ['lineRef', 'selectedTopic', 'fab', 'icon', 'tooltipText', 'small', 'large'],
 
   data: () => ({
-    ready: false,
+    noDataText: getCommonText('ua', 'noData'),
+    ready: 0,
     records: [],
     topics: [],
-    topic: '',
+    topic: {
+      _id: Date.now().toString(),
+      title: '',
+      refs: []
+    },
     search: '',
     dialog: false,
     buttonTooltipText: menuItems[2].text,
@@ -76,42 +97,29 @@ export default {
   methods: {
     async getData () {
       this.topics = await this.$root.contentController.getTopics()
-      this.ready = true
+      ++this.ready
     },
 
     async saveTopic () {
-      if (!this.topic && !this.search) return
-      if (!this.topic) {
-        this.topic = {
-          _id: Date.now().toString(),
-          title: this.search,
-          notes: [],
-          refs: this.lineRef ? [this.lineRef] : []
-        }
-      } else {
-        const refs = !this.topic.refs
-          ? [this.lineRef]
-          : !this.topic.refs.includes(this.lineRef)
-            ? this.topic.refs.concat([this.lineRef])
-            : this.topic.refs
+      if (!this.topic.title && !this.search) return
 
-        this.topic.refs = refs
-      }
+      !this.topic.title && Object.assign(this.topic, { title: this.search })
 
-      this.topics.push(this.topic)
+      this.lineRef && !this.topic.refs.includes(this.lineRef) && this.topic.refs.push(this.lineRef)
 
       await this.$root.contentController.putTopic(this.topic)
-      this.topic = null
-      this.search = ''
-      this.dialog = false
+
+      this.$emit('update:selectedTopic', this.topic)
+
+      Object.assign(this, { search: '', dialog: false })
     }
+  },
+
+  mounted () {
+    Object.assign(this, {
+      buttonTooltipText: this.tooltipText || this.buttonTooltipText,
+      buttonIcon: this.icon || this.buttonIcon
+    })
   }
 }
 </script>
-
-<style>
-
-.v-toolbar__content {
-  padding: 4px !important;
-}
-</style>

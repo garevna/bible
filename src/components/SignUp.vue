@@ -211,7 +211,7 @@ export default {
     },
 
     async createUser () {
-      const { login, userName, password } = this
+      const { login, userName, password, city, country } = this
       // console.log({ login: this.login, userName: this.userName, password: this.passwordHash })
       await createNewUser({ login, userName, city, country, password })
       user({ login, userName, password })

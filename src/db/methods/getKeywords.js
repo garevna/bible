@@ -1,5 +1,9 @@
-const { getRecordsByIndex } = require('../helpers').default
+const { getRecordsByIndex, searchLineKeywords } = require('../helpers').default
 
-export async function getKeywords () {
-  return await getRecordsByIndex('keywords')
+export async function getKeywords (lineRef) {
+  const { status, result } = !lineRef
+    ? await getRecordsByIndex('keywords')
+    : await searchLineKeywords(lineRef)
+
+  return status === 200 ? result : []
 }

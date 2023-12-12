@@ -5,39 +5,49 @@
   >
     <template v-slot:activator="{ on, attrs }">
       <ButtonTooltip
-        :icon='buttonIcon'
-        :text="buttonTooltipText"
-        :small="true"
+        :icon='icon || buttonIcon'
+        :text="buttonText || buttonTooltipText"
+        :small="small"
+        :large="large"
         v-bind="attrs"
         v-on="on"
         :clicked.sync="dialog"
       />
     </template>
-    <v-card flat class="homefone">
+    <v-card flat class="homefone pb-4">
       <v-toolbar flat dense class="transparent" height="48">
         <v-spacer />
-        <v-icon large @click="dialog = false">
+        <v-icon @click="dialog = false">
           $close
         </v-icon>
       </v-toolbar>
 
-      <v-card flat class="transparent pa-4" v-if="ready">
+      <v-card flat class="transparent px-5 pb-4" :key="ready">
         <v-autocomplete
           v-model="keyword"
           :items="records"
           item-text="_id"
           return-object
-          prepend-icon="$add"
-          append-icon="$submit"
           dense
           outlined
+          autofocus
           hide-selected
+          hide-details
           label="Ключові слова"
-          no-data-text="Немає відповідних даних"
-          @click:append="saveKeyword(keyword)"
+          :no-data-text="noDataText"
           :search-input.sync="search"
         />
       </v-card>
+      <v-btn
+        outlined
+        :disabled="!keyword"
+        color="buttons"
+        @click="saveKeyword"
+        class="d-block mx-auto"
+        width="120"
+      >
+        OK
+      </v-btn>
     </v-card>
   </v-dialog>
 </template>
@@ -47,6 +57,8 @@
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import { menuItems } from '@/configs'
 
+const { getCommonText } = require('@/configs/language').default
+
 export default {
   name: 'KeywordList',
 
@@ -54,11 +66,12 @@ export default {
     ButtonTooltip
   },
 
-  props: ['lineRef'],
+  props: ['lineRef', 'selectedKeyword', 'icon', 'buttonText', 'large', 'small'],
 
   data: () => ({
+    noDataText: getCommonText('ua', 'noData'),
     dialog: false,
-    ready: false,
+    ready: 0,
     records: [],
     keyword: null,
     search: '',
@@ -74,40 +87,23 @@ export default {
 
   methods: {
     async getData () {
-      this.records = (await this.$root.contentController.getKeywords())?.result || []
-      console.log('KEYWORDS:\n', this.records)
-      this.ready = true
+      this.records = await this.$root.contentController.getKeywords()
+      ++this.ready
     },
 
     async saveKeyword () {
-      this.ready = false
-      console.log('\nTHIS.KEYWORD:\n', this.keyword, '\nSEARCH:', this.search)
       if (!this.keyword && !this.search) return
-      const keyword = this.keyword || { _id: this.search, refs: [this.lineRef] }
 
-      const { status, result } = await this.$root.contentController.getKeyword(keyword._id)
-      keyword.refs = status !== 200
-        ? this.lineRef ? [this.lineRef] : []
-        : !result.refs.includes(this.lineRef)
-          ? result.refs.concat([this.lineRef])
-          : result.refs
+      const keyword = this.keyword || { _id: this.search }
 
-      this.records.push(keyword)
+      const result = await this.$root.contentController.putKeyword(keyword._id, this.lineRef || null)
 
-      await this.$root.contentController.putKeyword(keyword._id, this.lineRef)
-      // await this.$root.contentController.assignKeyword(keyword._id, this.lineRef)
-      this.keyword = null
-      this.search = ''
-      this.$nextTick(() => { this.ready = true })
-      this.dialog = false
+      this.$emit('update:selectedKeyword', result._id)
+
+      this.records.push(result)
+
+      Object.assign(this, { dialog: false, keyword: null, search: '', ready: ++this.ready })
     }
   }
 }
 </script>
-
-<style>
-
-.v-toolbar__content {
-  padding: 4px !important;
-}
-</style>

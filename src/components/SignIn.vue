@@ -9,7 +9,7 @@
     <v-card elevation="12" class="homefone text-center">
       <v-toolbar flat class="transparent">
         <v-toolbar-title>
-          <b> {{ getText('title') }} </b>
+          <b class="ml-4"> {{ getText('title') }} </b>
         </v-toolbar-title>
 
         <v-spacer />

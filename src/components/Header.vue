@@ -4,9 +4,15 @@
     flat
     color="primary"
     dark
-    class="mx-0 px-0"
+    class="bottom-border mx-0 px-0"
   >
-    <v-card class="d-flex align-center justify-space-between transparent" flat tile width="100%" height="48">
+    <v-card
+      class="app-bar-content d-flex align-center justify-space-between transparent"
+      flat
+      tile
+      width="100%"
+      height="48"
+    >
       <div class="ml-5">
         <v-img
           :src="require('@/assets/logo.png')"
@@ -65,12 +71,25 @@
         <span>{{ translation }}</span>
       </v-tooltip>
     </v-card>
+
+    <v-slide-y-transition>
+      <div :key="ready">
+        <h4
+          dark
+          class="primary view-title"
+        >
+          {{ title }}
+        </h4>
+      </div>
+    </v-slide-y-transition>
   </v-app-bar>
 </template>
 
 <script>
 
 import User from '@/components/User.vue'
+
+import { footerMenu } from '@/configs'
 
 export default {
   name: 'Header',
@@ -79,19 +98,19 @@ export default {
     User
   },
 
-  props: ['signIn', 'signUp'],
+  props: ['signIn', 'signUp', 'page'],
 
   data: () => ({
+    title: '',
+    ready: 0,
     translation: 'Переклад І. Огієнка',
     signed: true
   }),
 
   watch: {
-    signIn (val) {
-      console.log('SIGN IN: ', val)
-    },
-    signUp (val) {
-      console.log('SIGN UP: ', val)
+    page (val) {
+      this.title = footerMenu.find(item => item.value === val).text
+      ++this.ready
     }
   },
 
@@ -122,7 +141,11 @@ export default {
 }
 </script>
 
-<style>
+<style scoped>
+
+.app-bar-content {
+  z-index: 50;
+}
 
 .logo, .kcc-title {
   display: inline-block;
@@ -139,6 +162,21 @@ export default {
   content: 'Переклад І. Огієнка'
 }
 
+.view-title-wrapper {}
+
+.view-title {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  transform: translate(-50%, 0);
+  top: 40px;
+  border-radius: 8px;
+  max-width: 360px;
+  min-width: 160px;
+  padding: 16px 16px 8px;
+  text-align: center;
+}
+
 @media screen and (max-width: 600px) {
   .kcc-title::after {
     content: 'ХXЦ';
@@ -146,5 +184,15 @@ export default {
   .translation-text::after {
     content: ''
   }
+
+  .view-title {
+    left: 0px;
+    transform: none;
+  }
 }
+
+.bottom-border {
+  border-bottom: solid 1px #fff8 !important;
+}
+
 </style>

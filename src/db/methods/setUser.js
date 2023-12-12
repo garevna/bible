@@ -16,7 +16,7 @@ export async function setUser ({ userName, login, password }) {
 
   await read()
 
-  window.dispatchEvent(new Event('user-changed'))
+  this.$root.$emit('user-changed', user())
 
   this.$root.$emit('progress-off')
 }

@@ -1,0 +1,13 @@
+.field-set {
+  padding: 8px;
+  border: solid 1px #ccc;
+  border-radius: 4px;
+  margin-bottom: 32px;
+}
+
+.field-set > legend {
+  color: #09b8;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: bold;
+}

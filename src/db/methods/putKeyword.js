@@ -1,15 +1,18 @@
 const { putRecordByKey } = require('../helpers').default
 const { saveFirebaseDocument } = require('@/firebase').default
 
-export async function putKeyword (keyword, lineRef) {
-  const { status, result: found } = await this.getKeyword(keyword)
-  const refs = status === 200 ? found.refs : []
+export async function putKeyword (keyword, lineRef, removing) {
+  const { status, result } = await this.getKeyword(keyword)
+
+  const refs = status === 200 ? result.refs : []
+
   lineRef && !refs.includes(lineRef) && refs.push(lineRef)
+  removing && refs.includes(removing) && refs.splice(refs.indexOf(removing), 1)
 
-  await saveFirebaseDocument('keywords', { _id: keyword, refs })
+  const record = { _id: keyword, refs }
 
-  return await putRecordByKey('keywords', keyword, {
-    _id: keyword,
-    refs
-  })
+  await saveFirebaseDocument('keywords', record)
+  await putRecordByKey('keywords', keyword, record)
+
+  return record
 }

@@ -1,0 +1,23 @@
+.draggable-item {
+  border: solid 1px #ddd;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: grab;
+}
+
+.draggable-item:hover {
+  /* border-color: #fa04; */
+  background-color: #ddd5;
+}
+
+.drop-placeholder:hover {
+  border: solid 2px #f0f;
+}
+
+.chosen-item {
+  border: solid 1px #005;
+}
+
+.dragging-item {
+  border: solid 2px #f0f;
+}

@@ -3,6 +3,7 @@
     <v-toolbar flat class="transparent">
       <v-spacer />
       <v-btn-toggle
+        v-if="$root.user"
         v-model="toggle"
         mandatory
         dense
@@ -42,7 +43,7 @@
       @click:row="showDetails($event)"
     >
       <template v-slot:item.line="{ item }">
-        <sup style="margin: 0 8px 0 0; border: solid 1px #ddd; border-radius: 4px; padding: 4px 4px 4px 8px; text-align: center; user-select: none;">
+        <sup :id="item._id" :class="item._id === verseId ? 'line-number--emph' : 'line-number--normal'">
           {{ item.line + 1 }}
         </sup>
       </template>
@@ -55,15 +56,14 @@
         />
       </template>
 
-      <template v-slot:item.actions="{ item }" v-if="viewportWidth > 600">
-        <LineActions :lineRef="item._id" />
+      <template v-slot:item.actions="{ item }">
+        <LineActions
+          v-if="$root.user"
+          :lineRef="item._id"
+          :activeRef.sync="activeRef"
+        />
       </template>
     </v-data-table>
-
-    <LineDetails
-      :details.sync="details"
-      :lineRef="lineRef"
-    />
 
     <DropdownMenu
       :showMenu.sync="showMenu"
@@ -80,7 +80,6 @@ import Highlighter from '@/assets/Highlighter.vue'
 
 import DropdownMenu from '@/components/DropdownMenu.vue'
 import LineActions from '@/components/LineActions.vue'
-import LineDetails from '@/components/LineDetails.vue'
 
 import { selectionChange } from '@/helpers'
 import { menuItems } from '@/configs'
@@ -91,8 +90,7 @@ export default {
   components: {
     Highlighter,
     DropdownMenu,
-    LineActions,
-    LineDetails
+    LineActions
   },
 
   props: ['covenantIndex', 'bookIndex', 'chapter'],
@@ -104,33 +102,26 @@ export default {
     toggle: 4,
     chapterContent: null,
     lineRef: '',
+    verseId: null,
     ready: false,
     menuItems,
     showMenu: false,
     option: null,
     event: {},
-    dialog: false,
-    keyword: '',
-    topicId: null,
-    noteId: null,
     headers: [
       { text: '', align: 'start', justify: 'end', sortable: false, value: 'line', width: '32px' },
       { text: '', align: 'start', justify: 'start', sortable: false, value: 'text' },
       { text: '', sortable: false, value: 'actions', width: 240 }
     ],
-    clicked: null,
-    selected: null,
 
-    details: false,
-
-    mouseButtonState: false
+    activeRef: null
   }),
 
   watch: {
-    // toggle (val) {
-    //   console.log('MARKER: ', val)
-    //   if (val === 4) this.
-    // },
+    toggle (val) {
+      if (val === 4) this.resetHighlightning()
+      else this.setListeners()
+    },
 
     async bookIndex (val) {
       await this.getChapterContent()
@@ -144,6 +135,23 @@ export default {
       this.keywordClicked = val === 'keywords' ? this.lineRef : null
       this.noteClicked = val === 'notes' ? this.lineRef : null
       this.topicClicked = val === 'topics' ? this.lineRef : null
+    },
+
+    ready: {
+      immediate: true,
+      handler (val) {
+        if (!val) return
+        localStorage.setItem('chapter', this.chapter)
+
+        this.$nextTick(() => {
+          const elem = this.verseId && document.getElementById(this.verseId)
+          elem && this.$vuetify.goTo(elem, {
+            duration: 300,
+            offset: 100,
+            easing: 'easeInOutCubic'
+          })
+        })
+      }
     }
   },
 
@@ -154,15 +162,14 @@ export default {
     getChapterHighlights: () => null,
 
     showDetails (item) {
-      console.log(this.cursorStyle)
       if (this.cursorStyle !== 'default') return
-      Object.assign(this, { lineRef: item._id })
-      this.details = true
+      Object.assign(this, { activeRef: item._id })
     },
 
     async getChapterContent () {
       this.ready = false
-      this.chapterContent = await this.getBookChapter(this.covenantIndex, this.bookIndex, this.chapter - 1)
+
+      this.chapterContent = await this.getBookChapter(this.covenantIndex, this.bookIndex, Math.max(this.chapter - 1, 0))
       const chapterRef = this.getChapterRef(this.covenantIndex, this.bookIndex, this.chapter - 1)
       const highlights = await this.getChapterHighlights(chapterRef)
 
@@ -224,16 +231,14 @@ export default {
       }
       this.resetHighlightning()
       this.$nextTick(() => {
-        // this.cursorStyle = marker.cursor
-        // this.highlightColor = marker.color
         Object.assign(this, marker)
         document.getSelection().empty()
+        this.cursorStyle !== 'default' && this.setListeners()
       })
     },
 
     setMouseButtonState (event) {
       if (this.cursorStyle === 'default') return
-      this.mouseButtonState = event.type !== 'mousemove' && event.buttons === 0
       if (event.type !== 'mousemove' && event.buttons === 0) {
         this.selectionChange()
         this.resetSelection()
@@ -241,7 +246,8 @@ export default {
     },
 
     setListeners () {
-      ['mousedown', 'mousemove', 'mouseup'].forEach(event => document.addEventListener(event, this.setMouseButtonState))
+      ['mousedown', 'mousemove', 'mouseup']
+        .forEach(event => document.addEventListener(event, this.setMouseButtonState))
     },
 
     clearListeners () {
@@ -251,14 +257,22 @@ export default {
   },
 
   async created () {
-    const { getBookChapter, getChapterRef, getChapterHighlights } = this.$root.contentController
+    console.log('CHAPTER: ', this.chapter)
+
+    const {
+      getBookChapter,
+      getChapterRef,
+      getChapterHighlights
+    } = this.$root.contentController
+
     Object.assign(this, { getBookChapter, getChapterRef, getChapterHighlights })
     await this.getChapterContent()
     this.ready = true
   },
 
   mounted () {
-    // this.setListeners()
+    this.verseId = localStorage.getItem('verse')
+
     this.$root.$on('resize', this.resize)
     this.$root.$on('marker-changed', this.changeMarker)
   },
@@ -272,15 +286,6 @@ export default {
 </script>
 
 <style>
-
-.v-data-table__mobile-row {
-  display: table-cell;
-  justify-content: start;
-}
-
-.v-data-table > .v-data-table__wrapper > table > tbody > tr > td {
-  padding: 4px;
-}
 
 .v-pagination__item {
   box-shadow: none !important;
@@ -301,12 +306,26 @@ export default {
   margin: 0;
 }
 
-.line-number {
-  border: solid 1px #bbb;
+.line-number--normal,
+.line-number--emph {
+  margin: 0 8px 0 0;
   border-radius: 4px;
-  margin-right: 8px;
-  padding: 0 4px;
+  padding: 4px 4px 4px 8px;
+  text-align: center;
+  user-select: none;
+}
+
+.line-number--normal {
+  border: solid 1px #ddd;
+  font-weight: normal;
   color: #999;
+}
+
+.line-number--emph {
+  border: solid 2px #09b;
+  font-weight: bold;
+  background: #09bb;
+  color: #eef;
 }
 
 .line-text {

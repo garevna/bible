@@ -1,3 +1,15 @@
-$body-font-family: 'News Gothic MT', Arial;
+$body-font-family: Montserrat, Helvetica, sans-serif;
 $font-size-root: 16px;
 $tabs-bar-background-color: #09b;
+
+$fab-sizes: (
+  'small': 36,
+  'default': 48,
+  'large': 56
+);
+
+$fab-icon-sizes: (
+  'small': 24,
+  'default': 32,
+  'large': 48
+);

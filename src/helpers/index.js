@@ -6,6 +6,14 @@ import { getRight } from './getRight'
 import { getCovering } from './getCovering'
 import { addInterval } from './addInterval'
 import { readTextFile } from './readTextFile'
+import { replaceChapter } from './replaceChapter'
+import { getSelector } from './getSelector'
+import { setSelector } from './setSelector'
+import { resetSelector } from './resetSelector'
+import { gotoVerse } from './gotoVerse'
+import { getTopicData } from './getTopicData'
+import { saveTopic } from './saveTopic'
+import { getVerseNode } from './getVerseNode'
 
 export {
   initUser,
@@ -15,5 +23,13 @@ export {
   getCovering,
   addInterval,
   selectionChange,
-  readTextFile
+  readTextFile,
+  replaceChapter,
+  getSelector,
+  setSelector,
+  resetSelector,
+  gotoVerse,
+  getTopicData,
+  saveTopic,
+  getVerseNode
 }

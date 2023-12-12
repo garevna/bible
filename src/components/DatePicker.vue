@@ -8,8 +8,9 @@
   >
     <template v-slot:activator="{ on, attrs }">
       <v-text-field
+        :dark="dark"
         v-model="localDate"
-        prepend-icon="mdi-calendar"
+        prepend-icon="$calendar"
         readonly
         outlined
         dense
@@ -30,23 +31,7 @@
       :first-day-of-week="1"
       locale="uk"
       @input="modal = false"
-    >
-      <!-- <v-spacer />
-      <v-btn
-        text
-        color="primary"
-        @click="modal = false"
-      >
-        <strong>Скасувати</strong>
-      </v-btn>
-      <v-btn
-        text
-        color="primary"
-        @click="$refs.dialog.save(date)"
-      >
-        <strong>OK</strong>
-      </v-btn> -->
-    </v-date-picker>
+    />
   </v-dialog>
 </template>
 
@@ -63,6 +48,10 @@ export default {
     availableDates: {
       type: Array,
       default: () => ([])
+    },
+    dark: {
+      type: Boolean,
+      default: false
     }
   },
 

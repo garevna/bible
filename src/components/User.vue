@@ -55,11 +55,7 @@ export default {
   methods: {
     changeUser () {
       this.user = user()
-      console.log('USER CHANGED:\n', this.user)
-      if (this.user) {
-        const { read } = require('@/firebase').default
-        read().then(() => this.$emit('update:signed', true))
-      } else this.$emit('update:signed', false)
+      this.$emit('update:signed', true)
     },
 
     resetUser () {

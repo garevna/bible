@@ -1,0 +1,7 @@
+.delete-icon {
+  opacity: 0.4;
+}
+
+.delete-icon:hover {
+  opacity: 0.8;
+}

@@ -1,8 +1,8 @@
 export const mainKeys = {
   content: ['_id'],
   books: ['_id'],
-  notes: ['date'],
-  stored: ['topic'],
-  search: ['topic'],
-  keywords: ['keyword']
+  notes: ['_id'],
+  stored: ['_id'],
+  search: ['_id'],
+  keywords: ['_id']
 }

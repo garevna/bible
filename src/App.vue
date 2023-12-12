@@ -1,6 +1,10 @@
 <template>
   <v-app>
-    <Header :signIn.sync="login" :signUp.sync="register" />
+    <Header
+      :signIn.sync="login"
+      :signUp.sync="register"
+      :page="page"
+    />
 
     <v-progress-linear
       :active="progress"
@@ -10,7 +14,7 @@
       color="warning"
     />
 
-    <v-main class="homefone">
+    <v-main class="homefone overflow-y-auto">
       <SignIn
         v-if="login"
         :dialog.sync="login"
@@ -23,42 +27,48 @@
         lang="ua"
       />
 
-      <v-card
-        v-if="contentReady"
-        flat
-        class="transparent mx-auto"
-        max-width="1440"
-        height="100%"
-      >
-        <component :is="currentView" />
-      </v-card>
+        <component v-if="contentReady" :is="currentView" />
     </v-main>
 
-    <Footer :selected.sync="action" />
+    <Footer :selected.sync="page" />
+
+    <v-snackbar
+      v-model="snackbar"
+      :timeout="8000"
+      color="warning"
+      bottom
+      right
+    >
+      Зареєструйтеся або увійдіть у систему, щоб мати можливість зберігати свої власні налаштування, нотатки, ключові слова та виділяти фрагменти текстів кольоровими маркерами
+    </v-snackbar>
   </v-app>
 </template>
 
 <script>
+
+import '@/sass/main.css'
 
 import Header from '@/components/Header.vue'
 import Footer from '@/components/Footer.vue'
 
 import { footerMenu } from '@/configs'
 
-// const { read } = require('@/firebase').default
+const pages = footerMenu.map(item => ({ value: item.value, component: item.component }))
 
 export default {
   name: 'App',
 
   components: {
     Header,
+    Footer,
     SignIn: () => import('@/components/SignIn.vue'),
     SignUp: () => import('@/components/SignUp.vue'),
     Home: () => import('@/views/Home.vue'),
     Keywords: () => import('@/views/Keywords.vue'),
     Topics: () => import('@/views/Topics.vue'),
+    Topic: () => import('@/views/Topic.vue'),
     Notes: () => import('@/views/Notes.vue'),
-    Footer
+    Search: () => import('@/views/Search.vue')
   },
 
   data: () => ({
@@ -66,29 +76,28 @@ export default {
     register: false,
     contentReady: false,
     progress: false,
-    currentView: 'Home',
-    action: 'bible',
     covenantIndex: undefined,
     books: [],
     bookIndex: 0,
     bookTitle: '',
     selectedMenuItem: null,
-    event: null
+    event: null,
+    pages,
+    page: null
   }),
 
-  watch: {
-    login (val) {
-      console.log('SIGN IN: ', val)
+  computed: {
+    currentView () {
+      return this.pages.find(item => item.value === this.page)?.component || 'Home'
     },
 
-    register (val) {
-      console.log('SIGN UP: ', val)
-    },
+    snackbar: {
+      get () {
+        return !this.$root.user
+      },
+      set (val) {
 
-    action (value) {
-      console.log('Action changed: ', value)
-
-      this.currentView = footerMenu.find(item => item.value === value)?.component
+      }
     }
   },
 
@@ -102,8 +111,13 @@ export default {
     },
 
     setContentReady () {
-      if (!this.$root.user) console.warn('Sign in please to configure your own environment.')
-      this.contentReady = true
+      if (!this.$root.user) {
+        console.warn('Sign in please to configure your own environment.')
+        this.contentReady = true
+      } else {
+        const { read } = require('@/firebase').default
+        read().then(() => { this.contentReady = true })
+      }
     },
 
     resizeWindow () {
@@ -119,9 +133,6 @@ export default {
       this.$emit('resize')
     }.bind(this.$root)
 
-    // window.addEventListener('user-sign-in', this.changeUser)
-    // window.addEventListener('user-exit', this.changeUser)
-
     this.$root.$on('progress-on', this.setProgressOn)
     this.$root.$on('progress-off', this.setProgressOff)
     this.$root.$on('content-ready', this.setContentReady)
@@ -136,48 +147,6 @@ export default {
 
     this.$root.$off('resize', this.resizeWindow)
     window.onresize = null
-    // window.removeEventListener('user-sign-in', this.changeUser)
-    // window.removeEventListener('user-exit', this.changeUser)
   }
 }
 </script>
-
-<style>
-
-body {
-  overflow: hidden;
-}
-
-.v-data-table__mobile-row__cell {
-  text-align: left !important;
-}
-
-p {
-  font-family: Arial;
-  font-size: 14px;
-  margin-bottom: 8px;
-}
-
-.covenant-name, .active-covenant-name {
-  font-size: 13px;
-  font-family: Arial;
-}
-
-.active-covenant-name {
-  color: #900;
-  font-weight: bold;
-}
-
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #20731C;
-}
-::-webkit-scrollbar-thumb {
-  background: #4CAF50;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #72BF44;
-}
-</style>

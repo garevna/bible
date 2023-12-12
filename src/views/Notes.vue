@@ -1,127 +1,144 @@
 <template>
-  <v-card flat class="transparent mx-auto" max-width="990" height="100%">
-    <!-- <v-toolbar flat class="transparent">
-      <v-toolbar-title>
-        <strong class="mr-4" style="color: #090">{{ title }}</strong>
-      </v-toolbar-title> -->
-      <!-- <h4 class="my-5 mx-auto" style="color: #090">{{ title }}</h4> -->
+  <v-container
+    style="max-width: 960px; padding: 16px 0 0 !important"
+  >
+    <v-app-bar flat class="transparent my-8 my-md-4">
+      <Selector
+        :selectedDate.sync="date"
+        :selectedKeyword.sync="keyword"
+        :selectedTopic.sync="topic"
+        :title="title"
+      />
+    </v-app-bar>
 
-      <!-- <v-spacer />
-      <DatePicker :date.sync="date" :availableDates="availableDates" /> -->
+    <v-row justify="end" class="mx-4">
+      <ControlsView :showControls.sync="showControls" />
+    </v-row>
 
-    <!-- <DatePicker :date.sync="date" :availableDates="availableDates" /> -->
-
-    <!-- </v-toolbar> -->
-
-    <Selector
-      :selectedDate.sync="date"
-      :selectedKeyword.sync="keyword"
-      :selectedTopic.sync="topic"
+    <AddNote
+      :fab="true"
+      icon="$addNote"
+      :note.sync="newNote"
+      :topic="topic"
+      :keyword="keyword"
     />
 
-    <v-data-table
-      v-if="ready"
-      :items="notes"
-      :headers="headers"
-      item-key="_id"
-      :items-per-page="-1"
-      show-expand
-      single-expand
-      :expanded.sync="expanded"
-      hide-default-footer
-    />
+    <v-sheet
+      :key="ready"
+      class="transparent overflow-y-auto my-12"
+      :style="sheetStyle"
+    >
+        <v-card flat class="transparent pa-4" v-if="!date && !keyword && !topic._id">
+          <v-icon color="warning" class="mr-2">
+            $warning
+          </v-icon>
+          <small style="color: #aaa">
+            Умови пошуку не визначені. Виберіть один із критеріїв вище.
+          </small>
+        </v-card>
 
-    <v-bottom-navigation absolute flat class="transparent" height="48">
-      <v-btn outlined @click="add">
-        <v-icon>$add</v-icon>
-        Додати замітку
-      </v-btn>
-    </v-bottom-navigation>
-  </v-card>
+        <v-card flat class="transparent overflow-auto" v-else>
+          <Note
+            v-for="note of notes"
+            :key="note._id"
+            :note="note"
+            :edited.sync="edited"
+            :removed.sync="removed"
+            :expanded.sync="expanded"
+            :static="true"
+            :showControls="showControls"
+          />
+        </v-card>
+    </v-sheet>
+  </v-container>
 </template>
 
 <script>
 
 import { footerMenu } from '@/configs'
 
-import Selector from '@/components/Selector.vue'
+import { getSelector } from '@/helpers'
 
-// import DatePicker from '@/components/DatePicker.vue'
+const { getCommonText } = require('@/configs/language').default
 
 export default {
   name: 'Notes',
 
   components: {
-    Selector
-    // DatePicker
+    ControlsView: () => import('@/components/ControlsView.vue'),
+    Note: () => import('@/components/Note.vue'),
+    AddNote: () => import('@/components/AddNote.vue'),
+    Selector: () => import('@/components/Selector.vue')
   },
 
   data: () => ({
-    sourceData: [],
+    ready: 0,
+    showControls: true,
     title: footerMenu[1].text,
-    // notes: [],
-    date: new Date().toISOString().slice(0, 10),
-    availableDates: [],
-    keyword: '',
-    topic: '',
-    ready: false,
-    expanded: [],
-    headers: [
-      { text: '', align: 'start', sortable: false, value: 'text' },
-      { text: '', value: 'data-table-expand' }
-    ]
+    noDataText: getCommonText('ua', 'noData'),
+    notes: [],
+    date: null,
+    keyword: null,
+    topic: { _id: null, title: '' },
+    edited: null,
+    expanded: null,
+    removed: null,
+    newNote: null
   }),
 
+  computed: {
+    sheetStyle () {
+      return `height: calc(100vh - ${this.viewportWidth < 600 ? 420 : 300})`
+    }
+  },
+
   watch: {
-    ready: {
-      immediate: true,
-      handler (val) {
-        !val && this.getNotes()
-      }
-    },
-
     date (val) {
-      this.ready = !val
+      this.getNotes()
     },
 
-    topic (val) {
-      this.ready = !val
+    topic (obj) {
+      this.getNotes()
     },
 
     keyword (val) {
-      this.ready = !val
-      // console.log('KEYWORD: ', val)
-      // val && this.getNotes()
+      this.getNotes()
+    },
+
+    removed (value) {
+      const index = this.notes.findIndex(note => note._id === value)
+      index !== -1 && this.notes.splice(index, 1) && ++this.ready
+    },
+
+    newNote (data) {
+      console.log('NEW NOTE:\n', data)
+      if (!data) return
+      const index = this.notes.findIndex(note => note._id === data._id)
+      index === -1
+        ? this.notes.push(JSON.parse(JSON.stringify(data)))
+        : this.notes.splice(index, 1, data)
+      Object.assign(this, { newNote: null })
     }
   },
 
   methods: {
     async getNotes () {
-      // this.ready = false
-      console.log({ date: this.date, keyword: this.keyword, topic: this.topic })
-      this.notes = await this.$root.contentController.getNoteList({ date: this.date, keyword: this.keyword, topic: this.topic })
-      console.log('NOTES:\n', this.notes)
-      this.$nextTick(() => { this.ready = true })
-      // this.topics = await this.$root.contentController.getTopics()
-      // console.log('TOPICS:\n', this.topics)
+      if (!this.date && !this.keyword && !this.topic._id) {
+        return console.warn('Filter conditions are not defined')
+      }
+
+      this.notes = await this.$root.contentController
+        .getNotes({ date: this.date, keyword: this.keyword, topic: this.topic._id })
     },
 
-    add (item) {
-      console.log(item)
+    async getTopics (item) {
+      this.topics = await this.$root.contentController.getTopics(item.topics)
     }
   },
 
-  async created () {
-    const keys = await this.$root.contentController.getAllKeys('notes', 'date')
-    console.log('AVAILABLE KEYS:\n', keys)
-
-    this.availableDates = keys.status === 200
-      ? keys.result.map(key => new Date(key - 0).toISOString().slice(0, 10))
-      : []
-
-    // await this.getNotes({ date: this.date, keyword: this.keyword, topic: this.topic })
-    // console.log(this.notes)
-    // this.ready = true
+  created () {
+    const { date, keyword, topic } = getSelector()
+    Object.assign(this, { date, keyword, topic })
   }
 }
 </script>

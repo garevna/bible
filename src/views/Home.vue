@@ -11,7 +11,7 @@
 
       <v-icon
         large
-        color="secondary"
+        color="buttons"
         class="mr-2"
         @click.stop="switchCovenant()"
       >
@@ -28,7 +28,7 @@
       </v-btn>
     </v-row>
 
-    <v-card flat class="transparent" v-if="bookIndex === undefined">
+    <v-card flat class="transparent" v-if="showBooks">
       <v-navigation-drawer
           permanent
           class="transparent"
@@ -42,8 +42,7 @@
             <p
               v-for="(item, num) in books[covenantIndex]"
               :key="num"
-              class="mb-1"
-              style="cursor: pointer"
+              class="book-menu-item mb-1"
               @click.stop="selectBook(num)"
             >
               {{ item.title }}
@@ -80,31 +79,33 @@ export default {
   data: () => ({
     covenantIndex: 0,
     bookIndex: undefined,
-    bookTitle: '',
     ready: false,
     books: [],
     showMenu: false,
-    showBooks: false,
     menuItems: [],
     selectedMenuItem: null
   }),
 
   computed: {
     chapters () {
-      return this.books[this.covenantIndex][this.bookIndex].chapters
-    }
-  },
+      return this.showBooks ? [] : this.books[this.covenantIndex][this.bookIndex].chapters
+    },
 
-  watch: {
-    bookIndex (val) {
-      if (val === undefined) return
-      this.bookTitle = this.books[this.covenantIndex][val].title
+    showBooks () {
+      return typeof this.bookIndex !== 'number'
+    },
+
+    bookTitle () {
+      return this.ready &&
+        !this.showBooks &&
+        this.books[this.covenantIndex][this.bookIndex].title
     }
   },
 
   methods: {
-    getBookList (index) {
-      const promises = [0, 1].map(index => this.$root.contentController.getBookNames(index))
+    getBookList () {
+      this.ready = false
+      const promises = [0, 1].map(index => this.$root.contentController.getBookNames(this.covenantIndex))
 
       Promise.all(promises)
         .then(responses => {
@@ -122,7 +123,8 @@ export default {
 
     selectBook (bookNum) {
       this.bookIndex = bookNum
-      this.bookTitle = this.books[this.covenantIndex][this.bookIndex].title
+      localStorage.setItem('book-index', this.bookIndex)
+      localStorage.setItem('book-title', this.bookTitle)
     },
 
     async switchCovenant () {
@@ -132,7 +134,6 @@ export default {
       localStorage.setItem('covenant', this.covenantIndex)
       await this.getBookList()
       this.ready = true
-      this.showBooks = true
       this.showMenu = false
     },
 
@@ -142,15 +143,36 @@ export default {
   },
 
   async created () {
-    this.covenantIndex = localStorage.getItem('covenant') - 0 || 0
+    const verseId = localStorage.getItem('verse')
+
+    if (verseId) {
+      [this.covenantIndex, this.bookIndex] = verseId.split('.').map(item => Number(item))
+    } else {
+      [this.covenantIndex, this.bookIndex] = [
+        localStorage.getItem('covenant') - 0 || 0,
+        localStorage.getItem('book-index') - 0
+      ]
+    }
+
     await this.getBookList()
-    this.showBooks = true
-    this.ready = true
+  },
+
+  beforeDestroy () {
+    localStorage.removeItem('verse')
   }
 }
 </script>
 
 <style scoped>
+
+.book-menu-item {
+  cursor: pointer;
+}
+
+.book-menu-item:hover {
+  background: #09b4;
+  color: #09b;
+}
 
 .clicked-item {
   padding: 4px 16px;
@@ -188,21 +210,4 @@ export default {
   color: #555;
 }
 
-</style>
-
-<style>
-/* .v-pagination__item {
-  box-shadow: none !important;
-  border: solid 1px #ddd;
-  font-size: 13px;
-}
-
-.v-pagination__navigation {
-  box-shadow: none !important;
-} */
-
-.mdi-toggle-switch::before, .mdi-toggle-switch-off::before {
-  font-size: 48px !important;
-  color: #09b;
-}
 </style>

@@ -24,8 +24,9 @@ export const getVersesByRefs = async (refs) => {
   return new Promise(resolve => {
     const promises = refs.map(ref => func(ref))
     Promise.all(promises)
-      .then(responses => {
-        const bookRefs = Array.from(new Set(responses.map(response => response.book)))
+      .then(res => {
+        const responses = res.filter(item => Boolean(item))
+        const bookRefs = Array.from(new Set(responses.map(response => response?.book)))
         const promises = bookRefs.map(bookRef => new Promise(resolve => Object.assign(bookStore.get(bookRef), {
           onsuccess: event => resolve(event.target.result),
           onerror: event => resolve(null)

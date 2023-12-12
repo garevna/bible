@@ -8,6 +8,8 @@ export async function saveFirebaseDocument (collectionName, data, id) {
   if (!collectionRef) return
 
   const docRef = doc(collectionRef, data._id || id || Date.now().toString())
-  const result = await setDoc(docRef, data)
+
+  const result = await setDoc(docRef, data).catch(error => console.warn('Error writing document\n', error))
+
   return result
 }

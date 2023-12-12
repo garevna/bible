@@ -1,0 +1,134 @@
+body {
+  overflow: hidden;
+}
+
+.link-to-verse {
+  display: inline-block;
+  cursor: pointer;
+  font-weight: bold;
+  color: #09b;
+}
+
+.link-to-verse::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background-color: #09b9;
+  transform-origin: bottom right;
+  transition: transform 0.25s ease-out;
+}
+
+.link-to-verse:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+.v-expansion-panel-header {
+  line-height: 1.2 !important;
+}
+
+main {
+  padding: 88px 0 64px !important;
+}
+
+.v-item-group.v-bottom-navigation {
+  box-shadow: none !important;
+  border-bottom: solid 1px #ddd !important;
+}
+
+.mdi-toggle-switch::before, .mdi-toggle-switch-off::before {
+  font-size: 48px !important;
+}
+
+.v-data-table__wrapper {
+  overflow-x: hidden !important;
+}
+
+.v-data-table > .v-data-table__wrapper .v-data-table__mobile-table-row {
+  padding: 12px 0;
+  border-radius: 4px;
+  border: solid 1px #ddd;
+}
+
+.v-toolbar__content {
+  padding: 4px !important;
+}
+
+.v-application--is-ltr .v-toolbar__content > .v-btn.v-btn--icon:last-child,
+.v-application--is-ltr .v-toolbar__extension > .v-btn.v-btn--icon:last-child {
+  margin-top: -16px !important;
+}
+
+
+.v-data-table--mobile > .v-data-table__wrapper tbody {
+  width: 100vw;
+  overflow-x: hidden;
+}
+
+.v-data-table > .v-data-table__wrapper > table > tbody > tr > td {
+  padding: 4px;
+}
+
+.v-data-table__mobile-row__cell {
+  text-align: left !important;
+}
+
+.v-expansion-panel-content__wrap {
+  padding: 0 !important;
+}
+
+.theme--light.v-expansion-panels .v-expansion-panel {
+  background: transparent !important;
+}
+
+.v-pagination__item {
+  box-shadow: none !important;
+  border: solid 1px #ddd;
+  font-size: 13px;
+}
+
+.v-pagination__navigation {
+  box-shadow: none !important;
+}
+
+p {
+  /* font-family: Arial; */
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.covenant-name, .active-covenant-name {
+  font-size: 13px;
+  /* font-family: Arial; */
+}
+
+.active-covenant-name {
+  color: #900;
+  font-weight: bold;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #20731C;
+}
+::-webkit-scrollbar-thumb {
+  background: #4CAF50;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #72BF44;
+}
+
+.expanded-item-header {
+  color: #09b;
+  font-weight: bold;
+}
+
+.v-date-picker-title__date {
+  font-size: 18px;
+}

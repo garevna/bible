@@ -1,9 +1,13 @@
 <template>
   <v-card flat class="transparent mx-auto" max-width="960" v-if="ready">
-    <v-icon large color="primary">
-      mdi-book-open-variant
-    </v-icon>
-    <h4 style="display: inline-block" class="ml-2">{{ bookTitle }}</h4>
+    <div class="px-2">
+      <v-icon large color="secondary">
+        mdi-book-open-variant
+      </v-icon>
+      <h3 style="display: inline-block; color: #09b;" class="ml-2">
+        {{ bookTitle }}
+      </h3>
+    </div>
 
     <v-pagination
       v-model="chapter"
@@ -23,6 +27,8 @@
 
 import Chapter from '@/components/Chapter.vue'
 
+import { replaceChapter } from '@/helpers'
+
 export default {
   name: 'Book',
 
@@ -35,30 +41,7 @@ export default {
   data: () => ({
     chapter: 1,
     chapterContent: null,
-    lineRef: '',
-    expanded: [],
-    ready: false,
-    menuItems: [
-      { text: 'Додати замітку або коментар', value: 'notes' },
-      { text: 'Вказати ключові слова для системи пошуку', value: 'keywords' },
-      { text: 'Пов\'язати з певною темою', value: 'topics' }
-    ],
-    showMenu: false,
-    option: null,
-    event: {},
-    dialog: false,
-    keyword: '',
-    noteId: '',
-    headers: [
-      { text: '', align: 'start', justify: 'end', sortable: false, value: 'line', width: '32px' },
-      { text: '', align: 'start', justify: 'start', sortable: false, value: 'text' },
-      // { text: '', sortable: false, value: 'actions', width: 180 },
-      { text: '', value: 'data-table-expand' }
-    ],
-    keywordClicked: false,
-    topicClicked: false,
-    noteClicked: false,
-    refreshLineDetails: false
+    ready: false
   }),
 
   watch: {
@@ -67,76 +50,22 @@ export default {
     },
 
     chapter (val) {
-      this.getChapterContent()
-    },
-
-    option (val) {
-      console.log('Selected option: ', val)
-      if (this.option === 'keywords') this.dialog = true
-    },
-
-    keyword (val) {
-      console.log('NEW KEYWORD ADDED TO LINE: ', val)
-      this.refreshLineDetails = true
-    }
-  },
-
-  methods: {
-    async getChapterContent () {
-      this.chapterContent = await this.$root.contentController.getBookChapter(this.covenantIndex, this.bookIndex, this.chapter - 1)
-    },
-
-    selectOption (event, item) {
-      this.event = {
-        x: event.clientX,
-        y: event.clientY,
-        show: true
-      }
-      this.showMenu = true
-    },
-
-    addKeyword (ref) {
-      this.lineRef = ref
-      this.dialog = true
-    },
-
-    addNote (ref) {
-      this.lineRef = ref
+      replaceChapter(val - 1)
     }
   },
 
   async created () {
-    await this.getChapterContent()
+    const verse = localStorage.getItem('verse')
+    ;[, , this.chapter = 1] = verse
+      ? verse.split('.').map(item => Number(item) + 1)
+      : [null, null, Number(localStorage.getItem('chapter'))]
+
+    if (!this.chapter) Object.assign(this, { chapter: 1 })
+
     this.ready = true
   }
 }
 </script>
-
-<style>
-
-/* .v-application--is-ltr .v-data-table__mobile-row__cell {
-  text-align: left;
-} */
-
-.v-data-table__mobile-row {
-  display: table-cell;
-  justify-content: start;
-}
-
-.v-data-table > .v-data-table__wrapper > table > tbody > tr > td {
-  padding: 4px;
-}
-
-.v-pagination__item {
-  box-shadow: none !important;
-  border: solid 1px #ddd;
-  font-size: 13px;
-}
-
-.v-pagination__navigation {
-  box-shadow: none !important;
-}
-</style>
 
 <style scoped>
 

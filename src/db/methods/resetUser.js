@@ -14,7 +14,7 @@ export async function resetUser () {
   ;['keywords', 'topics', 'notes', 'highlights']
     .forEach(storeName => clearStore(storeName))
 
-  window.dispatchEvent(new Event('user-exit'))
+  this.$root.$emit('user-changed', null)
 
   this.$root.$emit('progress-off')
 }
