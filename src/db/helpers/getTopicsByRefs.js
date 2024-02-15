@@ -1,25 +1,20 @@
 import { openDB } from './openDB'
 
-export async function getTopicsByRefs (refs) {
-  if (!Array.isArray(refs)) return console.warn('Topic refs are required')
+import { getPromise } from './getPromise'
 
+export const getTopicsByRefs = async (refs) => {
+  if (!refs || !Array.isArray(refs)) return
   const response = await openDB()
   if (response.status !== 200) return response
 
   const { result: db } = response
 
-  const store = db
-    .transaction('topics', 'readonly')
-    .objectStore('topics')
-
-  const result = []
+  const transaction = db.transaction(['topics'], 'readonly')
+  const store = transaction.objectStore('topics')
 
   return new Promise(resolve => {
-    for (const id of refs) {
-      Object.assing(store.get(id), {
-        onsuccess: response => result.push({ status: 200, result: response, error: null }),
-        onerror: event => result.push({ status: 400, result: null, error: event.target.error })
-      })
-    }
+    const promises = refs.map(ref => getPromise(store, ref))
+    Promise.all(promises)
+      .then(res => resolve(res.filter(item => Boolean(item))))
   })
 }

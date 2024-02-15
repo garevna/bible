@@ -1,49 +1,68 @@
 <template>
-  <v-card flat class="transparent mx-auto my-4" max-width="700">
-    <v-card flat class="transparent content-toggle-buttons" max-width="700">
-      <v-btn-toggle v-model="toggle" mandatory>
-        <v-tooltip bottom color="buttons">
-          <template v-slot:activator="{ on, attrs }">
-            <v-btn
-              text
-              color="buttons"
-              v-bind="attrs"
-              v-on="on"
-            >
-              <v-icon color="buttons">
-                $verses
-              </v-icon>
-            </v-btn>
-          </template>
-          <span> Вірші з Біблії </span>
-        </v-tooltip>
+  <v-card flat class="transparent mx-auto my-4" max-width="700" :key="lang">
+    <table width="100%">
+      <tr>
+        <td>
+          <h4 style="color: #09b">{{ keyword?._id || '' }}</h4>
+        </td>
+        <td style="text-align: right">
+          <v-btn-toggle v-model="toggle" mandatory color="buttons">
+            <v-tooltip bottom>
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn
+                  text
+                  color="buttons"
+                  v-bind="attrs"
+                  v-on="on"
+                >
+                  <v-icon color="buttons">
+                    $verses
+                  </v-icon>
+                </v-btn>
+              </template>
+              <span> {{ _keywords.toggleButtonVersesTooltip }} </span>
+            </v-tooltip>
 
-        <v-tooltip bottom color="buttons">
-          <template v-slot:activator="{ on, attrs }">
-            <v-btn
-              text
-              color="buttons"
-              v-bind="attrs"
-              v-on="on"
-            >
-              <v-icon color="buttons">$notes</v-icon>
-            </v-btn>
-          </template>
-          <span> Нотатки </span>
-        </v-tooltip>
-      </v-btn-toggle>
-    </v-card>
+            <span v-if="toggle === 0" class="toggle-button-text">
+              {{ _keywords.toggleButtonVerses }}
+            </span>
+
+            <v-tooltip bottom>
+              <template v-slot:activator="{ on, attrs }">
+                <v-btn
+                  text
+                  color="buttons"
+                  v-bind="attrs"
+                  v-on="on"
+                >
+                  <v-icon color="buttons">$notes</v-icon>
+                </v-btn>
+              </template>
+              <span> {{ _keywords.toggleButtonNotesTooltip }} </span>
+            </v-tooltip>
+
+            <span v-if="toggle === 1"  class="toggle-button-text">
+              {{ _keywords.toggleButtonNotes }}
+            </span>
+          </v-btn-toggle>
+        </td>
+      </tr>
+    </table>
 
     <v-expansion-panels
+      flat
+      focusable
+      popout
       v-model="panel"
       class="transparent mt-4"
+      active-class="expanded-keyword"
       style="height: calc(100vh - 240px); overflow-y: auto"
     >
       <v-expansion-panel
-        v-for="(keyword, num) in keywords"
+        v-for="keyword in keywordList"
         :key="keyword._id"
       >
-        <v-expansion-panel-header :style="getHeaderStyle(num)">
+        <v-expansion-panel-header>
           <tr>
             <td width="48">
               <v-icon
@@ -61,22 +80,44 @@
         </v-expansion-panel-header>
 
         <v-expansion-panel-content>
-          <v-card flat class="transparent pa-4" :key="contentReady">
-              <div v-for="(item, index) in content" :key="index" style="text-align: justify">
-                {{ item.text }}
-                <small
-                  v-if="toggle === 0"
-                  class="link-to-verse"
-                  @click="gotoVerse(item._id)"
-                >
-                  ({{ item.book }} {{ item.chapter }}:{{ item.line }})
-                </small>
-                <v-divider class="my-2" />
+          <v-card flat class="transparent pa-4">
+              <div
+                v-for="(item, index) in content"
+                :key="index"
+                style="text-align: justify; border: solid 1px #ddd; border-radius: 4px; padding: 4px 8px;"
+              >
+                <v-chip small v-if="toggle" class="mb-2">{{ new Date(item._id - 0).toISOString().slice(0, 10) }}</v-chip>
+                <p
+                  v-html="item.text || item.html"
+                  @click="!toggle && $root.$gotoVerse(item._id)"
+                />
+                <div style="text-align: right" v-if="toggle">
+                  <v-chip small v-for="keyword in item.keywords" :key="keyword">#{{ keyword }}</v-chip>
+                </div>
               </div>
           </v-card>
         </v-expansion-panel-content>
       </v-expansion-panel>
     </v-expansion-panels>
+
+    <!-- <v-bottom-navigation
+      fixed
+      v-model="toggle"
+      class="transparent mb-12"
+      height="48"
+    >
+      <v-btn>
+        <span>{{ _keywords.toggleButtonVerses }}</span>
+
+        <v-icon>$verses</v-icon>
+      </v-btn>
+
+      <v-btn>
+        <span>{{ _keywords.toggleButtonNotes }}</span>
+
+        <v-icon>$notes</v-icon>
+      </v-btn>
+    </v-bottom-navigation> -->
   </v-card>
 </template>
 
@@ -84,25 +125,33 @@
 
 import '@/sass/delete.css'
 
-import { footerMenu } from '@/configs'
-import { gotoVerse } from '@/helpers'
+import { mapState, mapGetters, mapActions } from 'vuex'
 
 export default {
   name: 'Keywords',
 
   data: () => ({
-    title: footerMenu[2].text,
-    ready: 0,
     toggle: 0,
-    panel: undefined,
-    keywords: [],
-    content: [],
-    contentReady: 0
+    panel: undefined
   }),
 
   computed: {
-    methodName () {
-      return ['getVerses', 'getNotes'][this.toggle]
+    ...mapState(['lang']),
+    ...mapGetters('language', ['_keywords']),
+    ...mapState('keywords', ['keywordList']),
+    ...mapState('content', ['listOfVerses']),
+    ...mapState('notes', ['notes']),
+
+    content () {
+      return [this.listOfVerses, this.notes][this.toggle]
+    },
+
+    method () {
+      return this[['getListOfVerses', 'getNotes'][this.toggle]]
+    },
+
+    keyword () {
+      return this.panel !== undefined ? this.keywordList[this.panel] : null
     },
 
     toggleButtonStyle () {
@@ -125,48 +174,56 @@ export default {
   },
 
   methods: {
-    gotoVerse,
+    ...mapActions('keywords', ['getFullList']),
+    ...mapActions('content', ['getListOfVerses']),
+    ...mapActions('notes', ['getNotes']),
 
-    changeContent () {
-      this[this.methodName](this.keywords[this.panel])
-        .then(response => Object.assign(this, {
-          content: response,
-          contentReady: ++this.contentReady
-        }))
-    },
+    async changeContent () {
+      if (!this.keyword) return
 
-    async getVerses (keyword) {
-      const verses = await this.$root.contentController.getVersesByRefs(keyword.refs)
-      return verses.map(verse => ({
-        _id: verse._id,
-        book: verse.bookName,
-        chapter: verse.chapterNum,
-        line: verse.line + 1,
-        text: verse.text
-      }))
-    },
+      const args = this.toggle
+        ? { keyword: this.keyword._id }
+        : this.keyword.refs
 
-    async getNotes (keyword) {
-      const notes = await this.$root.contentController.getNotes({ keyword: keyword._id })
-      return notes
-    },
-
-    getHeaderStyle (index) {
-      return this.panel === index
-        ? { color: '#09b', fontWeight: 'bold' }
-        : { color: '#777', fontWeight: 'normal' }
+      await this.method(args)
     }
   },
 
   async created () {
-    this.keywords = await this.$root.contentController.getKeywords()
-    ++this.ready
+    await this.getFullList()
   }
 }
 </script>
 
 <style>
-.content-toggle-buttons {
-  text-align: right;
+
+.v-expansion-panel-header--active {
+  background: #09b;
+  color: #fff !important;
+  font-weight: bold;
 }
+
+.v-expansion-panel-header--active button::before {
+  color: #fff !important;
+}
+
+.v-expansion-panel-header--active .mdi-chevron-down::before {
+  color: #fff !important;
+}
+
+.content-toggle-buttons {
+  text-align: justify;
+}
+
+.toggle-button-text {
+  padding: 8px;
+  color: inherit;
+  font-weight: bold;
+}
+
+/* .v-btn-toggle > .v-btn.v-btn--active .toggle-button-text {
+  padding: 8px;
+  color: inherit;
+  font-weight: bold;
+} */
 </style>

@@ -1,46 +1,27 @@
 <template>
-  <v-app>
+  <v-app :key="lang">
     <Header
-      :signIn.sync="login"
+      :signIn.sync="enter"
       :signUp.sync="register"
-      :page="page"
     />
 
     <v-progress-linear
       :active="progress"
       :indeterminate="progress"
       fixed
-      style="top: 56px; z-index: 55"
+      style="top: 64px; z-index: 55"
       color="warning"
     />
 
     <v-main class="homefone overflow-y-auto">
-      <SignIn
-        v-if="login"
-        :dialog.sync="login"
-        lang="ua"
-      />
+      <SignIn :dialog.sync="enter" />
+      <SignUp :dialog.sync="register" />
 
-      <SignUp
-        v-if="register"
-        :dialog.sync="register"
-        lang="ua"
-      />
-
-        <component v-if="contentReady" :is="currentView" />
+      <component :is="currentView" />
     </v-main>
 
-    <Footer :selected.sync="page" />
+    <Footer />
 
-    <v-snackbar
-      v-model="snackbar"
-      :timeout="8000"
-      color="warning"
-      bottom
-      right
-    >
-      Зареєструйтеся або увійдіть у систему, щоб мати можливість зберігати свої власні налаштування, нотатки, ключові слова та виділяти фрагменти текстів кольоровими маркерами
-    </v-snackbar>
   </v-app>
 </template>
 
@@ -51,9 +32,7 @@ import '@/sass/main.css'
 import Header from '@/components/Header.vue'
 import Footer from '@/components/Footer.vue'
 
-import { footerMenu } from '@/configs'
-
-const pages = footerMenu.map(item => ({ value: item.value, component: item.component }))
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
 
 export default {
   name: 'App',
@@ -61,8 +40,8 @@ export default {
   components: {
     Header,
     Footer,
-    SignIn: () => import('@/components/SignIn.vue'),
-    SignUp: () => import('@/components/SignUp.vue'),
+    SignIn: () => import('@/components/user/SignIn.vue'),
+    SignUp: () => import('@/components/user/SignUp.vue'),
     Home: () => import('@/views/Home.vue'),
     Keywords: () => import('@/views/Keywords.vue'),
     Topics: () => import('@/views/Topics.vue'),
@@ -72,80 +51,38 @@ export default {
   },
 
   data: () => ({
-    login: false,
-    register: false,
-    contentReady: false,
-    progress: false,
-    covenantIndex: undefined,
-    books: [],
-    bookIndex: 0,
-    bookTitle: '',
-    selectedMenuItem: null,
-    event: null,
-    pages,
-    page: null
+    enter: false,
+    register: false
   }),
 
   computed: {
-    currentView () {
-      return this.pages.find(item => item.value === this.page)?.component || 'Home'
-    },
+    ...mapGetters(['currentView']),
+    ...mapState(['viewportWidth', 'progress']),
+    ...mapState('user', ['lang']),
+    ...mapGetters('user', ['signed'])
+  },
 
-    snackbar: {
-      get () {
-        return !this.$root.user
-      },
-      set (val) {
-
-      }
+  watch: {
+    signed (val) {
+      if (!val) this.signOut()
     }
   },
 
   methods: {
-    setProgressOn () {
-      this.progress = true
-    },
+    ...mapMutations(['changeViewport', 'setProgress']),
+    ...mapActions(['init']),
+    ...mapActions('user', ['signIn', 'signOut'])
+  },
 
-    setProgressOff () {
-      this.progress = false
-    },
-
-    setContentReady () {
-      if (!this.$root.user) {
-        console.warn('Sign in please to configure your own environment.')
-        this.contentReady = true
-      } else {
-        const { read } = require('@/firebase').default
-        read().then(() => { this.contentReady = true })
-      }
-    },
-
-    resizeWindow () {
-      Object.assign(this.$root, {
-        viewportWidth: window.innerWidth,
-        viewportHeight: window.innerHeight
-      })
-    }
+  async created () {
+    await this.init()
   },
 
   mounted () {
-    window.onresize = function (event) {
-      this.$emit('resize')
-    }.bind(this.$root)
-
-    this.$root.$on('progress-on', this.setProgressOn)
-    this.$root.$on('progress-off', this.setProgressOff)
-    this.$root.$on('content-ready', this.setContentReady)
-
-    this.$root.$on('resize', this.resizeWindow)
+    window.onresize = this.changeViewport
   },
 
   beforeDestroy () {
-    this.$root.$off('progress-on', this.setProgressOn)
-    this.$root.$off('progress-off', this.setProgressOff)
-    this.$root.$off('content-ready', this.setContentReady)
-
-    this.$root.$off('resize', this.resizeWindow)
     window.onresize = null
   }
 }

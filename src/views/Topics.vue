@@ -1,12 +1,12 @@
 <template>
-  <v-card flat class="transparent mx-auto my-7" max-width="600" v-if="ready">
+  <v-card flat class="transparent mx-auto my-7" max-width="600" :key="lang">
     <v-toolbar flat class="transparent">
       <v-spacer />
-      <TopicList
+      <AddTopicToList
         :selectedTopic.sync="newTopic"
         :fab="true"
         icon="$addTopic"
-        tooltipText="Додати тему"
+        tooltipText="_topic.tooltipText"
       />
     </v-toolbar>
 
@@ -14,30 +14,22 @@
 
       <v-data-table
         :headers="headers"
-        :items="topics"
+        :items="topicList || []"
         item-key="_id"
         class="transparent"
         hide-default-header
         hide-default-footer
         calculate-widths
         :items-per-page="-1"
-        :no-data-text="noDataText"
+        :no-data-text="_common.noData"
       >
-
-        <!-- <template v-slot:top>
-          <v-divider />
-
-          <v-divider />
-        </template> -->
-
         <template v-slot:item.title="{ item }">
           <table width="100%">
             <tr>
               <td width="48">
                 <v-icon
-                  color="delete"
-                  @click.stop="deleteTopic(item)"
-                  class="mr-4"
+                  class="delete--text delete-icon mr-4"
+                  @click.stop="deleteTopic(item._id)"
                 >
                   $delete
                 </v-icon>
@@ -45,7 +37,8 @@
               <td>
                 <span
                   v-if="editMode !== item._id"
-                  @click="showTopic(item)"
+                  @click="gotoTopic(item)"
+                  style="cursor: pointer"
                 >
                   {{ item.title }}
                 </span>
@@ -55,8 +48,10 @@
                   outlined
                   hide-details
                   dense
+                  prepend-icon="$reset"
                   append-icon="$save"
                   @click:append="saveTopic(item)"
+                  @click:prepend="editMode = undefined"
                 />
               </td>
               <td width="48">
@@ -79,75 +74,59 @@
 
 <script>
 
+import '@/sass/delete.css'
+
 import { footerMenu } from '@/configs'
-const { deleteDocument } = require('@/firebase').default
-const { getCommonText } = require('@/configs/language').default
+
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
 
 export default {
   name: 'Topics',
 
   components: {
-    TopicList: () => import('@/components/TopicList.vue')
+    AddTopicToList: () => import('@/components/topics/AddTopicToList.vue')
   },
 
   data: () => ({
-    noDataText: getCommonText('ua', 'noData'),
     title: footerMenu[3].text,
-    ready: false,
     editMode: null,
-    topics: [],
     headers: [
       // { text: '', value: 'actions', sortable: false },
       { text: '', value: 'title', width: '320' }
     ],
-    newTopic: null
+    topic: null
   }),
 
+  computed: {
+    ...mapState(['lang']),
+    ...mapGetters('language', ['_common', '_topic']),
+    ...mapState('topics', ['topicList', 'newTopic'])
+  },
+
   watch: {
-    topics: {
-      deep: true,
-      handler (data) {
-        console.log('TOPIC LIST UPDATED:\n', data.map(item => `${item.title}\n`))
-      }
-    },
     newTopic (data) {
       data && data._id && this.add()
     }
   },
 
   methods: {
-    showTopic (topic) {
-      localStorage.setItem('page', 'topic')
-      localStorage.setItem('topic', topic._id)
-      this.$root.$emit('page-changed')
-    },
-
-    async deleteTopic (topic) {
-      const index = this.topics.findIndex(item => item._id === topic._id)
-      await deleteDocument('topics', topic._id)
-      index !== -1 && this.topics.splice(index, 1)
-    },
+    ...mapMutations('topics', ['setSelectedTopic']),
+    ...mapActions('topics', ['getTopics', 'putTopic', 'deleteTopic', 'gotoTopic']),
 
     async saveTopic (topic) {
-      await this.$root.contentController.putTopic(topic)
+      await this.putTopic(topic)
       this.editMode = null
     },
 
-    async getTopics () {
-      this.ready = false
-      this.topics = await this.$root.contentController.getTopics()
-      this.$nextTick(() => { this.ready = true })
-    },
-
     async add () {
-      if (!this.newTopic._id) return
-      const found = this.topics.find(topic => topic._id === this.newTopic._id)
+      const found = this.list.find(topic => topic._id === this.newTopic._id)
       !found && this.topics.push(this.newTopic)
     }
   },
 
-  mounted () {
-    this.getTopics()
+  async mounted () {
+    await this.getTopics()
+    console.log(this.topicList)
   }
 }
 </script>

@@ -5,43 +5,41 @@
     :color="color"
     :small="small"
   >
-      <v-icon
-        :small="small"
-        :color="color"
-        class="mx-2"
-      >
-        {{ iconLocal }}
-      </v-icon>
+    <span v-if="dir === 'next'">
       {{ text }}
+    </span>
+    <v-icon
+      :small="small"
+      :color="color"
+      class="mx-2"
+    >
+      {{ iconLocal }}
+    </v-icon>
+    <span v-if="dir === 'back'">
+      {{ text }}
+    </span>
   </v-btn>
 </template>
 
 <script>
 
-const { getCommonText } = require('@/configs/language').default
+import { mapGetters } from 'vuex'
+
 const icons = {
   back: '$back',
   next: '$next'
-}
-const text = {
-  back: 'buttonBack',
-  next: 'buttonNext'
 }
 
 export default {
   name: 'NavigationButton',
 
   props: {
-    lang: {
-      type: String,
-      default: 'ua'
-    },
     icon: {
       type: String
     },
     color: {
       type: String,
-      default: 'primary'
+      default: 'buttons'
     },
     small: {
       type: Boolean,
@@ -49,7 +47,7 @@ export default {
     },
     step: {
       type: Number,
-      default: 2
+      default: 1
     },
     dir: {
       type: String,
@@ -58,12 +56,14 @@ export default {
   },
 
   computed: {
+    ...mapGetters('language', ['_common']),
+
     iconLocal () {
       return this.icon || icons[this.dir]
     },
 
     text () {
-      return getCommonText(this.lang, text[this.dir])
+      return this._common[this.dir === 'back' ? 'buttonBack' : 'buttonNext']
     }
   },
 

@@ -1,1 +1,1 @@
-export const dbName = 'bible-ukr'
+export const dbName = 'bible'

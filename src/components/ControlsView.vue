@@ -1,5 +1,5 @@
 <template>
-  <v-tooltip bottom color="secondary">
+  <v-tooltip bottom>
     <template v-slot:activator="{ on, attrs }">
       <v-icon
         color="secondary"
@@ -10,11 +10,13 @@
         {{ show ? '$hide' : '$show' }}
       </v-icon>
     </template>
-    <span> {{ show ? 'Приховати елементи управління' : 'Показати елементи управління' }} </span>
+    <span> {{ show ? _showControls.hide : _showControls.show }} </span>
   </v-tooltip>
 </template>
 
 <script>
+
+import { mapGetters } from 'vuex'
 
 export default {
   name: 'ControlsView',
@@ -27,6 +29,7 @@ export default {
   },
 
   computed: {
+    ...mapGetters('language', ['_showControls']),
     show: {
       get () {
         return this.showControls

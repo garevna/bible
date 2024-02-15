@@ -4,32 +4,33 @@
     v-bind="dragOptions"
     :move="checkMove"
     id="container"
-    @end="endDrag"
+    @end="endDrag($event)"
   >
     <div
       v-for="element in elements"
       :key="element._id"
       class="draggable-item"
       :id="element.type + '_' + element._id"
+      @end="endDrag(element)"
     >
       <v-row v-if="show" class="my-1">
-        <v-tooltip bottom color="buttons">
+        <v-tooltip bottom>
           <template v-slot:activator="{ on, attrs }">
             <v-icon color="buttons" v-bind="attrs" v-on="on">
               $drag
             </v-icon>
           </template>
-          <span> Перетягування </span>
+          <span> {{ _nestedDraggable.dragTooltip }} </span>
         </v-tooltip>
 
         <v-spacer />
 
-        <EditNote
+        <DialogToUpdateNote
           v-if="element.type === 'note'"
           :note.sync="element"
           icon="$editNote"
           :small="false"
-          tooltipText="Редагувати нотатку"
+          :tooltipText="_nestedDraggable.editNoteTooltip"
         />
 
         <v-tooltip
@@ -48,32 +49,27 @@
               {{ removeIcon }}
             </v-icon>
           </template>
-          <span> Прибрати з нотатки </span>
+          <span> {{ _nestedDraggable.removeFromNoteTooltip }} </span>
         </v-tooltip>
-
-        <!-- <small v-else class="link-to-verse" @click="gotoVerse(element._id)">
-          {{ element.link }}
-        </small> -->
       </v-row>
 
       <p
-        v-html="element.text"
-        @click="element.type !== 'note' && gotoVerse(element._id)"
+        v-html="element.text || element.html"
+        @click="element.type === 'verse' ? $root.$gotoVerse(element._id) : null"
       />
 
       <nested-draggable
-        :key="ready"
         v-if="element.type === 'note'"
         class="ml-3 ml-sm-5 ml-md-12"
         :elements="element.verses || []"
         :id="element.type + '.' + element._id"
         :show="show"
         :removed.sync="nestedRemoved"
-        @end="endDrag"
+        @end="endDrag(element)"
       />
 
       <v-row v-if="show && element.type === 'note'" class="my-2 px-2">
-        <v-tooltip bottom color="warning">
+        <v-tooltip bottom>
           <template v-slot:activator="{ on, attrs }">
             <v-icon
               color="delete"
@@ -85,7 +81,7 @@
               {{ removeIcon }}
             </v-icon>
           </template>
-          <span> Прибрати з теми </span>
+          <span> {{ _nestedDraggable.removeFromTopicTooltip }} </span>
         </v-tooltip>
 
         <v-spacer />
@@ -96,7 +92,7 @@
           :key="index"
           color="#bbb"
           dark
-          class="my-1"
+          class="my-1 mr-1"
         >
           #{{ keyword }}
         </v-chip>
@@ -112,7 +108,7 @@ import '@/sass/delete.css'
 
 import draggable from 'vuedraggable'
 
-import { gotoVerse } from '@/helpers'
+import { mapGetters, mapActions } from 'vuex'
 
 const valid = {
   verse: ['container', 'note'],
@@ -124,39 +120,24 @@ export default {
 
   components: {
     draggable,
-    EditNote: () => import('@/components/EditNote.vue')
+    DialogToUpdateNote: () => import('@/components/notes/DialogToUpdateNote.vue')
   },
 
   props: {
-    elements: {
-      required: true,
-      type: Array
-    },
-
-    static: {
-      default: false
-    },
-
-    modified: {
-      default: false
-    },
-
-    removed: {
-      required: true
-    },
-
-    show: {
-      default: true
-    }
+    elements: { required: true, type: Array },
+    static: { default: false },
+    modified: { default: false },
+    removed: { required: true },
+    show: { default: true }
   },
 
   data: () => ({
-    ready: 0,
     edit: null,
     nestedRemoved: null
   }),
 
   computed: {
+    ...mapGetters('language', ['_nestedDraggable']),
     dragOptions () {
       return {
         animation: 200,
@@ -182,14 +163,13 @@ export default {
       this.elements[base].refs.removeById(elem._id)
       this.elements[base].verses.removeById(elem._id)
       const { _id, text, refs, keywords, topics } = this.elements[base]
-      this.$root.contentController.putNote({ _id, text, refs, keywords, topics })
+      this.putNote({ _id, text, refs, keywords, topics })
       Object.assign(this, { nestedRemoved: null })
-      ++this.ready
     }
   },
 
   methods: {
-    gotoVerse,
+    ...mapActions('notes', ['putNote']),
 
     checkMove (event) {
       const {
@@ -204,7 +184,7 @@ export default {
       return valid[type].includes(targetType)
     },
 
-    endDrag () {
+    endDrag (item) {
       this.$emit('update:modified', true)
     }
   }

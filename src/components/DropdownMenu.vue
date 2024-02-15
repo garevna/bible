@@ -2,13 +2,14 @@
   <v-menu
     v-model="show"
     :position-x="event.x"
-    :position-y="event.y + 8"
+    :position-y="event.y"
     absolute
     offset-y
   >
     <div class="homefone">
       <div v-for="(menuItem, menuItemIndex) in menuItems" :key="menuItemIndex" class="clicked-item">
-        <span @click.stop="selectItem(menuItem)">{{ menuItem.text }}</span>
+        <img v-if="menuItem.icon" :src="menuItem.icon" height="16" class="mr-1" />
+        <span @click.stop="selectItem(menuItem)">{{ menuItem.text || menuItem }}</span>
       </div>
     </div>
   </v-menu>
@@ -32,15 +33,8 @@ export default {
     }
   },
 
-  watch: {
-    event (value) {
-      console.log('EVENT:\n', value)
-    }
-  },
-
   methods: {
     selectItem (item) {
-      console.log(item)
       this.$emit('update:selected', item.value || item.title || item.text || item)
       this.show = false
     }

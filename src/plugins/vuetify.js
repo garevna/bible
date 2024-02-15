@@ -12,8 +12,10 @@ export default new Vuetify({
       add: 'mdi-plus-box',
       addNote: 'mdi-note-plus',
       addTopic: 'mdi-playlist-plus',
-      back: 'mdi-page-previous',
+      addKeyword: 'mdi-pound-box',
+      back: 'mdi-chevron-left',
       bible: 'mdi-cross',
+      book: 'mdi-book-open-page-variant',
       calendar: 'mdi-calendar-cursor',
       cite: 'mdi-comment-quote-outline',
       close: 'mdi-close',
@@ -53,6 +55,7 @@ export default new Vuetify({
       topics: 'mdi-list-box-outline',
       topic: 'mdi-form-select',
       up: 'mdi-arrow-up',
+      verse: 'mdi-sticker-text-outline',
       verses: 'mdi-book-cross',
       warning: 'mdi-alert'
     }
@@ -64,24 +67,24 @@ export default new Vuetify({
     themes: {
       light: {
         primary: '#4CAF50',
-        secondary: '#09b',
+        secondary: '#0090B0',
         buttons: '#72BF44',
         greentext: '#20731C',
         deepgreen: '#070',
         homefone: '#FAFAFA',
         warning: '#FA0',
         delete: '#900',
-        comment: '#aaa'
+        comment: '#A0A0A0'
       },
       dark: {
         primary: '#4CAF50',
-        secondary: '#09b',
+        secondary: '#0090b0',
         buttons: '#72BF44',
         greentext: '#20731C',
         deepgreen: '#20731C',
         homefone: '#FAFAFA',
         warning: '#FA0',
-        delete: '#900'
+        delete: '#900000'
       }
     }
   }

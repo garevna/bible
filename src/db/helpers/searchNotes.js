@@ -1,6 +1,6 @@
 import { openDB } from './openDB'
 
-export async function searchNotes ({ lineRef, keyword, topic, date }) {
+export async function searchNotes ({ lineRef, keyword, topic, date = null }) {
   const response = await openDB()
   if (response.status !== 200) return response
 
@@ -16,14 +16,13 @@ export async function searchNotes ({ lineRef, keyword, topic, date }) {
       const cursor = event.target.result
       if (cursor) {
         const { refs, topics, keywords, _id } = cursor.value
-        // console.log(cursor.value)
-        // console.log(!lineRef || refs.includes(lineRef), !keyword || keywords.includes(keyword), !topic || topics.includes(topic), !date || (new Date(Number(_id))).toISOString().slice(0, 10) === date)
+        const _date = new Date(Number(_id)).toISOString().slice(0, 10)
 
         ;(!lineRef || refs.includes(lineRef)) &&
           (!keyword || keywords.includes(keyword)) &&
           (!topic || topics.includes(topic)) &&
-          (!date || (new Date(Number(_id))).toISOString().slice(0, 10) === date) &&
-          result.push(cursor.value)
+          (!date || _date === date) &&
+          result.pushUnique(cursor.value)
 
         cursor.continue()
       } else {

@@ -1,5 +1,5 @@
 <template>
-  <v-tooltip top :color="color || 'buttons'">
+  <v-tooltip top>
     <template v-slot:activator="{ on, attrs }">
       <v-fab-transition v-if="fab">
         <v-btn

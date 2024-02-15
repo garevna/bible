@@ -2,6 +2,11 @@ body {
   overflow: hidden;
 }
 
+.v-dialog {
+  background: #FAFAFA !important;
+  padding: 16px !important;
+}
+
 .link-to-verse {
   display: inline-block;
   cursor: pointer;

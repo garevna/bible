@@ -1,20 +1,22 @@
 <template>
   <v-bottom-navigation
-    v-if="userExist"
+    v-if="signed"
     app
     class="primary"
     dark
-    v-model="action"
+    v-model="view"
     fixed
+    active-class="active-menu-item"
   >
     <v-btn
-      v-for="item of items"
+      v-for="item of footerMenu"
       :key="item.value"
       :value="item.value"
       :style="{ display: showItem(item) ? 'inline-flex' : 'none' }"
       @click.stop="setPage(item.value)"
     >
-      <span>{{ item.text }}</span>
+      <!-- <span>{{ item.text }}</span> -->
+      <span>{{ _pages[item.value] }}</span>
       <v-icon>{{ item.icon }}</v-icon>
     </v-btn>
   </v-bottom-navigation>
@@ -22,56 +24,34 @@
 
 <script>
 
-import { footerMenu } from '@/configs'
+import { mapState, mapGetters, mapActions } from 'vuex'
 
 export default {
   name: 'Footer',
 
-  props: ['selected'],
-
   data: () => ({
-    items: footerMenu,
-    action: null,
-    userExist: false
+    view: null
   }),
 
+  computed: {
+    ...mapGetters('language', ['_pages']),
+    ...mapState(['footerMenu', 'page', 'action']),
+    ...mapGetters('user', ['signed'])
+  },
+
   methods: {
-    getPage () {
-      const page = localStorage.getItem('page') || 'bible'
-      this.action = page === 'topic' ? 'topics' : page
-
-      this.$emit('update:selected', page)
-    },
-
-    setPage (page) {
-      localStorage.setItem('page', page)
-      this.$emit('update:selected', page)
-    },
-
-    userChanged (user) {
-      this.userExist = Boolean(this.$root.user)
-      if (!this.userExist) {
-        this.setPage('bible')
-        this.getPage()
-      }
-    },
+    ...mapActions(['setPage']),
 
     showItem (item) {
       return item.value === item.menu && item.value !== this.action
     }
-  },
-
-  mounted () {
-    this.userExist = Boolean(this.$root.user)
-    this.userExist && this.getPage()
-
-    this.$root.$on('page-changed', this.getPage)
-    this.$root.$on('user-changed', this.userChanged)
-  },
-
-  beforeDestroy () {
-    this.$root.$off('page-changed', this.getPage)
-    this.$root.$off('user-changed', this.userChanged)
   }
 }
 </script>
+
+<style scoped>
+
+.active-menu-item {
+  display: none;
+}
+</style>

@@ -1,19 +1,24 @@
 <template>
-  <v-card flat class="transparent mx-auto" max-width="1008" v-if="ready">
+  <v-card
+    flat
+    class="transparent mx-auto"
+    max-width="1008"
+    :key="lang"
+  >
     <v-row align="center" justify="end" class="my-2">
       <v-btn
         text
         @click.stop="resetBook"
         :disabled="!!covenantIndex"
       >
-        <small>{{ $root.contentController.covenantNames[0] }}</small>
+        <small>{{ covenantNames[0] }}</small>
       </v-btn>
 
       <v-icon
         large
         color="buttons"
         class="mr-2"
-        @click.stop="switchCovenant()"
+        @click="switchCovenant()"
       >
         {{ this.covenantIndex ? 'mdi-toggle-switch' : 'mdi-toggle-switch-off' }}
       </v-icon>
@@ -24,141 +29,82 @@
         @click.stop="resetBook"
         :disabled="!covenantIndex"
       >
-        <small>{{ $root.contentController.covenantNames[1] }}</small>
+        <small>{{ covenantNames[1] }}</small>
       </v-btn>
     </v-row>
 
-    <v-card flat class="transparent" v-if="showBooks">
+    <v-card
+      v-if="!showChapter"
+      flat
+      class="transparent"
+    >
       <v-navigation-drawer
-          permanent
-          class="transparent"
-          style="border: 0;"
+        v-if="showBookList"
+        permanent
+        class="transparent"
+        style="border: 0;"
       >
-          <v-card flat class="pa-4 transparent">
-            <h5 class="mb-4">
-              {{ $root.contentController.covenantNames[covenantIndex] }}
-            </h5>
-            <v-divider class="mb-5" />
-            <p
-              v-for="(item, num) in books[covenantIndex]"
-              :key="num"
-              class="book-menu-item mb-1"
-              @click.stop="selectBook(num)"
-            >
-              {{ item.title }}
-              <v-divider class="my-3" v-if="item.div" />
-            </p>
-          </v-card>
+        <v-card flat class="pa-4 transparent">
+          <h5 class="mb-4">
+            {{ covenantNames[covenantIndex] }}
+          </h5>
+          <v-divider class="mb-5" />
+          <p
+            v-for="(book, num) in books[covenantIndex]"
+            :key="num"
+            class="book-menu-item mb-1"
+            @click.stop="selectBook(num)"
+          >
+            <v-icon small color="buttons" class="mr-1">
+              $book
+            </v-icon>
+            {{ book.title }}
+            <v-divider class="my-3" v-if="book.div" />
+          </p>
+        </v-card>
       </v-navigation-drawer>
     </v-card>
 
-    <v-card
-      v-else
-      flat
-      class="transparent mx-auto"
-    >
-      <Book
-        :covenantIndex="covenantIndex"
-        :bookIndex="bookIndex"
-        :bookTitle="bookTitle"
-        :books="chapters"
-      />
-    </v-card>
+    <Book v-else />
   </v-card>
 </template>
 
 <script>
 
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
+
 export default {
   name: 'Home',
 
   components: {
-    Book: () => import('@/components/Book.vue')
+    Book: () => import('@/components/bible/Book.vue')
   },
 
   data: () => ({
-    covenantIndex: 0,
-    bookIndex: undefined,
-    ready: false,
-    books: [],
     showMenu: false,
     menuItems: [],
     selectedMenuItem: null
   }),
 
   computed: {
-    chapters () {
-      return this.showBooks ? [] : this.books[this.covenantIndex][this.bookIndex].chapters
+    ...mapState(['lang']),
+    ...mapGetters('content', ['covenantNames']),
+    ...mapState('content', ['covenantIndex', 'books', 'bookIndex', 'chapterIndex']),
+    showChapter () {
+      return this.bookIndex !== null
     },
-
-    showBooks () {
-      return typeof this.bookIndex !== 'number'
-    },
-
-    bookTitle () {
-      return this.ready &&
-        !this.showBooks &&
-        this.books[this.covenantIndex][this.bookIndex].title
+    showBookList () {
+      return Array.isArray(this.books) && this.bookIndex === null
     }
   },
 
   methods: {
-    getBookList () {
-      this.ready = false
-      const promises = [0, 1].map(index => this.$root.contentController.getBookNames(this.covenantIndex))
-
-      Promise.all(promises)
-        .then(responses => {
-          this.books = []
-          responses.forEach(response => this.books.push(response.status === 200 ? response.result : []))
-
-          this.menuItems = [
-            this.$root.contentController.covenantNames[0],
-            this.$root.contentController.covenantNames[1]
-          ]
-
-          this.ready = true
-        })
-    },
-
-    selectBook (bookNum) {
-      this.bookIndex = bookNum
-      localStorage.setItem('book-index', this.bookIndex)
-      localStorage.setItem('book-title', this.bookTitle)
-    },
-
-    async switchCovenant () {
-      this.ready = false
-      this.bookIndex = undefined
-      this.covenantIndex = this.covenantIndex ? 0 : 1
-      localStorage.setItem('covenant', this.covenantIndex)
-      await this.getBookList()
-      this.ready = true
-      this.showMenu = false
-    },
-
-    resetBook () {
-      this.bookIndex = undefined
-    }
+    ...mapMutations('content', ['selectBook', 'resetBook']),
+    ...mapActions('content', ['switchCovenant'])
   },
 
-  async created () {
-    const verseId = localStorage.getItem('verse')
-
-    if (verseId) {
-      [this.covenantIndex, this.bookIndex] = verseId.split('.').map(item => Number(item))
-    } else {
-      [this.covenantIndex, this.bookIndex] = [
-        localStorage.getItem('covenant') - 0 || 0,
-        localStorage.getItem('book-index') - 0
-      ]
-    }
-
-    await this.getBookList()
-  },
-
-  beforeDestroy () {
-    localStorage.removeItem('verse')
+  mounted () {
+    console.log(this.covenantNames)
   }
 }
 </script>

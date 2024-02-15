@@ -1,5 +1,7 @@
 import { openDB } from './openDB'
 
+import { getPromise } from './getPromise'
+
 export const getVersesByRefs = async (refs) => {
   if (!refs || !Array.isArray(refs)) return
   const response = await openDB()
@@ -13,16 +15,8 @@ export const getVersesByRefs = async (refs) => {
     transaction.objectStore('books')
   ]
 
-  const func = ref => new Promise(resolve => Object.assign(store.get(ref), {
-    onsuccess: event => resolve(event.target.result),
-    onerror: event => {
-      console.warn(`The verse ${ref} not found in db store content`)
-      resolve(null)
-    }
-  }))
-
   return new Promise(resolve => {
-    const promises = refs.map(ref => func(ref))
+    const promises = refs.map(ref => getPromise(store, ref))
     Promise.all(promises)
       .then(res => {
         const responses = res.filter(item => Boolean(item))

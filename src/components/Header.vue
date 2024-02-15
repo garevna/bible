@@ -5,6 +5,7 @@
     color="primary"
     dark
     class="bottom-border mx-0 px-0"
+    :key="lang"
   >
     <v-card
       class="app-bar-content d-flex align-center justify-space-between transparent"
@@ -22,7 +23,24 @@
           height="48"
         />
 
-          <span class="kcc-title"></span>
+        <span v-if="!short" class="kcc-title">
+          {{ _header.chirchTitle }}
+        </span>
+        <span v-else>
+          <v-tooltip bottom>
+            <template v-slot:activator="{ on, attrs }">
+              <span
+                dark
+                class="mr-4"
+                v-bind="attrs"
+                v-on="on"
+              >
+                {{ _header.chirchTitleShort }}
+              </span>
+            </template>
+            <span>{{ _header.chirchTitle }}</span>
+          </v-tooltip>
+        </span>
       </div>
 
       <v-spacer />
@@ -43,7 +61,7 @@
                 $signIn
               </v-icon>
             </template>
-            <span>Вхід</span>
+            <span>{{ _common.signIn }}</span>
           </v-tooltip>
 
           <v-tooltip bottom>
@@ -57,27 +75,74 @@
                 $signUp
               </v-icon>
             </template>
-            <span>Реєстрація</span>
+            <span>{{ _common.signUp }}</span>
           </v-tooltip>
         </span>
       </div>
 
-      <v-tooltip bottom color="primary">
+      <v-tooltip bottom>
         <template v-slot:activator="{ on, attrs }">
-          <v-avatar size="16" class="ml-2 rounded-0" v-bind="attrs" v-on="on">
-            <v-img :src="require('@/assets/ukrainian.svg')" />
-          </v-avatar>
+          <!-- <v-avatar size="24" class="mx-2 rounded-0" v-bind="attrs" v-on="on"> -->
+            <img
+              v-bind="attrs"
+              v-on="on"
+              :src="langIcon"
+              height="16"
+              @click="showLangMenu($event)"
+            />
+          <!-- </v-avatar> -->
         </template>
-        <span>{{ translation }}</span>
+        <span>{{ _common.lang }}</span>
       </v-tooltip>
+
+      <DropdownMenu
+        v-if="langMenu"
+        :event="event"
+        :showMenu.sync="langMenu"
+        :menuItems="langMenuItems"
+        :selected.sync="language"
+      />
+
+      <!-- <v-avatar size="16" class="ml-2 rounded-0"> -->
+        <!-- <img :src="require('@/assets/uk-flag.png')" height="16" /> -->
+      <!-- </v-avatar> -->
+
+      <!-- <v-tooltip bottom>
+        <template v-slot:activator="{ on, attrs }">
+          <v-icon
+            class="ml-2 rounded-0"
+            v-bind="attrs"
+            v-on="on"
+            @click="showTranslationMenu($event)"
+          >
+            mdi-book-cross
+          </v-icon> -->
+          <!-- <v-avatar size="16" class="ml-2 rounded-0" v-bind="attrs" v-on="on">
+            <v-img :src="require('@/assets/ukrainian.svg')" />
+          </v-avatar> -->
+        <!-- </template>
+        <span>{{ _header[translation] }}</span>
+      </v-tooltip> -->
+
+      <v-icon
+        class="ml-2 rounded-0"
+        @click="showTranslationMenu($event)"
+      >
+        mdi-book-cross
+      </v-icon>
     </v-card>
 
+    <DropdownMenu
+      v-if="translationMenu"
+      :event="event"
+      :showMenu.sync="translationMenu"
+      :menuItems="translationMenuItems"
+      :selected.sync="translated"
+    />
+
     <v-slide-y-transition>
-      <div :key="ready">
-        <h4
-          dark
-          class="primary view-title"
-        >
+      <div>
+        <h4 dark class="primary view-title">
           {{ title }}
         </h4>
       </div>
@@ -87,56 +152,104 @@
 
 <script>
 
-import User from '@/components/User.vue'
+import User from '@/components/user/User.vue'
+import DropdownMenu from '@/components/DropdownMenu.vue'
 
-import { footerMenu } from '@/configs'
+import { langMenuItems, translationMenuItems } from '@/configs'
+
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
 
 export default {
   name: 'Header',
 
   components: {
-    User
+    User,
+    DropdownMenu
   },
 
-  props: ['signIn', 'signUp', 'page'],
+  props: ['signIn', 'signUp'],
 
   data: () => ({
-    title: '',
-    ready: 0,
-    translation: 'Переклад І. Огієнка',
-    signed: true
+    event: null,
+    langMenu: false,
+    translationMenu: false,
+    translationMenuItems: []
   }),
 
+  computed: {
+    ...mapGetters('language', ['_common', '_header', '_pages']),
+    ...mapState(['viewportWidth']),
+    ...mapGetters(['langIcon']),
+    ...mapState(['page', 'footerMenu']),
+    ...mapState('content', ['covenantIndex', 'bookIndex']),
+    ...mapGetters('content', ['books', 'bookTitle']),
+    ...mapState('user', ['lang', 'translation']),
+    ...mapGetters('user', ['signed']),
+
+    short () {
+      return this.viewportWidth < 600
+    },
+
+    title () {
+      return this._pages[this.page || 'bible']
+    },
+
+    language: {
+      get () {
+        return this.lang
+      },
+      set (val) {
+        this.switchLanguage(val)
+        console.log(this._common)
+      }
+    },
+
+    translated: {
+      get () {
+        return this.translation
+      },
+      set (val) {
+        this.switchTranslation(val)
+      }
+    },
+
+    langMenuItems () {
+      return langMenuItems.map(item => ({ value: item.value, text: item.text[this.lang], icon: item.icon }))
+    }
+  },
+
   watch: {
-    page (val) {
-      this.title = footerMenu.find(item => item.value === val).text
-      ++this.ready
+    lang (val) {
+      console.log('HEADER LANG: ', val)
+      Object.assign(this, {
+        translationMenuItems: translationMenuItems.map(item => ({ value: item.value, text: item.text[this.lang] }))
+      })
     }
   },
 
   methods: {
+    ...mapMutations(['switchLanguage', 'setTranslation']),
+    ...mapActions('content', ['switchTranslation']),
+
     executeAction (actionName) {
       typeof this[actionName] === 'function' && this[actionName]()
     },
 
-    logout () {
-      this.signed = false
+    showLangMenu (event) {
+      this.event = { x: event.x - 32, y: event.y - 8 }
+      this.langMenu = true
     },
 
-    login () {
-      this.signed = true
+    showTranslationMenu (event) {
+      this.event = { x: event.x - 16, y: event.y + 16 }
+      this.translationMenu = true
     }
   },
 
-  created () {
-    this.signed = Boolean(this.$root.user)
-    this.$on('user-logout', this.logout)
-    this.$on('user-login', this.login)
-  },
-
-  beforeDestroy () {
-    this.$off('user-logout', this.logout)
-    this.$off('user-login', this.login)
+  mounted () {
+    Object.assign(this, {
+      translationMenuItems: translationMenuItems.map(item => ({ value: item.value, text: item.text[this.lang || 'ua'] }))
+    })
   }
 }
 </script>
@@ -152,16 +265,17 @@ export default {
   vertical-align: middle;
   margin-right: 12px;
 }
-
+/*
 .kcc-title::after {
   content: 'Харківська християнська церква';
   font-weight: bold;
 }
-
+*/
+/*
 .translation-text::after {
   content: 'Переклад І. Огієнка'
 }
-
+*/
 .view-title-wrapper {}
 
 .view-title {
@@ -176,7 +290,7 @@ export default {
   padding: 16px 16px 8px;
   text-align: center;
 }
-
+/*
 @media screen and (max-width: 600px) {
   .kcc-title::after {
     content: 'ХXЦ';
@@ -184,13 +298,8 @@ export default {
   .translation-text::after {
     content: ''
   }
-
-  .view-title {
-    left: 0px;
-    transform: none;
-  }
 }
-
+*/
 .bottom-border {
   border-bottom: solid 1px #fff8 !important;
 }

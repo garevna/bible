@@ -1,22 +1,29 @@
-import { covenantNames } from './covenantNames'
+import { storeNames } from './storeNames'
 import { beforeDivider } from './beforeDivider'
 import { footerMenu } from './footerMenu'
 import { highlights } from './highlights'
 
 import { firebaseConfig } from './firebaseConfig'
 
-import { menuItems } from './menuItems'
+// import { menuItems } from './menuItems'
+import { langMenuItems } from './langMenuItems'
+import { translationMenuItems } from './translationMenuItems'
+import { defaultTranslation } from './defaultTranslation'
 
-// import * as languages from './language'
+import { cursor } from './cursor'
 
 const languages = require('./language').default
 
 export {
+  storeNames,
   languages,
   firebaseConfig,
-  covenantNames,
   beforeDivider,
   footerMenu,
   highlights,
-  menuItems
+  cursor,
+  // menuItems,
+  langMenuItems,
+  translationMenuItems,
+  defaultTranslation
 }

@@ -1,11 +1,13 @@
-import { user } from '@/helpers'
+// import { user } from '@/helpers'
 
 const { clearStore } = require('../helpers').default
 
 export async function resetUser () {
   this.$root.$emit('progress-on')
 
-  user.reset()
+  console.log('RESER USER')
+
+  // user.reset()
 
   Object.assign(this.$root, { user: null })
 
@@ -13,8 +15,6 @@ export async function resetUser () {
 
   ;['keywords', 'topics', 'notes', 'highlights']
     .forEach(storeName => clearStore(storeName))
-
-  this.$root.$emit('user-changed', null)
 
   this.$root.$emit('progress-off')
 }

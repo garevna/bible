@@ -1,30 +1,17 @@
 <template>
   <v-container
     style="max-width: 960px; padding: 16px 0 0 !important"
+    :key="lang"
   >
     <v-app-bar flat class="transparent my-8 my-md-4">
-      <Selector
-        :selectedDate.sync="date"
-        :selectedKeyword.sync="keyword"
-        :selectedTopic.sync="topic"
-        :title="title"
-      />
+      <NotesFilterOptions />
     </v-app-bar>
 
     <v-row justify="end" class="mx-4">
       <ControlsView :showControls.sync="showControls" />
     </v-row>
 
-    <AddNote
-      :fab="true"
-      icon="$addNote"
-      :note.sync="newNote"
-      :topic="topic"
-      :keyword="keyword"
-    />
-
     <v-sheet
-      :key="ready"
       class="transparent overflow-y-auto my-12"
       :style="sheetStyle"
     >
@@ -33,7 +20,7 @@
             $warning
           </v-icon>
           <small style="color: #aaa">
-            Умови пошуку не визначені. Виберіть один із критеріїв вище.
+            {{ _selector.noSearchOptions }}
           </small>
         </v-card>
 
@@ -42,76 +29,68 @@
             v-for="note of notes"
             :key="note._id"
             :note="note"
-            :edited.sync="edited"
-            :removed.sync="removed"
-            :expanded.sync="expanded"
             :static="true"
             :showControls="showControls"
           />
         </v-card>
     </v-sheet>
+
+    <v-bottom-navigation fixed height="48" class="mb-12 pt-2" background-color="#ddd">
+      <DatePickerDialog :date.sync="selectedDate" />
+      <SelectKeywordDialog :selectedKeyword.sync="selectedKeyword" />
+      <SelectTopicDialog :selectedTopic.sync="selectedTopic" />
+      <CreateNote />
+    </v-bottom-navigation>
   </v-container>
 </template>
 
 <script>
 
-import { footerMenu } from '@/configs'
-
-import { getSelector } from '@/helpers'
-
-const { getCommonText } = require('@/configs/language').default
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
 
 export default {
   name: 'Notes',
 
   components: {
+    DatePickerDialog: () => import('@/components/selectors/DatePickerDialog.vue'),
+    SelectKeywordDialog: () => import('@/components/selectors/SelectKeywordDialog.vue'),
+    SelectTopicDialog: () => import('@/components/selectors/SelectTopicDialog.vue'),
     ControlsView: () => import('@/components/ControlsView.vue'),
-    Note: () => import('@/components/Note.vue'),
-    AddNote: () => import('@/components/AddNote.vue'),
-    Selector: () => import('@/components/Selector.vue')
+    Note: () => import('@/components/notes/Note.vue'),
+    CreateNote: () => import('@/components/notes/CreateNote.vue'),
+    NotesFilterOptions: () => import('@/components/NotesFilterOptions.vue')
   },
 
   data: () => ({
-    ready: 0,
     showControls: true,
-    title: footerMenu[1].text,
-    noDataText: getCommonText('ua', 'noData'),
-    notes: [],
-    date: null,
-    keyword: null,
-    topic: { _id: null, title: '' },
-    edited: null,
-    expanded: null,
-    removed: null,
-    newNote: null
+    newNote: null,
+    selectedDate: null,
+    selectedKeyword: '',
+    selectedTopic: null
   }),
 
   computed: {
+    ...mapState(['lang']),
+    ...mapGetters('language', ['_selector']),
+    ...mapState('notes', ['notes', 'topic', 'keyword', 'date']),
+
     sheetStyle () {
       return `height: calc(100vh - ${this.viewportWidth < 600 ? 420 : 300})`
     }
   },
 
   watch: {
-    date (val) {
-      this.getNotes()
+    selectedDate (val) {
+      this.updateDate(val)
     },
-
-    topic (obj) {
-      this.getNotes()
+    selectedKeyword (val) {
+      this.updateKeyword(val)
     },
-
-    keyword (val) {
-      this.getNotes()
-    },
-
-    removed (value) {
-      const index = this.notes.findIndex(note => note._id === value)
-      index !== -1 && this.notes.splice(index, 1) && ++this.ready
+    selectedTopic (val) {
+      this.updateTopic(val)
     },
 
     newNote (data) {
-      console.log('NEW NOTE:\n', data)
       if (!data) return
       const index = this.notes.findIndex(note => note._id === data._id)
       index === -1
@@ -122,23 +101,12 @@ export default {
   },
 
   methods: {
-    async getNotes () {
-      if (!this.date && !this.keyword && !this.topic._id) {
-        return console.warn('Filter conditions are not defined')
-      }
-
-      this.notes = await this.$root.contentController
-        .getNotes({ date: this.date, keyword: this.keyword, topic: this.topic._id })
-    },
-
-    async getTopics (item) {
-      this.topics = await this.$root.contentController.getTopics(item.topics)
-    }
+    ...mapMutations('notes', ['addNote']),
+    ...mapActions('notes', ['init', 'getNotes', 'getCurrentNoteTopics', 'updateDate', 'updateKeyword', 'updateTopic'])
   },
 
-  created () {
-    const { date, keyword, topic } = getSelector()
-    Object.assign(this, { date, keyword, topic })
+  async created () {
+    this.init()
   }
 }
 </script>

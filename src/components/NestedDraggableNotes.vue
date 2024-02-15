@@ -1,6 +1,5 @@
 <template>
   <v-card
-    :key="ready"
     flat
     class="transparent mx-auto"
     max-width="960"
@@ -10,16 +9,16 @@
     </v-row>
 
     <nested-draggable
-      :elements="items"
+      :elements="currentTopicData"
       :modified.sync="modified"
       :removed.sync="removed"
       :show="show"
     />
 
     <v-card flat class="transparent mx-auto my-12" width="240">
-      <v-btn outlined color="primary" @click="saveTopic">
+      <v-btn outlined color="primary" @click="saveCurrentTopic">
         <v-icon class="mr-2"> $save </v-icon>
-          Зберегти
+          {{ _nestedDraggable.saveButton }}
       </v-btn>
     </v-card>
   </v-card>
@@ -27,9 +26,9 @@
 
 <script>
 
-import nestedDraggable from '@/components/NestedDraggable.vue'
+import { mapState, mapGetters, mapMutations, mapActions } from 'vuex'
 
-import { getTopicData, saveTopic } from '@/helpers'
+import nestedDraggable from '@/components/NestedDraggable.vue'
 
 export default {
   name: 'NestedDraggableNotes',
@@ -39,30 +38,24 @@ export default {
     ControlsView: () => import('@/components/ControlsView.vue')
   },
 
-  props: {
-    topic: {
-      type: Object,
-      required: true
-    }
-  },
-
   data () {
     return {
-      ready: 0,
       modified: false,
-      items: [],
       removed: null,
       show: true
     }
+  },
+
+  computed: {
+    ...mapGetters('language', ['_nestedDraggable']),
+    ...mapState('topics', ['currentTopic', 'currentTopicData'])
   },
 
   watch: {
     modified (val) {
       if (!val) return
 
-      console.log('LIST OF ITEMS MODIFIED:\n', this.items)
-
-      this.items.forEach(item => {
+      this.currentTopicData.forEach(item => {
         if (item.type === 'note' && item.verses.length > item.refs.length) {
           Object.assign(item, { refs: item.verses.map(verse => verse._id) })
         }
@@ -70,69 +63,44 @@ export default {
       Object.assign(this, { modified: false })
     },
 
-    topic (data) {
-      this.getTopicData()
-        .then(() => Object.assign(this, { ready: ++this.ready }))
-    },
-
     findIndex (index, id) {
-      return this.items[index]._id === id
+      return this.currentTopicData[index]._id === id
         ? ({ index })
-        : this.items[index].refs
-          ? ({ index, num: this.items[index].refs.indexOf(id) })
+        : this.currentTopicData[index].refs
+          ? ({ index, num: this.currentTopicData[index].refs.indexOf(id) })
           : -1
     },
 
     removed (elem) {
+      const { _id: topicId, order, refs } = this.currentTopic
       if (elem.type === 'note') {
-        elem.topics.removeById(this.topic._id)
-        this.topic.order.removeById(elem._id)
+        order.removeById(elem._id)
+        elem.topics.removeById(topicId)
         const { _id, text, refs, topics, keywords } = elem
-        this.$root.contentController.putNote({ _id, text, refs, topics, keywords })
+        this.putNote({ _id, text, refs, topics, keywords })
       } else {
-        this.topic.refs.removeById(elem._id)
+        refs.removeById(elem._id)
       }
+      this.updateCurrentTopic({ order, refs })
 
-      this.items.removeById(elem._id)
-
-      ++this.ready
+      this.removeCurrentTopicDataItem(elem._id)
     }
   },
 
   methods: {
-    saveTopic,
-    getTopicData,
-
-    buildOrder (items) {
-      const rest = items.filter(item => !this.topic.order.includes(item._id))
-      this.topic.order.push(...rest.map(item => (item._id)))
-    },
-
-    getVerseLink ({ bookName, chapterNum, line }) {
-      return `${bookName} ${chapterNum}:${line + 1}`
-    },
-
-    getVerseText ({ _id, bookName, chapterNum, line, text }) {
-      return `${text} <small class="link-to-verse" @click="${require('@/helpers/gotoVerse.js').gotoVerse}('${_id}')">(${bookName} ${chapterNum}:${line + 1})</small>`
-    },
+    ...mapMutations('topics', ['updateCurrentTopic', 'removeCurrentTopicDataItem']),
+    ...mapActions('topics', ['saveCurrentTopic']),
+    ...mapActions('notes', ['putNote']),
 
     updateItems (modifiedItem) {
-      const index = this.items.findIndex(item => item._id === modifiedItem._id)
+      const index = this.currentTopicData
+        .findIndex(item => item._id === modifiedItem._id)
 
       if (index === -1) return console.warn('Modified item not found in collection:\n', modifiedItem)
 
-      if (!modifiedItem.topics.includes(this.topic._id)) this.items.splice(index, 1)
-      else Object.assign(this.items[index], modifiedItem)
+      if (!modifiedItem.topics.includes(this.currentTopic._id)) this.currentTopicData.splice(index, 1)
+      else Object.assign(this.currentTopicData[index], modifiedItem)
     }
-  },
-
-  created () {
-    this.getTopicData()
-      .then(() => Object.assign(this, { ready: ++this.ready }))
-  },
-
-  mounted () {
-    this.$root.$on('note-updated', this.updateItems)
   }
 }
 </script>
