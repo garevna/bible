@@ -35,7 +35,7 @@
             <p class="ml-2 my-1" v-html="verse.html" />
           </div>
 
-          <AddVersesToNote />
+          <AddVerses @add="notes.addVersesToCurrentNote" />
         </fieldset>
 
         <EditKeywordList for-note />
@@ -54,7 +54,7 @@ import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import EditKeywordList from '@/components/keywords/EditKeywordList.vue'
-import AddVersesToNote from '@/components/notes/AddVersesToNote.vue'
+import AddVerses from '@/components/selectors/AddVerses.vue'
 import EditTopicList from '@/components/topics/EditTopicList.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'

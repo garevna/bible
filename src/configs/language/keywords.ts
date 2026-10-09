@@ -58,5 +58,15 @@ export const keywords = {
     ua: 'Видалити ключове слово',
     ru: 'Удалить ключевое слово',
     en: 'Delete keyword'
+  },
+  addNewKeyword: {
+    ua: 'Додати ключове слово «{name}»',
+    ru: 'Добавить ключевое слово «{name}»',
+    en: 'Add the keyword “{name}”'
+  },
+  newKeyword: {
+    ua: 'Нове ключове слово',
+    ru: 'Новое ключевое слово',
+    en: 'New keyword'
   }
 }

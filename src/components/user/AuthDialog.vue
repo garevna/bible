@@ -11,9 +11,9 @@
         />
       </div>
 
-      <v-tabs v-model="tab" grow hide-slider class="px-8 mb-2" selected-class="auth-tab--active">
-        <v-tab value="sign-in" class="auth-tab">{{ inText.title }}</v-tab>
-        <v-tab value="sign-up" class="auth-tab">{{ upText.title }}</v-tab>
+      <v-tabs v-model="tab" grow hide-slider class="px-8 mb-2" selected-class="app-tab--active">
+        <v-tab value="sign-in" class="app-tab">{{ inText.title }}</v-tab>
+        <v-tab value="sign-up" class="app-tab">{{ upText.title }}</v-tab>
       </v-tabs>
 
       <v-card-text class="px-8">
@@ -209,22 +209,6 @@ async function reset() {
 <style scoped>
 .auth-card {
   border-radius: 12px !important;
-}
-
-.auth-tab {
-  border-radius: 10px 10px 0 0 !important;
-  font-size: 17px;
-  font-weight: 500;
-  text-transform: none;
-  letter-spacing: normal;
-  color: #888;
-  border-bottom: solid 1px #ddd;
-}
-
-.auth-tab--active {
-  background: rgb(0 144 176 / 10%);
-  color: rgb(var(--v-theme-secondary));
-  border-bottom: solid 2px rgb(var(--v-theme-secondary));
 }
 
 .auth-button {

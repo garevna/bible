@@ -1,5 +1,15 @@
 <template>
-  <ButtonTooltip icon="$addVerse" :text="text.addVerses" large @click="open = true" />
+  <v-btn
+    v-if="label"
+    variant="tonal"
+    color="buttons"
+    prepend-icon="$addVerse"
+    class="text-none"
+    @click="open = true"
+  >
+    {{ label }}
+  </v-btn>
+  <ButtonTooltip v-else icon="$addVerse" :text="text.addVerses" large @click="open = true" />
 
   <v-dialog v-model="open" max-width="760" scrollable>
     <v-card color="homefone">
@@ -115,15 +125,16 @@ import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import { getRecordsByIndex } from '@/db'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
-import { useNotesStore } from '@/stores/notes'
 import { useSearchStore } from '@/stores/search'
 import type { Verse } from '@/types'
 import { getChapterRef } from '@/utils/refs'
 import { markWords, queryWords } from '@/utils/search'
 
-/** Adds Bible verses to the note being edited, found by text or chosen by reference */
+/** Picks Bible verses, found by text or chosen by reference, and emits their ids */
+defineProps<{ label?: string }>()
+const emit = defineEmits<{ add: [verseIds: string[]] }>()
+
 const content = useContentStore()
-const notes = useNotesStore()
 const search = useSearchStore()
 const { notes: text, search: searchText, common } = storeToRefs(useLanguageStore())
 
@@ -215,8 +226,8 @@ const selection = computed(() =>
   tab.value === 'search' ? ticked.value : rangeVerses.value.map((verse) => verse._id)
 )
 
-async function add() {
-  await notes.addVersesToCurrentNote(selection.value)
+function add() {
+  emit('add', [...selection.value])
   open.value = false
 }
 </script>

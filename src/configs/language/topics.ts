@@ -43,5 +43,10 @@ export const topics = {
     ua: 'Додати нотатку до теми',
     ru: 'Добавить заметку к теме',
     en: 'Add a note to the topic'
+  },
+  addNewTopic: {
+    ua: 'Додати тему «{name}»',
+    ru: 'Добавить тему «{name}»',
+    en: 'Add the topic “{name}”'
   }
 }

@@ -3,6 +3,7 @@
     <div class="d-flex align-center mt-5 mb-4">
       <v-btn icon="$return" variant="text" color="primary" size="large" @click="topics.returnToTopicList()" />
       <span class="topic-title text-primary ml-3 flex-grow-1">{{ topics.currentTopic?.title }}</span>
+      <AddVerses v-if="topics.currentTopic" @add="addVerses" />
       <CreateNote
         v-if="topics.currentTopic"
         :topic-id="topics.currentTopic._id"
@@ -42,7 +43,9 @@ import { storeToRefs } from 'pinia'
 
 import ControlsView from '@/components/ControlsView.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
+import AddVerses from '@/components/selectors/AddVerses.vue'
 import NestedDraggable from '@/components/topics/NestedDraggable.vue'
+import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
 import { useTopicsStore, type TopicItem, type TopicNoteItem } from '@/stores/topics'
@@ -51,6 +54,7 @@ import { removeById } from '@/utils/array'
 import { versesWithLinks } from '@/utils/verse'
 
 const topics = useTopicsStore()
+const content = useContentStore()
 const notes = useNotesStore()
 const { common, nestedDraggable, topics: text } = storeToRefs(useLanguageStore())
 
@@ -87,6 +91,15 @@ async function updateNote(item: TopicNoteItem, note: Note) {
   }
   Object.assign(item, { text: note.text, keywords: note.keywords, topics: note.topics })
   item.verses = (await versesWithLinks(note.refs)).map((verse) => ({ ...verse, type: 'verse' as const }))
+}
+
+/** Links the verses to the topic; they appear at the end of its list */
+async function addVerses(verseIds: string[]) {
+  const topic = topics.currentTopic
+  if (!topic) return
+  for (const verseId of verseIds) await content.addTopicToVerse(topic._id, verseId)
+  await topics.getCurrentTopic(topic._id)
+  await topics.getTopicData()
 }
 </script>
 

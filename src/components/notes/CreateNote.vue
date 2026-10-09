@@ -1,5 +1,9 @@
 <template>
+  <v-btn v-if="label" variant="tonal" color="buttons" :prepend-icon="icon" class="text-none" @click="open">
+    {{ label }}
+  </v-btn>
   <ButtonTooltip
+    v-else
     :icon="icon"
     :text="tooltip || text.createNoteTooltip"
     :small="small"
@@ -31,8 +35,17 @@ const props = withDefaults(
     small?: boolean
     large?: boolean
     fab?: boolean
+    /** a button with this text instead of an icon */
+    label?: string
   }>(),
-  { lineRef: undefined, topicId: undefined, keywordId: undefined, icon: '$addNote', tooltip: '' }
+  {
+    lineRef: undefined,
+    topicId: undefined,
+    keywordId: undefined,
+    icon: '$addNote',
+    tooltip: '',
+    label: undefined
+  }
 )
 
 const emit = defineEmits<{ saved: [note: Note] }>()

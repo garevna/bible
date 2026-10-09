@@ -127,3 +127,26 @@ p {
 .v-field--variant-outlined:not(.v-field--focused):not(.v-field--error) .v-field__outline {
   --v-field-border-opacity: 0.22;
 }
+
+/* tabs: the inactive one has a light grey border, the active one is light blue */
+.app-tab.v-tab {
+  border: solid 1px #ddd;
+  border-bottom-color: rgb(var(--v-theme-secondary));
+  border-radius: 10px 10px 0 0 !important;
+  color: #888;
+  font-size: 16px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.app-tab.v-tab + .app-tab.v-tab {
+  margin-left: 4px;
+}
+
+.app-tab--active.v-tab {
+  background: rgb(0 144 176 / 10%);
+  color: rgb(var(--v-theme-secondary));
+  border-color: rgb(var(--v-theme-secondary));
+  border-bottom-width: 2px;
+}

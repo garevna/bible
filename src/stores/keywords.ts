@@ -34,8 +34,25 @@ export const useKeywordsStore = defineStore('keywords', () => {
   async function createKeyword(name: string) {
     const keyword = name.trim()
     if (!keyword) return
-    await putKeyword({ _id: keyword, refs: [] })
+    // an existing keyword keeps its verses
+    const existing = keywordList.value.find((item) => item._id === keyword)
+    if (!existing) {
+      await putKeyword({ _id: keyword, refs: [] })
+      keywordList.value.push({ _id: keyword, refs: [] })
+    }
     searchResult.value = [keyword]
+  }
+
+  /** Links the keyword to the verses and keeps the list in step */
+  async function addKeywordToVerses(keyword: string, verseIds: string[]) {
+    const content = useContentStore()
+    for (const verseId of verseIds) await content.addKeywordToVerse(keyword, verseId)
+    await getFullList()
+  }
+
+  async function removeKeywordFromVerse(keyword: string, verseId: string) {
+    await useContentStore().removeKeywordFromVerse(keyword, verseId)
+    await getFullList()
   }
 
   /** Deletes the keyword and removes it from the notes that link to it */
@@ -69,6 +86,8 @@ export const useKeywordsStore = defineStore('keywords', () => {
     createKeyword,
     deleteKeyword,
     searchKeywords,
+    addKeywordToVerses,
+    removeKeywordFromVerse,
     getKeywordNotes
   }
 })

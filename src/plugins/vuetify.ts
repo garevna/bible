@@ -39,6 +39,7 @@ const iconAliases = {
   notes: 'mdi-note-edit-outline',
   note: 'mdi-note',
   remove: 'mdi-paperclip-remove',
+  deleteNote: 'mdi-note-remove-outline',
   reset: 'mdi-close',
   return: 'mdi-page-previous',
   save: 'mdi-content-save-outline',

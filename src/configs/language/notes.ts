@@ -98,5 +98,15 @@ export const notes = {
     ua: 'Додати',
     ru: 'Добавить',
     en: 'Add'
+  },
+  newNote: {
+    ua: 'Нова нотатка',
+    ru: 'Новая заметка',
+    en: 'New note'
+  },
+  noNotes: {
+    ua: 'Нотаток за цими умовами немає',
+    ru: 'Заметок по этим условиям нет',
+    en: 'No notes match these conditions'
   }
 }

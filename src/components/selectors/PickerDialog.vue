@@ -1,5 +1,16 @@
 <template>
+  <v-btn
+    v-if="label"
+    variant="tonal"
+    color="buttons"
+    :prepend-icon="icon"
+    class="text-none"
+    @click="open = true"
+  >
+    {{ label }}
+  </v-btn>
   <ButtonTooltip
+    v-else
     :icon="icon"
     :text="tooltip"
     :small="small"
@@ -55,9 +66,11 @@ withDefaults(
     fab?: boolean
     badge?: string
     badgeIcon?: string
+    /** a button with this text instead of an icon */
+    label?: string
     disabled?: boolean
   }>(),
-  { tooltip: '', title: '', color: 'buttons', badge: undefined, badgeIcon: undefined }
+  { tooltip: '', title: '', color: 'buttons', badge: undefined, badgeIcon: undefined, label: undefined }
 )
 
 const emit = defineEmits<{ ok: [] }>()

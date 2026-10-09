@@ -1,17 +1,17 @@
 <template>
   <div class="mx-auto pt-6 pb-16 px-2" style="max-width: 960px">
-    <div class="d-flex align-center">
+    <div class="d-flex align-center flex-wrap ga-2">
+      <CreateNote
+        :label="text.newNote"
+        :topic-id="notes.topic?._id"
+        :keyword-id="notes.keyword ?? undefined"
+      />
       <NotesFilterOptions class="flex-grow-1" />
       <ControlsView v-model="showControls" />
     </div>
 
     <div class="mt-6">
-      <div v-if="!notes.date && !notes.keyword && !notes.topic" class="pa-4">
-        <v-icon color="warning" class="mr-2">$warning</v-icon>
-        <small class="text-medium-emphasis">{{ selector.noSearchOptions }}</small>
-      </div>
-
-      <p v-else-if="!notes.notes.length" class="pa-4 text-medium-emphasis">{{ common.noData }}</p>
+      <p v-if="!notes.notes.length" class="pa-4 text-medium-emphasis">{{ text.noNotes }}</p>
 
       <Note v-for="note of notes.notes" :key="note._id" :note="note" :show-controls="showControls" />
     </div>
@@ -29,7 +29,7 @@
         :title="keywords.select"
         @ok="notes.updateKeyword(keyword)"
       >
-        <SelectKeyword v-model="keyword" />
+        <SelectKeyword v-model="keyword" :creatable="false" />
       </PickerDialog>
 
       <PickerDialog
@@ -38,10 +38,8 @@
         :title="topics.select"
         @ok="notes.updateTopic(topic)"
       >
-        <SelectTopic v-model="topic" />
+        <SelectTopic v-model="topic" :creatable="false" />
       </PickerDialog>
-
-      <CreateNote :topic-id="notes.topic?._id" :keyword-id="notes.keyword ?? undefined" />
     </div>
   </div>
 </template>
@@ -63,7 +61,7 @@ import { useNotesStore } from '@/stores/notes'
 import type { Topic } from '@/types'
 
 const notes = useNotesStore()
-const { common, keywords, selector, topics } = storeToRefs(useLanguageStore())
+const { notes: text, keywords, selector, topics } = storeToRefs(useLanguageStore())
 
 const showControls = ref(true)
 const keyword = ref<string | null>(notes.keyword)

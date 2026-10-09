@@ -6,6 +6,7 @@ import {
   getAllKeys,
   getRecordsByKeys,
   getVersesByRefs,
+  localISODate,
   noteDate,
   putRecord,
   searchNotes
@@ -69,6 +70,11 @@ export const useNotesStore = defineStore('notes', () => {
 
   const hasFilter = () => Boolean(date.value || keyword.value || topic.value)
 
+  const matchesFilter = (note: Note) =>
+    (!date.value || noteDate(note) === date.value) &&
+    (!keyword.value || note.keywords.includes(keyword.value)) &&
+    (!topic.value || note.topics.includes(topic.value._id))
+
   function saveSelector() {
     localStorage.setItem(
       selectorKey,
@@ -93,7 +99,8 @@ export const useNotesStore = defineStore('notes', () => {
 
     await getAvailableDates()
 
-    if (!hasFilter()) date.value = availableDates.value.at(-1) ?? null
+    // without a filter the page shows the last day with notes, or today
+    if (!hasFilter()) date.value = availableDates.value.at(-1) ?? localISODate(new Date())
 
     await getNotes()
   }
@@ -241,7 +248,11 @@ export const useNotesStore = defineStore('notes', () => {
 
     const saved = clone(note)
     const index = notes.value.findIndex((item) => item._id === saved._id)
-    index === -1 ? notes.value.push(saved) : notes.value.splice(index, 1, saved)
+
+    if (index !== -1) notes.value.splice(index, 1, saved)
+    else if (!hasFilter()) await updateDate(noteDate(saved))
+    // a new note goes to the list when it matches the filter of the Notes page
+    else if (matchesFilter(saved)) notes.value.unshift(saved)
 
     const content = useContentStore()
     if (content.currentLineId) {

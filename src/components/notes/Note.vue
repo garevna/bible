@@ -1,33 +1,39 @@
 <template>
-  <div class="draggable-item note mb-3">
-    <div v-if="showControls" class="d-flex align-center mb-2">
-      <ConfirmButton :text="notes.deleteNote" @confirm="remove" />
+  <div class="note mb-3">
+    <!-- date on the left, actions on the right -->
+    <div class="d-flex align-center">
+      <v-chip size="small" variant="tonal">{{ date }}</v-chip>
       <v-spacer />
-      <DialogToUpdateNote :note="note" />
+      <template v-if="showControls">
+        <DialogToUpdateNote :note="note" small @saved="emit('changed')" />
+        <ConfirmButton icon="$deleteNote" :text="notes.deleteNote" @confirm="remove" />
+      </template>
     </div>
 
-    <div>
-      <v-chip size="small" class="mr-2">{{ date }}</v-chip>
-      <span class="note-text">{{ note.text }}</span>
-    </div>
+    <p class="note-text my-3">{{ note.text }}</p>
 
-    <div v-if="note.keywords.length" class="text-right mt-1">
-      <v-chip v-for="keyword in note.keywords" :key="keyword" size="small" color="#999" class="ml-1">
+    <v-expand-transition>
+      <div v-if="expanded">
+        <p v-for="verse of verses" :key="verse._id" class="note-verse" v-html="verse.html" />
+      </div>
+    </v-expand-transition>
+
+    <!-- keywords below the text and verses, the verses toggle on the right -->
+    <div v-if="note.keywords.length || note.refs.length" class="d-flex align-center flex-wrap ga-1">
+      <v-chip v-for="keyword in note.keywords" :key="keyword" size="small" variant="tonal" color="#888">
         #{{ keyword }}
       </v-chip>
+      <v-spacer />
+      <v-btn
+        v-if="note.refs.length"
+        :icon="expanded ? '$collapse' : '$expand'"
+        :aria-label="notes.versesHeader"
+        variant="text"
+        size="small"
+        color="secondary"
+        @click="toggle"
+      />
     </div>
-
-    <template v-if="note.refs.length">
-      <div class="text-center">
-        <v-btn :icon="expanded ? '$collapse' : '$expand'" variant="text" size="small" @click="toggle" />
-      </div>
-
-      <v-expand-transition>
-        <div v-if="expanded">
-          <p v-for="verse of verses" :key="verse._id" class="draggable-item" v-html="verse.html" />
-        </div>
-      </v-expand-transition>
-    </template>
   </div>
 </template>
 
@@ -58,15 +64,32 @@ async function toggle() {
   if (expanded.value) verses.value = await versesWithLinks(props.note.refs)
 }
 
-const remove = () => notesStore.removeNote(props.note)
+const emit = defineEmits<{ removed: []; changed: [] }>()
+
+async function remove() {
+  await notesStore.removeNote(props.note)
+  emit('removed')
+}
 </script>
 
 <style scoped>
 .note {
-  cursor: default;
+  border: solid 1px #ddd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  background: #fff8;
 }
 
 .note-text {
   white-space: pre-wrap;
+  font-size: 15px;
+}
+
+.note-verse {
+  border: solid 1px #e4e4e4;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: #fff;
 }
 </style>
