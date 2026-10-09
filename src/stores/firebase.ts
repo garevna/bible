@@ -3,9 +3,13 @@ import { defineStore } from 'pinia'
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
   createUserWithEmailAndPassword,
+  getAdditionalUserInfo,
   getAuth,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signOut,
   updateProfile,
   type Auth,
@@ -21,7 +25,6 @@ import {
   persistentLocalCache,
   persistentMultipleTabManager,
   setDoc,
-  updateDoc,
   type DocumentData,
   type Firestore
 } from 'firebase/firestore'
@@ -36,12 +39,12 @@ import { useAppStore } from './app'
 import { useUserStore } from './user'
 
 /**
- * Accounts live in Firebase Auth (email/password, the email is derived from the login,
- * see utils/loginEmail). Firestore layout:
- *   logins/{login}                                   - { uid }: who owns the login, readable by anyone
- *   users/{login}                                    - profile + uid, only for its owner
- *   users/{login}/{keywords|topics|notes|highlights} - user data, only for its owner
- *   catalogs/geo                                     - { regions: [...], [region]: [...cities] }
+ * Accounts live in Firebase Auth: email + password or Google.
+ * Users of the Vue 2 version keep signing in with their login: the migration script gave
+ * them a technical email derived from it (see utils/loginEmail).
+ * Firestore layout:
+ *   users/{uid}                                    - profile, only for its owner
+ *   users/{uid}/{keywords|topics|notes|highlights} - user data, only for its owner
  * The rules are in firestore.rules.
  */
 const configured = Boolean(firebaseConfig.apiKey)
@@ -54,11 +57,6 @@ export const useFirebaseStore = defineStore('firebase', () => {
   /** the Firebase Auth user, restored by the SDK on start */
   const authUser = shallowRef<AuthUser | null>(null)
   let authReady: Promise<AuthUser | null> | null = null
-
-  const catalog = shallowRef<{ regions: string[] | null; cities: string[] | null }>({
-    regions: null,
-    cities: null
-  })
 
   function initFirebase() {
     app.value ??= initializeApp(firebaseConfig)
@@ -93,73 +91,54 @@ export const useFirebaseStore = defineStore('firebase', () => {
     return authReady
   }
 
-  const emailOf = (login: string) => loginEmail(login, firebaseConfig.authDomain || 'bible.local')
-
-  const getUserRef = (login: string) => doc(firestore(), 'users', login)
+  const getUserRef = (uid: string) => doc(firestore(), 'users', uid)
 
   const userRef = computed(() => {
-    const { login } = useUserStore()
-    return login ? getUserRef(login) : null
+    const { uid } = useUserStore()
+    return uid ? getUserRef(uid) : null
   })
 
   const getUserCollectionRef = (collectionName: UserStoreName) =>
     userRef.value ? collection(userRef.value, collectionName) : null
 
-  /** uid of the owner of the login, or null when the login is free */
-  async function loginOwner(login: string): Promise<string | null> {
-    const data = (await getDoc(doc(firestore(), 'logins', login))).data()
-    return data?.uid ?? null
+  async function getProfile(uid: string): Promise<Profile | null> {
+    return ((await getDoc(getUserRef(uid))).data() as Profile | undefined) ?? null
   }
 
-  async function getProfile(login: string): Promise<Profile | null> {
-    const data = (await getDoc(getUserRef(login))).data()
-    if (!data) return null
-    const { uid: _uid, ...profile } = data
-    return profile as Profile
+  /** Written in the background like all user data (an awaited write would hang offline) */
+  function saveProfile(uid: string, profile: Profile) {
+    setDoc(getUserRef(uid), profile, { merge: true }).catch((error) =>
+      console.warn('Error saving profile\n', error)
+    )
   }
 
-  /** Throws the Firebase error (auth/invalid-credential for a wrong password) */
-  async function signInWithLogin(login: string, password: string) {
-    const { user } = await signInWithEmailAndPassword(firebaseAuth(), await emailOf(login), password)
+  /** An email, or the login of a user of the Vue 2 version */
+  const emailOf = async (emailOrLogin: string) =>
+    emailOrLogin.includes('@')
+      ? emailOrLogin
+      : loginEmail(emailOrLogin, firebaseConfig.authDomain || 'bible.local')
+
+  /** Throws the Firebase error (auth/invalid-credential for a wrong email or password) */
+  async function signInWithPassword(emailOrLogin: string, password: string) {
+    const { user } = await signInWithEmailAndPassword(firebaseAuth(), await emailOf(emailOrLogin), password)
     authUser.value = user
-    return user.uid
+    return { user, isNew: false }
   }
 
-  /**
-   * Creates the Auth account and the login and profile documents.
-   * Firestore writes need the server, and a write made offline would wait forever,
-   * so they fail after a timeout; the Auth account is removed then.
-   */
-  async function createAccount(login: string, password: string, profile: Profile, timeout = 15000) {
-    const { user } = await createUserWithEmailAndPassword(firebaseAuth(), await emailOf(login), password)
-
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const expired = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error('Firestore did not answer: the user was not created')),
-        timeout
-      )
-    })
-
-    try {
-      await Promise.race([
-        (async () => {
-          await updateProfile(user, { displayName: login })
-          await setDoc(doc(firestore(), 'logins', login), { uid: user.uid })
-          await setDoc(getUserRef(login), { ...profile, uid: user.uid })
-        })(),
-        expired
-      ])
-    } catch (error) {
-      await user.delete().catch(() => undefined)
-      throw error
-    } finally {
-      clearTimeout(timer)
-    }
-
+  async function signUpWithPassword(email: string, password: string, displayName: string) {
+    const { user } = await createUserWithEmailAndPassword(firebaseAuth(), email, password)
+    displayName && (await updateProfile(user, { displayName }).catch(() => undefined))
     authUser.value = user
-    return user.uid
+    return { user, isNew: true }
   }
+
+  async function signInWithGoogle() {
+    const result = await signInWithPopup(firebaseAuth(), new GoogleAuthProvider())
+    authUser.value = result.user
+    return { user: result.user, isNew: Boolean(getAdditionalUserInfo(result)?.isNewUser) }
+  }
+
+  const resetPassword = async (email: string) => sendPasswordResetEmail(firebaseAuth(), email)
 
   async function signOutAuth() {
     await signOut(firebaseAuth()).catch((error) => console.warn('Sign out failed\n', error))
@@ -174,7 +153,9 @@ export const useFirebaseStore = defineStore('firebase', () => {
 
   function updateUserData(data: Partial<Profile>) {
     if (!userRef.value) return
-    updateDoc(userRef.value, data).catch((error) => console.warn('Error updating user\n', error))
+    setDoc(userRef.value, data, { merge: true }).catch((error) =>
+      console.warn('Error updating user\n', error)
+    )
   }
 
   function saveFirebaseDocument(collectionName: UserStoreName, data: DocumentData & { _id?: string }) {
@@ -216,51 +197,22 @@ export const useFirebaseStore = defineStore('firebase', () => {
     })
   }
 
-  async function getCatalog(catalogName = 'geo', collectionName = 'regions') {
-    const data = (await getDoc(doc(collection(firestore(), 'catalogs'), catalogName))).data()
-    return data ? Array.from(new Set<string>(data[collectionName])) : []
-  }
-
-  async function getRegions() {
-    const regions = await useAppStore().withProgress(() => getCatalog('geo', 'regions'))
-    catalog.value = { ...catalog.value, regions: regions ?? [] }
-  }
-
-  async function getRegionCities(region: string) {
-    const cities = await useAppStore().withProgress(() => getCatalog('geo', region))
-    catalog.value = { ...catalog.value, cities: cities ?? [] }
-  }
-
-  async function getCities(country: string) {
-    await useAppStore().withProgress(async () => {
-      const response = await fetch('https://countriesnow.space/api/v0.1/countries/cities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ country })
-      })
-      const { data } = await response.json()
-      catalog.value = { ...catalog.value, cities: data }
-    })
-  }
-
   return {
     db,
-    catalog,
     authUser,
     userRef,
     initFirebase,
     waitForAuth,
-    loginOwner,
+    saveProfile,
     getProfile,
-    signInWithLogin,
-    createAccount,
+    signInWithPassword,
+    signUpWithPassword,
+    signInWithGoogle,
+    resetPassword,
     signOutAuth,
     updateUserData,
     saveFirebaseDocument,
     deleteDocument,
-    read,
-    getRegions,
-    getRegionCities,
-    getCities
+    read
   }
 })

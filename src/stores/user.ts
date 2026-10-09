@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { FirebaseError } from 'firebase/app'
+import type { User as AuthUser } from 'firebase/auth'
 
 import { defaultAvatar } from '@/assets/default-avatar'
 import { defaultTranslation } from '@/configs'
@@ -13,8 +14,37 @@ import { useFirebaseStore } from './firebase'
 /** profile of the signed in user, so that the app starts offline too */
 const PROFILE_KEY = 'profile'
 
-export type LoginCheck = 'exists' | 'missing' | 'error'
-export type SignInResult = 'ok' | 'wrong-password' | 'error'
+export type AuthResult =
+  | 'ok'
+  | 'wrong-credentials'
+  | 'email-in-use'
+  | 'invalid-email'
+  | 'weak-password'
+  | 'cancelled'
+  | 'network'
+  | 'error'
+
+const authErrors: Record<string, AuthResult> = {
+  'auth/invalid-credential': 'wrong-credentials',
+  'auth/wrong-password': 'wrong-credentials',
+  'auth/user-not-found': 'wrong-credentials',
+  'auth/invalid-login-credentials': 'wrong-credentials',
+  'auth/email-already-in-use': 'email-in-use',
+  'auth/invalid-email': 'invalid-email',
+  'auth/missing-email': 'invalid-email',
+  'auth/weak-password': 'weak-password',
+  'auth/popup-closed-by-user': 'cancelled',
+  'auth/cancelled-popup-request': 'cancelled',
+  'auth/user-cancelled': 'cancelled',
+  'auth/network-request-failed': 'network'
+}
+
+function authResult(error: unknown): AuthResult {
+  if (!(error instanceof FirebaseError)) return 'error'
+  const result = authErrors[error.code]
+  result ?? console.error(error)
+  return result ?? 'error'
+}
 
 export const useUserStore = defineStore('user', () => {
   const userName = ref<string | null>(null)
@@ -23,12 +53,14 @@ export const useUserStore = defineStore('user', () => {
   const country = ref<string | null>(null)
   const translation = ref<string>(defaultTranslation)
   const lang = ref<Lang>('ua')
-  const login = ref<string | null>(null)
   /** Firebase Auth uid */
   const uid = ref<string | null>(null)
+  const email = ref<string | null>(null)
 
-  const signed = computed(() => Boolean(login.value) && Boolean(uid.value))
+  const signed = computed(() => Boolean(uid.value))
   const avatar = computed(() => userPhoto.value || defaultAvatar)
+  /** what the header shows */
+  const displayName = computed(() => userName.value || email.value || '')
 
   const profile = (): Profile => ({
     userName: userName.value ?? '',
@@ -44,31 +76,60 @@ export const useUserStore = defineStore('user', () => {
     userPhoto.value = user.avatar || defaultAvatar
     city.value = user.city ?? null
     country.value = user.country ?? null
-    login.value = user.login
     uid.value = user.uid
+    email.value = user.email ?? null
     translation.value = user.translation || defaultTranslation
     lang.value = user.lang || 'ua'
   }
 
   function clearUser() {
-    userName.value = userPhoto.value = city.value = country.value = login.value = uid.value = null
+    userName.value = userPhoto.value = city.value = country.value = uid.value = email.value = null
   }
 
   function updateLocalStorage() {
     localStorage.setItem('translation', translation.value)
     localStorage.setItem('lang', lang.value)
-    if (signed.value) localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile(), login: login.value }))
+    if (signed.value) localStorage.setItem(PROFILE_KEY, JSON.stringify({ ...profile(), uid: uid.value }))
   }
 
   /** Profile from Firestore, or the one saved locally when offline */
-  async function loadProfile(userLogin: string): Promise<Profile> {
+  async function loadProfile(userUid: string): Promise<Profile | null> {
     const remote = await useFirebaseStore()
-      .getProfile(userLogin)
+      .getProfile(userUid)
       .catch(() => null)
     if (remote) return remote
 
     const cached = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null')
-    return cached?.login === userLogin ? cached : {}
+    return cached?.uid === userUid ? cached : null
+  }
+
+  /** Profile for a new account: what the sign up form or the Google account gives */
+  const newProfile = (authUser: AuthUser, data: Profile = {}): Profile => ({
+    userName: data.userName || authUser.displayName || '',
+    avatar: data.avatar || authUser.photoURL || defaultAvatar,
+    city: data.city ?? '',
+    country: data.country ?? '',
+    lang: data.lang ?? lang.value,
+    translation: data.translation ?? translation.value
+  })
+
+  /** After any kind of sign in: profile (created for a new account) and the user's data */
+  async function enter(authUser: AuthUser, isNew: boolean, data?: Profile) {
+    const firebase = useFirebaseStore()
+
+    await useAppStore().withProgress(async () => {
+      let userProfile = isNew ? null : await loadProfile(authUser.uid)
+      if (!userProfile) {
+        userProfile = newProfile(authUser, data)
+        firebase.saveProfile(authUser.uid, userProfile)
+      }
+
+      setUser({ ...userProfile, uid: authUser.uid, email: authUser.email })
+      updateLocalStorage()
+
+      isNew || (await firebase.read())
+      await useContentStore().getChapterContent()
+    })
   }
 
   /** Restores the Firebase Auth session, if any */
@@ -80,74 +141,47 @@ export const useUserStore = defineStore('user', () => {
     ;['SI', 'avatar', 'location'].forEach((key) => localStorage.removeItem(key))
 
     const authUser = await useFirebaseStore().waitForAuth()
-    const userLogin = authUser?.displayName
-    if (!authUser || !userLogin) return
+    if (!authUser) return
 
+    const userProfile = (await loadProfile(authUser.uid)) ?? newProfile(authUser)
     setUser({
       lang: lang.value,
       translation: translation.value,
-      ...(await loadProfile(userLogin)),
-      login: userLogin,
-      uid: authUser.uid
+      ...userProfile,
+      uid: authUser.uid,
+      email: authUser.email
     })
     updateLocalStorage()
   }
 
-  /** Whether the login exists (sign in) or is taken (sign up) */
-  async function checkLogin(userLogin: string): Promise<LoginCheck> {
-    const owner = await useAppStore().withProgress(async () => ({
-      uid: await useFirebaseStore().loginOwner(userLogin)
-    }))
-    if (!owner) return 'error'
-    return owner.uid ? 'exists' : 'missing'
-  }
-
-  /** Signs in, loads the profile and the user's data */
-  async function signIn(userLogin: string, password: string): Promise<SignInResult> {
-    const app = useAppStore()
-    const firebase = useFirebaseStore()
-
-    let userUid: string
+  async function run(action: () => Promise<{ user: AuthUser; isNew: boolean }>, data?: Profile) {
     try {
-      userUid = (await app.withProgress(() => firebase.signInWithLogin(userLogin, password), {
-        rethrow: true
-      }))!
+      const { user, isNew } = (await useAppStore().withProgress(action, { rethrow: true }))!
+      await enter(user, isNew, data)
+      return 'ok' as const
     } catch (error) {
-      const code = error instanceof FirebaseError ? error.code : ''
-      return ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(code)
-        ? 'wrong-password'
-        : 'error'
+      return authResult(error)
     }
-
-    await app.withProgress(async () => {
-      setUser({ ...(await loadProfile(userLogin)), login: userLogin, uid: userUid })
-      updateLocalStorage()
-      await firebase.read()
-      await useContentStore().getChapterContent()
-    })
-    return 'ok'
   }
 
-  /** Creates the account and signs in; returns false when it could not be created */
-  async function createNewUser(userLogin: string, password: string, data: Profile) {
-    const newProfile: Profile = {
-      userName: data.userName ?? '',
-      avatar: data.avatar || defaultAvatar,
-      city: data.city ?? '',
-      country: data.country ?? '',
-      lang: data.lang ?? lang.value,
-      translation: data.translation ?? translation.value
+  /** Email (or the login of an old account) and password */
+  const signIn = (emailOrLogin: string, password: string) =>
+    run(() => useFirebaseStore().signInWithPassword(emailOrLogin.trim(), password))
+
+  const signInWithGoogle = () => run(() => useFirebaseStore().signInWithGoogle())
+
+  const signUp = (userEmail: string, password: string, data: Profile) =>
+    run(() => useFirebaseStore().signUpWithPassword(userEmail.trim(), password, data.userName ?? ''), data)
+
+  async function resetPassword(userEmail: string): Promise<AuthResult> {
+    try {
+      await useAppStore().withProgress(() => useFirebaseStore().resetPassword(userEmail.trim()), {
+        rethrow: true
+      })
+      return 'ok'
+    } catch (error) {
+      return authResult(error)
     }
-
-    const userUid = await useAppStore().withProgress(() =>
-      useFirebaseStore().createAccount(userLogin, password, newProfile)
-    )
-    if (!userUid) return false
-
-    setUser({ ...newProfile, login: userLogin, uid: userUid })
-    updateLocalStorage()
-    await useContentStore().getChapterContent()
-    return true
   }
 
   async function signOut() {
@@ -196,16 +230,18 @@ export const useUserStore = defineStore('user', () => {
     country,
     translation,
     lang,
-    login,
     uid,
+    email,
     signed,
     avatar,
+    displayName,
     setUser,
     initUser,
-    checkLogin,
     signIn,
+    signInWithGoogle,
+    signUp,
+    resetPassword,
     signOut,
-    createNewUser,
     updateUserLang,
     updateUserTranslation,
     updateUserAvatar,

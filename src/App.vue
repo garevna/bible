@@ -3,8 +3,7 @@
     <AppHeader v-model:sign-in="signInDialog" v-model:sign-up="signUpDialog" />
 
     <v-main class="bg-homefone">
-      <SignIn v-model="signInDialog" @sign-up="signUpDialog = true" />
-      <SignUp v-model="signUpDialog" />
+      <AuthDialog v-model="authOpen" v-model:tab="authTab" />
 
       <component :is="view" v-if="view" />
     </v-main>
@@ -22,8 +21,7 @@ import { useVerseLinks } from '@/composables/useVerseLinks'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 
-const SignIn = defineAsyncComponent(() => import('@/components/user/SignIn.vue'))
-const SignUp = defineAsyncComponent(() => import('@/components/user/SignUp.vue'))
+const AuthDialog = defineAsyncComponent(() => import('@/components/user/AuthDialog.vue'))
 
 const views = {
   Home: defineAsyncComponent(() => import('@/views/Home.vue')),
@@ -37,8 +35,20 @@ const views = {
 const app = useAppStore()
 const user = useUserStore()
 
-const signInDialog = ref(false)
-const signUpDialog = ref(false)
+const authOpen = ref(false)
+const authTab = ref<'sign-in' | 'sign-up'>('sign-in')
+
+/** the header has separate sign in and sign up buttons; both open the same dialog */
+const authButton = (value: 'sign-in' | 'sign-up') =>
+  computed({
+    get: () => authOpen.value && authTab.value === value,
+    set: (open: boolean) => {
+      authTab.value = value
+      authOpen.value = open
+    }
+  })
+const signInDialog = authButton('sign-in')
+const signUpDialog = authButton('sign-up')
 
 const view = computed(() => (app.currentView ? views[app.currentView as keyof typeof views] : null))
 
@@ -47,7 +57,7 @@ useVerseLinks()
 watch(
   () => user.signed,
   (signed, wasSigned) => {
-    if (signed) signInDialog.value = signUpDialog.value = false
+    if (signed) authOpen.value = false
     else if (wasSigned && app.page !== 'bible') app.setPage('bible')
   }
 )

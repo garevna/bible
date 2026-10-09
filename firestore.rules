@@ -1,41 +1,20 @@
 rules_version = '2';
 
-// Deploy: firebase deploy --only firestore:rules --project <project-id>
+// Deploy: pnpm dlx firebase-tools deploy --only firestore:rules --project <project-id>
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // the signed in Firebase Auth user owns this login
-    function isOwner(login) {
-      return request.auth != null
-        && get(/databases/$(database)/documents/logins/$(login)).data.uid == request.auth.uid;
-    }
+    // users/{uid}: profile and data of a Firebase Auth user, only for that user.
+    // Documents of the Vue 2 version are keyed by login, so nobody can read them any more;
+    // scripts/migrate-users-to-auth.ts copies them to users/{uid}.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
 
-    // logins/{login} = { uid }: sign up checks that a login is free, sign in that it exists
-    match /logins/{login} {
-      allow get: if true;
-      allow list: if false;
-      allow create: if request.auth != null
-        && request.resource.data.keys().hasOnly(['uid'])
-        && request.resource.data.uid == request.auth.uid;
-      allow update, delete: if false;
-    }
-
-    // profile; written right after logins/{login}, so isOwner already holds
-    match /users/{login} {
-      allow read, create, update: if isOwner(login);
-      allow delete: if false;
-
-      // keywords, topics, notes, highlights; the old "creds" collection is closed
       match /{collection}/{docId} {
-        allow read, write: if collection in ['keywords', 'topics', 'notes', 'highlights']
-          && isOwner(login);
+        allow read, write: if request.auth != null
+          && request.auth.uid == uid
+          && collection in ['keywords', 'topics', 'notes', 'highlights'];
       }
-    }
-
-    // regions and cities for sign up
-    match /catalogs/{catalog} {
-      allow read: if true;
-      allow write: if false;
     }
   }
 }

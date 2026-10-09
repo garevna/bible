@@ -30,27 +30,30 @@ pnpm dev
 
 ## Firebase
 
-Облікові записи — у Firebase Auth (email і пароль). Логін перетворюється на технічний email
-`l<sha256(логін)>@<authDomain>` (`src/utils/loginEmail.ts`), листи на нього не надсилаються.
-Документ `logins/{login}` = `{ uid }` показує, кому належить логін; усе інше доступне лише власнику.
-Правила — у `firestore.rules`.
+Вхід — через Firebase Auth: email і пароль або Google. Підтвердження email не вимагається.
+Дані користувача лежать у `users/{uid}` і доступні лише йому (правила — у `firestore.rules`).
+
+Користувачі версії на Vue 2 входять своїм старим логіном і паролем: скрипт міграції створює
+їм обліковий запис із технічним email `l<sha256(логін)>@<authDomain>` (`src/utils/loginEmail.ts`)
+і переносить їхні дані з `users/{login}` до `users/{uid}`.
 
 Налаштування проєкту (один раз):
 
-1. Firebase console → Authentication → Sign-in method → увімкнути **Email/Password**.
-2. Розгорнути правила: `pnpm dlx firebase-tools deploy --only firestore:rules --project <project-id>`.
-3. Перенести наявних користувачів (паролі зберігаються, вхід як раніше):
+1. Firebase console → Authentication → Sign-in method → увімкнути **Email/Password** і **Google**.
+2. Authentication → Settings → Authorized domains → додати домен сайту (наприклад, `<user>.github.io`).
+3. Розгорнути правила: `pnpm dlx firebase-tools deploy --only firestore:rules --project <project-id>`.
+4. Перенести наявних користувачів (паролі зберігаються):
 
    ```sh
    # ключ: Project settings → Service accounts → Generate new private key (не додавати в git)
-   node scripts/migrate-users-to-auth.ts --key key.json            # перегляд без змін
-   node scripts/migrate-users-to-auth.ts --key key.json --apply    # імпорт у Firebase Auth
-   node scripts/migrate-users-to-auth.ts --key key.json --check <логін>   # перевірити вхід
-   node scripts/migrate-users-to-auth.ts --key key.json --delete-creds    # прибрати старі хеші
+   node scripts/migrate-users-to-auth.ts --key key.json                  # перегляд без змін
+   node scripts/migrate-users-to-auth.ts --key key.json --apply          # імпорт і копіювання даних
+   node scripts/migrate-users-to-auth.ts --key key.json --check <логін>  # перевірити вхід
+   node scripts/migrate-users-to-auth.ts --key key.json --delete-legacy  # прибрати старі документи
    ```
 
    Якщо `--check` не проходить, `--undo` повертає все як було до `--apply`
-   (поки не виконано `--delete-creds`).
+   (поки не виконано `--delete-legacy`).
 
 ## E2E-тести
 

@@ -1,6 +1,6 @@
 <template>
   <span v-if="user.signed" class="d-flex align-center">
-    <v-tooltip :text="user.userName || user.login || ''">
+    <v-tooltip :text="user.displayName">
       <template #activator="{ props }">
         <v-avatar v-bind="props" size="32" class="mr-2" :image="user.avatar" />
       </template>

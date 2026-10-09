@@ -5,88 +5,53 @@ export const signUp = {
     en: 'Sign Up'
   },
   userNameLabel: {
-    ua: 'Як до вас краще звертатися?',
-    ru: 'Как к вам лучше обращаться?',
-    en: 'What is the best way to name you?'
+    ua: 'Як до вас звертатися (необов’язково)',
+    ru: 'Как к вам обращаться (необязательно)',
+    en: 'Your name (optional)'
   },
-  avatarLabel: {
-    ua: 'Завантажити фото',
-    ru: 'Загрузить фото',
-    en: 'Upload photo'
+  emailLabel: {
+    ua: 'Email',
+    ru: 'Email',
+    en: 'Email'
   },
-  avatarSizeError: {
-    ua: 'Файл занадто великий',
-    ru: 'Файл слишком большой',
-    en: 'File is too large'
-  },
-  avatarTypeError: {
-    ua: 'Файл не є зображенням',
-    ru: 'Файл не является изображением',
-    en: 'File is not an image'
-  },
-  userCountryLabel: {
-    ua: 'Країна, де ви живете',
-    ru: 'Страна, где вы живете',
-    en: 'Country where you live'
-  },
-  userCityLabel: {
-    ua: 'Місто, в якому ви живете',
-    ru: 'Город, в котором вы живете',
-    en: 'City where you live'
-  },
-  loginLabel: {
-    ua: 'Логін',
-    ru: 'Логин',
-    en: 'Login'
+  withGoogle: {
+    ua: 'Зареєструватися через Google',
+    ru: 'Зарегистрироваться через Google',
+    en: 'Sign up with Google'
   },
   passwordLabel: {
-    ua: 'Вигадайте пароль',
-    ru: 'Придумайте пароль',
-    en: 'Make up a password'
+    ua: 'Пароль',
+    ru: 'Пароль',
+    en: 'Password'
   },
   doublePasswordLabel: {
-    ua: 'Повторіть, будь ласка, пароль ще раз',
-    ru: 'Повторите, пожалуйста, пароль еще раз',
-    en: 'Please repeat password once more'
+    ua: 'Повторіть пароль',
+    ru: 'Повторите пароль',
+    en: 'Repeat the password'
   },
   registrationButtonText: {
-    ua: 'Реєстрація',
-    ru: 'Регистрация',
-    en: 'Sign Up'
+    ua: 'Зареєструватися',
+    ru: 'Зарегистрироваться',
+    en: 'Sign up'
   },
-  back: {
-    ua: 'Повернутися',
-    ru: 'Назад',
-    en: 'Back'
+  emailInUse: {
+    ua: 'Цей email уже зареєстрований. Увійдіть або відновіть пароль.',
+    ru: 'Этот email уже зарегистрирован. Войдите или восстановите пароль.',
+    en: 'This email is already registered. Sign in or reset the password.'
   },
-  next: {
-    ua: 'Далі',
-    ru: 'Далее',
-    en: 'Next'
-  },
-  loginErrorMessage: {
-    ua: 'Цей логін уже існує',
-    ru: 'Логин уже используется',
-    en: 'Login is in use'
+  emailInvalid: {
+    ua: 'Невірний формат email',
+    ru: 'Неверный формат email',
+    en: 'Invalid email'
   },
   passwordNotStrongEnough: {
-    ua: 'Пароль недостатньо надійний. Має бути не менше 8 символів і хоча б одна цифра.',
-    ru: 'Пароль недостаточно надежный. Должно быть не менее 8 символов и хотя бы одна цифра.',
-    en: 'Password is not secure enough. Must be at least 8 characters and at least one digit.'
+    ua: 'Не менше 8 символів і хоча б одна цифра',
+    ru: 'Не менее 8 символов и хотя бы одна цифра',
+    en: 'At least 8 characters and one digit'
   },
   passwordErrorMessage: {
-    ua: 'Помилка. Паролі не збігаються',
-    ru: 'Ошибка. Пароли не совпадают',
-    en: 'Error. Passwords do not match'
-  },
-  createError: {
-    ua: 'Не вдалося створити користувача. Перевірте з’єднання з інтернетом.',
-    ru: 'Не удалось создать пользователя. Проверьте подключение к интернету.',
-    en: 'Failed to create the user. Check your internet connection.'
-  },
-  regionLabel: {
-    ua: 'Область',
-    ru: 'Область',
-    en: 'Region'
+    ua: 'Паролі не збігаються',
+    ru: 'Пароли не совпадают',
+    en: 'Passwords do not match'
   }
 }

@@ -72,10 +72,10 @@ export interface Profile {
   lang?: Lang
 }
 
-/** Signed in user: the profile plus the login and the Firebase Auth uid */
+/** Signed in user: the profile plus the Firebase Auth uid and email */
 export interface User extends Profile {
-  login: string
   uid: string
+  email?: string | null
 }
 
 export type Page = 'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search'
