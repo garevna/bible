@@ -14,7 +14,9 @@
             :label="signIn.loginLabel"
             :loading="loginStatus === 'in-test' ? 'warning' : false"
             :append-inner-icon="loginStatus === 'not-tested' ? '$submit' : ''"
-            :error-messages="loginStatus === 'invalid' ? signIn.loginErrorMessage : ''"
+            :error-messages="
+              messages[loginStatus] ?? (loginStatus === 'invalid' ? signIn.loginErrorMessage : '')
+            "
             @update:model-value="loginStatus = 'not-tested'"
             @click:append-inner="testLogin"
             @keyup.enter="testLogin"
@@ -36,7 +38,9 @@
             :prepend-inner-icon="showPass ? 'mdi-eye' : 'mdi-eye-off'"
             append-inner-icon="$send"
             :loading="passwordStatus === 'in-test' ? 'warning' : false"
-            :error-messages="passwordStatus === 'invalid' ? signIn.passwordErrorMessage : ''"
+            :error-messages="
+              messages[passwordStatus] ?? (passwordStatus === 'invalid' ? signIn.passwordErrorMessage : '')
+            "
             @update:model-value="passwordStatus = 'not-tested'"
             @click:prepend-inner="showPass = !showPass"
             @click:append-inner="testPassword"
@@ -55,13 +59,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 
-type Status = 'not-tested' | 'in-test' | 'valid' | 'invalid'
+type Status = 'not-tested' | 'in-test' | 'valid' | 'invalid' | 'error'
 
 const dialog = defineModel<boolean>({ default: false })
 const emit = defineEmits<{ 'sign-up': [] }>()
@@ -76,6 +80,9 @@ const password = ref('')
 const passwordStatus = ref<Status>('not-tested')
 const showPass = ref(false)
 
+/** no answer from Firebase: not the user's mistake */
+const messages = computed<Partial<Record<Status, string>>>(() => ({ error: signIn.value.networkError }))
+
 watch(dialog, (open) => {
   if (!open) return
   step.value = 1
@@ -86,17 +93,17 @@ watch(dialog, (open) => {
 async function testLogin() {
   if (!login.value) return
   loginStatus.value = 'in-test'
-  const exists = await user.testUserLogin(login.value.trim())
-  loginStatus.value = exists ? 'valid' : 'invalid'
-  if (exists) step.value = 2
+  const check = await user.checkLogin(login.value.trim())
+  loginStatus.value = check === 'exists' ? 'valid' : check === 'missing' ? 'invalid' : 'error'
+  if (check === 'exists') step.value = 2
 }
 
 async function testPassword() {
   if (!password.value) return
   passwordStatus.value = 'in-test'
-  const valid = await user.testUserPassword(password.value)
-  passwordStatus.value = valid ? 'valid' : 'invalid'
-  if (valid) dialog.value = false
+  const result = await user.signIn(login.value.trim(), password.value)
+  passwordStatus.value = result === 'ok' ? 'valid' : result === 'wrong-password' ? 'invalid' : 'error'
+  if (result === 'ok') dialog.value = false
 }
 
 function goToSignUp() {

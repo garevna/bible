@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { pushUnique, removeById } from './array'
 import { clearHighlights, getHTML, updateIntervals } from './highlights'
 import { chapterOf, getLineRef, parseLineRef } from './refs'
+import { loginEmail, sha256Hex } from './loginEmail'
 import { markWords, normalize, queryWords } from './search'
 
 describe('refs', () => {
@@ -83,5 +84,18 @@ describe('search', () => {
       '<mark>Сина</mark> Давидового, <mark>Сина</mark>'
     )
     expect(markWords('a <b>', [])).toBe('a &lt;b&gt;')
+  })
+})
+
+describe('login email', () => {
+  it('hashes like sha256', async () => {
+    expect(await sha256Hex('abc')).toBe('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad')
+  })
+
+  it('makes a stable valid email for any login', async () => {
+    const email = await loginEmail('Ірина Ф.', 'bible.firebaseapp.com')
+    expect(email).toMatch(/^l[0-9a-f]{40}@bible\.firebaseapp\.com$/)
+    expect(await loginEmail('Ірина Ф.', 'bible.firebaseapp.com')).toBe(email)
+    expect(await loginEmail('ірина ф.', 'bible.firebaseapp.com')).not.toBe(email)
   })
 })

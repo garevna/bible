@@ -33,5 +33,10 @@ export const signIn = {
     ua: 'Невірний пароль',
     ru: 'Неверный пароль',
     en: 'Invalid password'
+  },
+  networkError: {
+    ua: 'Немає зв’язку з сервером. Перевірте з’єднання з інтернетом.',
+    ru: 'Нет связи с сервером. Проверьте подключение к интернету.',
+    en: 'The server cannot be reached. Check your internet connection.'
   }
 }

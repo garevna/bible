@@ -28,6 +28,30 @@ pnpm dev
 
 У продакшн-збірці `base` = `/bible-ukr/` (GitHub Pages), змінюється через `BASE_PATH`.
 
+## Firebase
+
+Облікові записи — у Firebase Auth (email і пароль). Логін перетворюється на технічний email
+`l<sha256(логін)>@<authDomain>` (`src/utils/loginEmail.ts`), листи на нього не надсилаються.
+Документ `logins/{login}` = `{ uid }` показує, кому належить логін; усе інше доступне лише власнику.
+Правила — у `firestore.rules`.
+
+Налаштування проєкту (один раз):
+
+1. Firebase console → Authentication → Sign-in method → увімкнути **Email/Password**.
+2. Розгорнути правила: `pnpm dlx firebase-tools deploy --only firestore:rules --project <project-id>`.
+3. Перенести наявних користувачів (паролі зберігаються, вхід як раніше):
+
+   ```sh
+   # ключ: Project settings → Service accounts → Generate new private key (не додавати в git)
+   node scripts/migrate-users-to-auth.ts --key key.json            # перегляд без змін
+   node scripts/migrate-users-to-auth.ts --key key.json --apply    # імпорт у Firebase Auth
+   node scripts/migrate-users-to-auth.ts --key key.json --check <логін>   # перевірити вхід
+   node scripts/migrate-users-to-auth.ts --key key.json --delete-creds    # прибрати старі хеші
+   ```
+
+   Якщо `--check` не проходить, `--undo` повертає все як було до `--apply`
+   (поки не виконано `--delete-creds`).
+
 ## E2E-тести
 
 Тести в `e2e/` запускаються на production-збірці (`vite build` + `vite preview` на порту 4179).

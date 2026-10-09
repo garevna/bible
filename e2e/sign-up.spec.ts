@@ -1,7 +1,8 @@
 import { dialog, expect, openBible, test, withStores } from './fixtures'
 
-test('sign up walks the steps and reports that Firestore is unreachable', async ({ page }) => {
-  test.setTimeout(150_000)
+/* The tests run offline, so they check that the dialogs say so instead of failing silently. */
+
+test('sign up checks the login and reports that the server is unreachable', async ({ page }) => {
   await openBible(page)
   await page.getByRole('button', { name: 'Реєстрація' }).click()
 
@@ -9,18 +10,22 @@ test('sign up walks the steps and reports that Firestore is unreachable', async 
   await form.getByLabel('Як до вас краще звертатися?').fill('E2E Tester')
   for (let step = 0; step < 3; step++) await form.getByRole('button', { name: 'Далі' }).click()
 
-  await form.getByLabel('Логін').fill('e2e-offline-user')
+  await form.getByRole('textbox', { name: 'Логін' }).fill('e2e-offline-user')
   await form.getByRole('button', { name: 'Далі' }).click()
 
-  const password = form.locator('.v-window-item--active input[type=password]')
-  await password.fill('short')
-  await expect(form.getByText('недостатньо надійний')).toBeVisible()
-  await password.fill('shortword123')
-  await form.getByRole('button', { name: 'Далі' }).click()
+  await expect(form.getByText('Немає зв’язку з сервером')).toBeVisible({ timeout: 30_000 })
+  await expect(form.getByRole('textbox', { name: 'Логін' })).toBeVisible()
+  expect(await withStores(page, (stores) => stores.user.signed)).toBe(false)
+})
 
-  await form.locator('.v-window-item--active input[type=password]').fill('shortword123')
-  await form.getByRole('button', { name: 'Реєстрація' }).click()
+test('sign in reports that the server is unreachable', async ({ page }) => {
+  await openBible(page)
+  await page.getByRole('button', { name: 'Вхід' }).click()
 
-  await expect(form.getByText('Не вдалося створити користувача')).toBeVisible({ timeout: 60_000 })
+  const form = dialog(page)
+  await form.getByRole('textbox', { name: 'Логін' }).fill('someone')
+  await form.getByRole('textbox', { name: 'Логін' }).press('Enter')
+
+  await expect(form.getByText('Немає зв’язку з сервером')).toBeVisible({ timeout: 30_000 })
   expect(await withStores(page, (stores) => stores.user.signed)).toBe(false)
 })

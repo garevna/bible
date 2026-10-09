@@ -48,7 +48,7 @@ export async function openBible(page: Page) {
  */
 export async function signInLocally(page: Page) {
   await withStores(page, async (stores) => {
-    stores.user.setUser({ login: 'e2e-user', password: 'e2e', userName: 'E2E' })
+    stores.user.setUser({ login: 'e2e-user', uid: 'e2e-uid', userName: 'E2E' })
     for (const page of ['topics', 'keywords', 'notes', 'bible']) await stores.app.setPage(page)
   })
   await expect(page.locator('.line-actions').first()).toBeVisible()

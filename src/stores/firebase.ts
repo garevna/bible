@@ -1,8 +1,17 @@
 import { computed, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
-import { initializeApp } from 'firebase/app'
+import { initializeApp, type FirebaseApp } from 'firebase/app'
 import {
-  addDoc,
+  createUserWithEmailAndPassword,
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  updateProfile,
+  type Auth,
+  type User as AuthUser
+} from 'firebase/auth'
+import {
   collection,
   deleteDoc,
   doc,
@@ -19,21 +28,32 @@ import {
 
 import { firebaseConfig } from '@/configs'
 import { clearStore, putRecords, userStoreNames, type UserStoreName } from '@/db'
-import type { User } from '@/types'
+import type { Profile } from '@/types'
+import { loginEmail } from '@/utils/loginEmail'
 import { chapterOf } from '@/utils/refs'
 
 import { useAppStore } from './app'
 import { useUserStore } from './user'
 
 /**
- * Firestore layout:
- *   users/{login}                 - profile (userName, avatar, city, country, lang, translation)
- *   users/{login}/creds/{auto-id} - { login, password }
- *   users/{login}/{keywords|topics|notes|highlights}/{_id}
- *   catalogs/geo                  - { regions: [...], [region]: [...cities] }
+ * Accounts live in Firebase Auth (email/password, the email is derived from the login,
+ * see utils/loginEmail). Firestore layout:
+ *   logins/{login}                                   - { uid }: who owns the login, readable by anyone
+ *   users/{login}                                    - profile + uid, only for its owner
+ *   users/{login}/{keywords|topics|notes|highlights} - user data, only for its owner
+ *   catalogs/geo                                     - { regions: [...], [region]: [...cities] }
+ * The rules are in firestore.rules.
  */
+const configured = Boolean(firebaseConfig.apiKey)
+
 export const useFirebaseStore = defineStore('firebase', () => {
+  const app = shallowRef<FirebaseApp | null>(null)
   const db = shallowRef<Firestore | null>(null)
+  const auth = shallowRef<Auth | null>(null)
+
+  /** the Firebase Auth user, restored by the SDK on start */
+  const authUser = shallowRef<AuthUser | null>(null)
+  let authReady: Promise<AuthUser | null> | null = null
 
   const catalog = shallowRef<{ regions: string[] | null; cities: string[] | null }>({
     regions: null,
@@ -41,16 +61,39 @@ export const useFirebaseStore = defineStore('firebase', () => {
   })
 
   function initFirebase() {
+    app.value ??= initializeApp(firebaseConfig)
     // the persistent cache keeps writes made offline until they reach the server
-    db.value ??= initializeFirestore(initializeApp(firebaseConfig), {
+    db.value ??= initializeFirestore(app.value, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     })
+    // without an API key (no .env.local) the app works for guests only
+    if (configured) auth.value ??= getAuth(app.value)
   }
 
   const firestore = () => {
     initFirebase()
     return db.value!
   }
+
+  const firebaseAuth = () => {
+    initFirebase()
+    if (!auth.value) throw new Error('Firebase is not configured: see .env.example')
+    return auth.value
+  }
+
+  /** Resolves with the restored session once the SDK has checked it */
+  function waitForAuth() {
+    if (!configured) return Promise.resolve(null)
+    authReady ??= new Promise((resolve) => {
+      onAuthStateChanged(firebaseAuth(), (user) => {
+        authUser.value = user
+        resolve(user)
+      })
+    })
+    return authReady
+  }
+
+  const emailOf = (login: string) => loginEmail(login, firebaseConfig.authDomain || 'bible.local')
 
   const getUserRef = (login: string) => doc(firestore(), 'users', login)
 
@@ -62,25 +105,33 @@ export const useFirebaseStore = defineStore('firebase', () => {
   const getUserCollectionRef = (collectionName: UserStoreName) =>
     userRef.value ? collection(userRef.value, collectionName) : null
 
-  /** Profile merged with the credentials, or null when there is no such user */
-  async function getUser(login: string): Promise<User | null> {
-    const userDocRef = getUserRef(login)
-    const user = (await getDoc(userDocRef)).data()
-    if (!user) return null
-
-    const creds = await getDocs(collection(userDocRef, 'creds'))
-    return { ...user, ...creds.docs[0]?.data() } as User
+  /** uid of the owner of the login, or null when the login is free */
+  async function loginOwner(login: string): Promise<string | null> {
+    const data = (await getDoc(doc(firestore(), 'logins', login))).data()
+    return data?.uid ?? null
   }
 
-  /** Needs the server: a write made offline would wait forever, so it fails after a timeout */
-  async function createUser(user: User, timeout = 15000) {
-    const { login, password, ...profile } = user
-    const docRef = getUserRef(login)
+  async function getProfile(login: string): Promise<Profile | null> {
+    const data = (await getDoc(getUserRef(login))).data()
+    if (!data) return null
+    const { uid: _uid, ...profile } = data
+    return profile as Profile
+  }
 
-    const write = async () => {
-      await setDoc(docRef, profile)
-      await addDoc(collection(docRef, 'creds'), { login, password })
-    }
+  /** Throws the Firebase error (auth/invalid-credential for a wrong password) */
+  async function signInWithLogin(login: string, password: string) {
+    const { user } = await signInWithEmailAndPassword(firebaseAuth(), await emailOf(login), password)
+    authUser.value = user
+    return user.uid
+  }
+
+  /**
+   * Creates the Auth account and the login and profile documents.
+   * Firestore writes need the server, and a write made offline would wait forever,
+   * so they fail after a timeout; the Auth account is removed then.
+   */
+  async function createAccount(login: string, password: string, profile: Profile, timeout = 15000) {
+    const { user } = await createUserWithEmailAndPassword(firebaseAuth(), await emailOf(login), password)
 
     let timer: ReturnType<typeof setTimeout> | undefined
     const expired = new Promise<never>((_, reject) => {
@@ -91,10 +142,28 @@ export const useFirebaseStore = defineStore('firebase', () => {
     })
 
     try {
-      await Promise.race([write(), expired])
+      await Promise.race([
+        (async () => {
+          await updateProfile(user, { displayName: login })
+          await setDoc(doc(firestore(), 'logins', login), { uid: user.uid })
+          await setDoc(getUserRef(login), { ...profile, uid: user.uid })
+        })(),
+        expired
+      ])
+    } catch (error) {
+      await user.delete().catch(() => undefined)
+      throw error
     } finally {
       clearTimeout(timer)
     }
+
+    authUser.value = user
+    return user.uid
+  }
+
+  async function signOutAuth() {
+    await signOut(firebaseAuth()).catch((error) => console.warn('Sign out failed\n', error))
+    authUser.value = null
   }
 
   /*
@@ -103,7 +172,7 @@ export const useFirebaseStore = defineStore('firebase', () => {
    * them would hang every save while offline. The SDK queues the writes and sends them later.
    */
 
-  function updateUserData(data: Partial<Omit<User, 'login' | 'password'>>) {
+  function updateUserData(data: Partial<Profile>) {
     if (!userRef.value) return
     updateDoc(userRef.value, data).catch((error) => console.warn('Error updating user\n', error))
   }
@@ -177,10 +246,15 @@ export const useFirebaseStore = defineStore('firebase', () => {
   return {
     db,
     catalog,
+    authUser,
     userRef,
     initFirebase,
-    getUser,
-    createUser,
+    waitForAuth,
+    loginOwner,
+    getProfile,
+    signInWithLogin,
+    createAccount,
+    signOutAuth,
     updateUserData,
     saveFirebaseDocument,
     deleteDocument,

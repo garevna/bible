@@ -29,12 +29,16 @@ export const useAppStore = defineStore('app', () => {
     viewportHeight.value = window.innerHeight
   }
 
-  /** Runs an async operation with the progress bar on; errors are logged, not rethrown */
-  async function withProgress<T>(operation: () => Promise<T>): Promise<T | undefined> {
+  /** Runs an async operation with the progress bar on; errors are logged, and rethrown on request */
+  async function withProgress<T>(
+    operation: () => Promise<T>,
+    { rethrow = false } = {}
+  ): Promise<T | undefined> {
     pending.value++
     try {
       return await operation()
     } catch (error) {
+      if (rethrow) throw error
       console.error(error)
       return undefined
     } finally {

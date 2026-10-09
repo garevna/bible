@@ -62,15 +62,20 @@ export interface Note {
   text: string
 }
 
-export interface User {
+/** users/{login} document in Firestore */
+export interface Profile {
   userName?: string
   avatar?: string
   city?: string
   country?: string
   translation?: string
   lang?: Lang
+}
+
+/** Signed in user: the profile plus the login and the Firebase Auth uid */
+export interface User extends Profile {
   login: string
-  password: string
+  uid: string
 }
 
 export type Page = 'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search'

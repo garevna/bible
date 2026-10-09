@@ -26,7 +26,13 @@
             :label="signUp.loginLabel"
             :loading="loginStatus === 'in-test' ? 'warning' : false"
             :append-inner-icon="loginStatus === 'not-tested' && login.trim() ? '$submit' : ''"
-            :error-messages="loginStatus === 'invalid' ? signUp.loginErrorMessage : ''"
+            :error-messages="
+              loginStatus === 'invalid'
+                ? signUp.loginErrorMessage
+                : loginStatus === 'error'
+                  ? signIn.networkError
+                  : ''
+            "
             @update:model-value="loginStatus = 'not-tested'"
             @click:append-inner="testLogin"
             @keyup.enter="testLogin"
@@ -102,12 +108,12 @@ import UserNameAndAvatar from '@/components/user/UserNameAndAvatar.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 
-type Status = 'not-tested' | 'in-test' | 'valid' | 'invalid'
+type Status = 'not-tested' | 'in-test' | 'valid' | 'invalid' | 'error'
 
 const dialog = defineModel<boolean>({ default: false })
 
 const user = useUserStore()
-const { signUp } = storeToRefs(useLanguageStore())
+const { signIn, signUp } = storeToRefs(useLanguageStore())
 
 const step = ref(1)
 const userName = ref('')
@@ -144,9 +150,9 @@ watch(dialog, (open) => {
 async function testLogin() {
   if (!login.value.trim()) return false
   loginStatus.value = 'in-test'
-  const taken = await user.loginExists(login.value.trim())
-  loginStatus.value = taken ? 'invalid' : 'valid'
-  return !taken
+  const check = await user.checkLogin(login.value.trim())
+  loginStatus.value = check === 'missing' ? 'valid' : check === 'exists' ? 'invalid' : 'error'
+  return check === 'missing'
 }
 
 async function next() {
@@ -159,9 +165,7 @@ async function create() {
   creating.value = true
   createError.value = ''
 
-  const created = await user.createNewUser({
-    login: login.value.trim(),
-    password: password.value,
+  const created = await user.createNewUser(login.value.trim(), password.value, {
     userName: userName.value.trim(),
     avatar: avatar.value || undefined,
     country: country.value,

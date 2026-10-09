@@ -29,3 +29,9 @@ dev-dist
 test-results
 playwright-report
 blob-report
+
+# Firebase service account keys (scripts/migrate-users-to-auth.ts)
+*service-account*.json
+*-firebase-adminsdk-*.json
+.firebase
+firebase-debug.log

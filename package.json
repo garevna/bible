@@ -25,7 +25,6 @@
   "dependencies": {
     "@mdi/font": "7.4.47",
     "firebase": "12.19.0",
-    "hash.js": "1.1.7",
     "pinia": "4.0.3",
     "vue": "3.5.43",
     "vuedraggable": "4.1.0",
@@ -43,6 +42,7 @@
     "@vue/test-utils": "2.5.1",
     "eslint": "^9.39.0",
     "eslint-plugin-vue": "10.11.0",
+    "firebase-admin": "14.5.0",
     "husky": "^9.1.7",
     "jsdom": "30.1.1",
     "lint-staged": "^16.2.0",
