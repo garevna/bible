@@ -23,5 +23,25 @@ export const common = {
     ua: 'Далі',
     ru: 'Далее',
     en: 'Next'
+  },
+  cancel: {
+    ua: 'Скасувати',
+    ru: 'Отмена',
+    en: 'Cancel'
+  },
+  delete: {
+    ua: 'Видалити',
+    ru: 'Удалить',
+    en: 'Delete'
+  },
+  deleteConfirm: {
+    ua: 'Видалити «{name}»?',
+    ru: 'Удалить «{name}»?',
+    en: 'Delete “{name}”?'
+  },
+  linkedNotes: {
+    ua: 'Посилання на «{name}» є в нотатках: {count}. Їх буде прибрано з цих нотаток, самі нотатки залишаться.',
+    ru: 'Ссылки на «{name}» есть в заметках: {count}. Они будут убраны из этих заметок, сами заметки останутся.',
+    en: '“{name}” is linked from {count} note(s). The links will be removed from those notes; the notes stay.'
   }
 }

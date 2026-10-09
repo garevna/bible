@@ -25,7 +25,13 @@
         elevation="0"
       >
         <v-expansion-panel-title>
-          <ConfirmButton :text="text.deleteKeyword" class="mr-2" @confirm="remove(keyword)" />
+          <DeleteLinkedButton
+            :id="keyword._id"
+            :name="`#${keyword._id}`"
+            field="keywords"
+            :tooltip="text.deleteKeyword"
+            @confirm="remove(keyword)"
+          />
           #{{ keyword._id }}
           <v-chip size="x-small" class="ml-2">{{ keyword.refs.length }}</v-chip>
         </v-expansion-panel-title>
@@ -55,7 +61,7 @@
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
-import ConfirmButton from '@/components/ConfirmButton.vue'
+import DeleteLinkedButton from '@/components/DeleteLinkedButton.vue'
 import Note from '@/components/notes/Note.vue'
 import { useContentStore } from '@/stores/content'
 import { useKeywordsStore } from '@/stores/keywords'

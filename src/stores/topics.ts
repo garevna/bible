@@ -15,6 +15,7 @@ import { clone, idFrom, isEqual, removeById } from '@/utils/array'
 import { getVerseHTML } from '@/utils/verse'
 
 import { useAppStore } from './app'
+import { useContentStore } from './content'
 import { useFirebaseStore } from './firebase'
 import { useNotesStore } from './notes'
 
@@ -75,7 +76,11 @@ export const useTopicsStore = defineStore('topics', () => {
     return putTopic(topic)
   }
 
+  /** Deletes the topic and removes it from the notes that link to it */
   async function deleteTopic(topicId: string) {
+    await useNotesStore().unlinkFromNotes('topics', topicId)
+    removeById(useContentStore().lineTopics, topicId)
+
     await app.withProgress(async () => {
       useFirebaseStore().deleteDocument('topics', topicId)
       await deleteRecord('topics', topicId)

@@ -197,6 +197,33 @@ export const useNotesStore = defineStore('notes', () => {
     removeById(currentNoteVerses.value, verseId)
   }
 
+  /** Number of notes that link to the topic or keyword */
+  async function countLinkedNotes(field: 'topics' | 'keywords', id: string) {
+    const found = await app.withProgress(() =>
+      searchNotes(field === 'topics' ? { topic: id } : { keyword: id })
+    )
+    return found?.length ?? 0
+  }
+
+  /** Removes a topic or keyword from every note that links to it (before it is deleted) */
+  async function unlinkFromNotes(field: 'topics' | 'keywords', id: string) {
+    const linked =
+      (await app.withProgress(() => searchNotes(field === 'topics' ? { topic: id } : { keyword: id }))) ?? []
+
+    await Promise.all(
+      linked.map((note) => {
+        removeById(note[field], id)
+        return putNote(note)
+      })
+    )
+
+    notes.value.forEach((note) => removeById(note[field], id))
+
+    // the Notes page must not keep filtering by something that no longer exists
+    if (field === 'topics' && topic.value?._id === id) await updateTopic(null)
+    if (field === 'keywords' && keyword.value === id) await updateKeyword(null)
+  }
+
   /** Adds verses to the note being edited, keeping their Bible order */
   async function addVersesToCurrentNote(verseIds: string[]) {
     if (!currentNote.value) return
@@ -257,6 +284,8 @@ export const useNotesStore = defineStore('notes', () => {
     removeKeywordFromCurrentNote,
     removeVerseFromCurrentNote,
     addVersesToCurrentNote,
+    countLinkedNotes,
+    unlinkFromNotes,
     saveCurrentNote
   }
 })

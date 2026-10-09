@@ -6,7 +6,9 @@ import type { Keyword } from '@/types'
 import { removeById } from '@/utils/array'
 
 import { useAppStore } from './app'
+import { useContentStore } from './content'
 import { useFirebaseStore } from './firebase'
+import { useNotesStore } from './notes'
 
 export const useKeywordsStore = defineStore('keywords', () => {
   const app = useAppStore()
@@ -36,7 +38,11 @@ export const useKeywordsStore = defineStore('keywords', () => {
     searchResult.value = [keyword]
   }
 
+  /** Deletes the keyword and removes it from the notes that link to it */
   async function deleteKeyword(keyword: Keyword) {
+    await useNotesStore().unlinkFromNotes('keywords', keyword._id)
+    removeById(useContentStore().lineKeywords, keyword._id)
+
     await app.withProgress(async () => {
       await deleteRecord('keywords', keyword._id)
       useFirebaseStore().deleteDocument('keywords', keyword._id)

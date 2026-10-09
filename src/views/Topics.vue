@@ -7,7 +7,13 @@
     <p v-if="!sorted.length" class="text-medium-emphasis">{{ common.noData }}</p>
 
     <div v-for="topic in sorted" :key="topic._id" class="topic-row d-flex align-center py-1">
-      <ConfirmButton :text="text.deleteTopic" @confirm="topics.deleteTopic(topic._id)" />
+      <DeleteLinkedButton
+        :id="topic._id"
+        :name="topic.title"
+        field="topics"
+        :tooltip="text.deleteTopic"
+        @confirm="topics.deleteTopic(topic._id)"
+      />
 
       <v-text-field
         v-if="editing === topic._id"
@@ -45,7 +51,7 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
-import ConfirmButton from '@/components/ConfirmButton.vue'
+import DeleteLinkedButton from '@/components/DeleteLinkedButton.vue'
 import CreateTopic from '@/components/topics/CreateTopic.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useTopicsStore } from '@/stores/topics'
