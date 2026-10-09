@@ -1,0 +1,110 @@
+html {
+  overflow-y: auto;
+}
+
+.v-application {
+  font-family: Montserrat, Helvetica, sans-serif;
+}
+
+p {
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.link-to-verse {
+  position: relative;
+  display: inline-block;
+  cursor: pointer;
+  font-weight: bold;
+  color: #09b;
+}
+
+.link-to-verse::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  transform: scaleX(0);
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background-color: #09b9;
+  transform-origin: bottom right;
+  transition: transform 0.25s ease-out;
+}
+
+.link-to-verse:hover::after {
+  transform: scaleX(1);
+  transform-origin: bottom left;
+}
+
+.delete-icon {
+  opacity: 0.4;
+}
+
+.delete-icon:hover {
+  opacity: 0.8;
+}
+
+.field-set {
+  padding: 8px;
+  border: solid 1px #ccc;
+  border-radius: 4px;
+  margin-bottom: 32px;
+}
+
+.field-set > legend {
+  color: #09b8;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.draggable-item {
+  border: solid 1px #ddd;
+  border-radius: 4px;
+  padding: 8px 16px;
+  cursor: grab;
+}
+
+.draggable-item:hover {
+  background-color: #ddd5;
+}
+
+.drop-placeholder {
+  border: dashed 2px #f0f;
+}
+
+.chosen-item {
+  border: solid 1px #005;
+}
+
+.dragging-item {
+  border: solid 2px #f0f;
+}
+
+.expanded-item-header {
+  color: #09b;
+  font-weight: bold;
+}
+
+.v-tooltip > .v-overlay__content {
+  background: #292b;
+}
+
+.v-pagination__item .v-btn {
+  border: solid 1px #ddd;
+  font-size: 13px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #20731c;
+}
+::-webkit-scrollbar-thumb {
+  background: #4caf50;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #72bf44;
+}

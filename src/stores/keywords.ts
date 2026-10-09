@@ -1,0 +1,62 @@
+import { ref } from 'vue'
+import { defineStore } from 'pinia'
+
+import { deleteRecord, getAllKeys, getAllRecords, putRecord } from '@/db'
+import type { Keyword } from '@/types'
+import { removeById } from '@/utils/array'
+
+import { useAppStore } from './app'
+import { useFirebaseStore } from './firebase'
+
+export const useKeywordsStore = defineStore('keywords', () => {
+  const app = useAppStore()
+
+  const keywordList = ref<Keyword[]>([])
+  /** keyword ids matching the last search */
+  const searchResult = ref<string[]>([])
+
+  async function getFullList() {
+    keywordList.value = (await app.withProgress(() => getAllRecords<Keyword>('keywords'))) ?? []
+  }
+
+  async function putKeyword(keyword: Keyword) {
+    if (!keyword._id) return console.warn('Illegal keyword: ', keyword)
+
+    await app.withProgress(async () => {
+      await putRecord('keywords', keyword)
+      await useFirebaseStore().saveFirebaseDocument('keywords', keyword)
+    })
+  }
+
+  /** Creates an empty keyword and offers it as the only search result */
+  async function createKeyword(name: string) {
+    const keyword = name.trim()
+    if (!keyword) return
+    await putKeyword({ _id: keyword, refs: [] })
+    searchResult.value = [keyword]
+  }
+
+  async function deleteKeyword(keyword: Keyword) {
+    await app.withProgress(async () => {
+      await deleteRecord('keywords', keyword._id)
+      await useFirebaseStore().deleteDocument('keywords', keyword._id)
+    })
+    removeById(keywordList.value, keyword._id)
+  }
+
+  async function searchKeywords(searchLine: string) {
+    const search = searchLine.toLowerCase()
+    const keys = (await app.withProgress(() => getAllKeys('keywords'))) ?? []
+    searchResult.value = keys.map(String).filter((keyword) => keyword.toLowerCase().includes(search))
+  }
+
+  return {
+    keywordList,
+    searchResult,
+    getFullList,
+    putKeyword,
+    createKeyword,
+    deleteKeyword,
+    searchKeywords
+  }
+})

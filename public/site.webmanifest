@@ -1,0 +1,14 @@
+{
+    "name": "Bible-ukr",
+    "short_name": "Bible-ukr",
+    "icons": [
+        {
+            "src": "/img/icons/android-chrome-144x144.png",
+            "sizes": "144x144",
+            "type": "image/png"
+        }
+    ],
+    "theme_color": "#4caf50",
+    "background_color": "#4caf50",
+    "display": "standalone"
+}

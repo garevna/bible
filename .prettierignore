@@ -1,0 +1,7 @@
+dist
+dev-dist
+coverage
+public
+.old-nuxt
+.backup-nuxt
+yarn.lock

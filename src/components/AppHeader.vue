@@ -1,0 +1,135 @@
+<template>
+  <v-app-bar flat color="primary" class="bottom-border">
+    <div class="d-flex align-center ml-4">
+      <img :src="logo" alt="" class="logo mr-3" width="40" height="48" />
+
+      <span v-if="!short" class="font-weight-bold">{{ header.chirchTitle }}</span>
+      <v-tooltip v-else :text="header.chirchTitle">
+        <template #activator="{ props }">
+          <span v-bind="props">{{ header.chirchTitleShort }}</span>
+        </template>
+      </v-tooltip>
+    </div>
+
+    <v-spacer />
+
+    <User />
+
+    <template v-if="!user.signed">
+      <v-tooltip :text="header.signIn">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" icon="$signIn" size="small" @click="signIn = true" />
+        </template>
+      </v-tooltip>
+
+      <v-tooltip :text="header.signUp">
+        <template #activator="{ props }">
+          <v-btn v-bind="props" icon="$signUp" size="small" @click="signUp = true" />
+        </template>
+      </v-tooltip>
+    </template>
+
+    <v-menu>
+      <template #activator="{ props: menu }">
+        <v-tooltip :text="common.langMenuTooltip">
+          <template #activator="{ props: tooltip }">
+            <v-btn v-bind="{ ...menu, ...tooltip }" icon size="small" class="ml-2">
+              <img :src="langIcon" alt="" width="28" />
+            </v-btn>
+          </template>
+        </v-tooltip>
+      </template>
+
+      <v-list density="compact" bg-color="homefone">
+        <v-list-item
+          v-for="item of langMenuItems"
+          :key="item.value"
+          :active="item.value === user.lang"
+          @click="user.updateUserLang(item.value)"
+        >
+          <template #prepend>
+            <img :src="item.icon" alt="" width="28" class="mr-3" />
+          </template>
+          <v-list-item-title>{{ item.text[user.lang] }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+
+    <v-menu>
+      <template #activator="{ props }">
+        <v-btn v-bind="props" icon="mdi-book-cross" size="small" class="mr-2" />
+      </template>
+
+      <v-list density="compact" bg-color="homefone">
+        <v-list-item
+          v-for="item of translationMenuItems"
+          :key="item.value"
+          :active="item.value === user.translation"
+          @click="content.switchTranslation(item.value)"
+        >
+          <v-list-item-title>{{ item.text[user.lang] }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-menu>
+
+    <v-progress-linear :active="app.progress" indeterminate absolute location="bottom" color="warning" />
+
+    <h4 class="view-title bg-primary">{{ title }}</h4>
+  </v-app-bar>
+</template>
+
+<script setup lang="ts">
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
+
+import langFallbackIcon from '@/assets/lang.svg'
+import logo from '@/assets/logo.png'
+import User from '@/components/user/User.vue'
+import { langMenuItems, translationMenuItems } from '@/configs'
+import { useAppStore } from '@/stores/app'
+import { useContentStore } from '@/stores/content'
+import { useLanguageStore } from '@/stores/language'
+import { useUserStore } from '@/stores/user'
+
+const signIn = defineModel<boolean>('signIn', { default: false })
+const signUp = defineModel<boolean>('signUp', { default: false })
+
+const app = useAppStore()
+const content = useContentStore()
+const user = useUserStore()
+const { common, header, pages } = storeToRefs(useLanguageStore())
+
+const short = computed(() => app.viewportWidth < 600)
+
+const title = computed(() => {
+  const page = (app.page ?? 'bible') as keyof typeof pages.value
+  return pages.value[page] ?? ''
+})
+
+const langIcon = computed(
+  () => langMenuItems.find((item) => item.value === user.lang)?.icon ?? langFallbackIcon
+)
+</script>
+
+<style scoped>
+.logo {
+  object-fit: contain;
+}
+
+.view-title {
+  position: fixed;
+  z-index: 45;
+  left: 50%;
+  transform: translate(-50%, 0);
+  top: 40px;
+  border-radius: 8px;
+  max-width: 360px;
+  min-width: 160px;
+  padding: 16px 16px 8px;
+  text-align: center;
+}
+
+.bottom-border {
+  border-bottom: solid 1px #fff8 !important;
+}
+</style>
