@@ -13,6 +13,17 @@
 
     <v-spacer />
 
+    <v-tooltip v-if="!user.signed" :text="pages.search">
+      <template #activator="{ props }">
+        <v-btn
+          v-bind="props"
+          icon="$search"
+          size="small"
+          @click="app.setPage(app.page === 'search' ? 'bible' : 'search')"
+        />
+      </template>
+    </v-tooltip>
+
     <User />
 
     <template v-if="!user.signed">

@@ -2,7 +2,7 @@ export const topics = {
   listHeader: {
     ua: 'Теми',
     ru: 'Темы',
-    en: 'Topcs'
+    en: 'Topics'
   },
   select: {
     ua: 'Вибрати тему',

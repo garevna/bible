@@ -4,6 +4,7 @@ import { keywords } from './keywords'
 import { nestedDraggable } from './nestedDraggable'
 import { notes } from './notes'
 import { pages } from './pages'
+import { search } from './search'
 import { selector } from './selector'
 import { showControls } from './showControls'
 import { signIn } from './signIn'
@@ -17,6 +18,7 @@ export const languages = {
   nestedDraggable,
   notes,
   pages,
+  search,
   selector,
   showControls,
   signIn,

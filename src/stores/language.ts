@@ -30,6 +30,7 @@ export const useLanguageStore = defineStore('language', () => {
     nestedDraggable: section('nestedDraggable'),
     notes: section('notes'),
     pages: section('pages'),
+    search: section('search'),
     selector: section('selector'),
     showControls: section('showControls'),
     signIn: section('signIn'),

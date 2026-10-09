@@ -130,6 +130,11 @@ export const useUserStore = defineStore('user', () => {
     return Boolean(user)
   }
 
+  /** True when the login is already taken (used by sign up) */
+  async function loginExists(userLogin: string) {
+    return Boolean(await useAppStore().withProgress(() => useFirebaseStore().getUser(userLogin)))
+  }
+
   /** Signs the candidate in when the password matches */
   async function testUserPassword(plainPassword: string) {
     const valid = Boolean(candidate.value) && candidate.value!.password === sha256(plainPassword)
@@ -141,23 +146,31 @@ export const useUserStore = defineStore('user', () => {
     return valid
   }
 
-  async function createNewUser(user: Omit<User, 'password'> & { password: string }) {
-    if (!user.login || !user.password) return console.warn('User login or password is not valid')
+  /** Creates the account in Firestore and signs in; returns false when it could not be created */
+  async function createNewUser(user: User) {
+    if (!user.login || !user.password) return false
 
+    // Firestore rejects undefined fields, so every field gets a value
     const newUser: User = {
-      userName: '',
-      avatar: defaultAvatar,
-      city: '',
-      country: '',
-      lang: lang.value,
-      translation: translation.value,
-      ...user,
+      userName: user.userName ?? '',
+      avatar: user.avatar || defaultAvatar,
+      city: user.city ?? '',
+      country: user.country ?? '',
+      lang: user.lang ?? lang.value,
+      translation: user.translation ?? translation.value,
+      login: user.login,
       password: sha256(user.password)
     }
 
-    await useAppStore().withProgress(() => useFirebaseStore().createUser(newUser))
+    const created = await useAppStore().withProgress(async () => {
+      await useFirebaseStore().createUser(newUser)
+      return true
+    })
+    if (!created) return false
+
     setUser(newUser)
     await signIn()
+    return true
   }
 
   async function signOut() {
@@ -216,6 +229,7 @@ export const useUserStore = defineStore('user', () => {
     signIn,
     signOut,
     testUserLogin,
+    loginExists,
     testUserPassword,
     createNewUser,
     updateUserLang,

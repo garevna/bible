@@ -1,8 +1,21 @@
+import { readFileSync } from 'node:fs'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
 import { VitePWA } from 'vite-plugin-pwa'
+
+/** 'vuetify/components/VBtn', ... for every component exported by the installed Vuetify */
+function vuetifyComponents() {
+  const index = readFileSync(
+    fileURLToPath(new URL('./node_modules/vuetify/lib/components/index.js', import.meta.url)),
+    'utf8'
+  )
+  return Array.from(
+    index.matchAll(/^export \* from "\.\/(\w+)\/index\.js"/gm),
+    ([, name]) => `vuetify/components/${name}`
+  )
+}
 
 // GitHub Pages serves the app from /bible-ukr/, as the Vue 2 version did
 export default defineConfig(({ command }) => ({
@@ -39,9 +52,12 @@ export default defineConfig(({ command }) => ({
     })
   ],
 
-  // lazily loaded pages import it; prebundling avoids a full reload in dev the first time
+  // Pages are loaded lazily and Vuetify components are imported by vite-plugin-vuetify while
+  // transforming them, so the dev server would discover them late and reload the page.
+  // Prebundling them all up front avoids that.
   optimizeDeps: {
-    include: ['vuedraggable']
+    entries: ['index.html', 'src/**/*.vue'],
+    include: ['vuetify/directives', ...vuetifyComponents()]
   },
 
   resolve: {

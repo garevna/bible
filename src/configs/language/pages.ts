@@ -12,16 +12,21 @@ export const pages = {
   topics: {
     ua: 'Теми',
     ru: 'Темы',
-    en: 'Topcs'
+    en: 'Topics'
   },
   topic: {
     ua: 'Теми',
     ru: 'Темы',
-    en: 'Topcs'
+    en: 'Topics'
   },
   keywords: {
     ua: 'Ключові слова',
     ru: 'Ключевые слова',
     en: 'Keywords'
+  },
+  search: {
+    ua: 'Пошук',
+    ru: 'Поиск',
+    en: 'Search'
   }
 }

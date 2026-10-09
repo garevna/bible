@@ -72,12 +72,29 @@ export const useFirebaseStore = defineStore('firebase', () => {
     return { ...user, ...creds.docs[0]?.data() } as User
   }
 
-  async function createUser(user: User) {
+  /** Needs the server: a write made offline would wait forever, so it fails after a timeout */
+  async function createUser(user: User, timeout = 15000) {
     const { login, password, ...profile } = user
     const docRef = getUserRef(login)
 
-    await setDoc(docRef, profile)
-    await addDoc(collection(docRef, 'creds'), { login, password })
+    const write = async () => {
+      await setDoc(docRef, profile)
+      await addDoc(collection(docRef, 'creds'), { login, password })
+    }
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const expired = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('Firestore did not answer: the user was not created')),
+        timeout
+      )
+    })
+
+    try {
+      await Promise.race([write(), expired])
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   /*
@@ -136,11 +153,13 @@ export const useFirebaseStore = defineStore('firebase', () => {
   }
 
   async function getRegions() {
-    catalog.value = { ...catalog.value, regions: await getCatalog('geo', 'regions') }
+    const regions = await useAppStore().withProgress(() => getCatalog('geo', 'regions'))
+    catalog.value = { ...catalog.value, regions: regions ?? [] }
   }
 
   async function getRegionCities(region: string) {
-    catalog.value = { ...catalog.value, cities: await getCatalog('geo', region) }
+    const cities = await useAppStore().withProgress(() => getCatalog('geo', region))
+    catalog.value = { ...catalog.value, cities: cities ?? [] }
   }
 
   async function getCities(country: string) {

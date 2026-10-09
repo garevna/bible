@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { pushUnique, removeById } from './array'
 import { clearHighlights, getHTML, updateIntervals } from './highlights'
 import { chapterOf, getLineRef, parseLineRef } from './refs'
+import { markWords, normalize, queryWords } from './search'
 
 describe('refs', () => {
   it('builds and parses line refs', () => {
@@ -67,5 +68,20 @@ describe('highlights', () => {
       `a <span style="background: ${red}">&lt;b&gt;</span> c`
     )
     expect(getHTML({ verse: 'text' })).toBe('')
+  })
+})
+
+describe('search', () => {
+  it('normalizes case, apostrophes, ё and punctuation', () => {
+    expect(normalize('Сім’я, ЇЖАК! Ёлка')).toBe('сімя їжак елка')
+    expect(queryWords('  сина Давидового сина ')).toEqual(['давидового', 'сина'])
+  })
+
+  it('marks words regardless of case and apostrophes', () => {
+    expect(markWords('Сім’я Давида', ['сімя'])).toBe('<mark>Сім’я</mark> Давида')
+    expect(markWords('Сина Давидового, Сина', ['сина'])).toBe(
+      '<mark>Сина</mark> Давидового, <mark>Сина</mark>'
+    )
+    expect(markWords('a <b>', [])).toBe('a &lt;b&gt;')
   })
 })

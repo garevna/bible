@@ -78,5 +78,15 @@ export const signUp = {
     ua: 'Помилка. Паролі не збігаються',
     ru: 'Ошибка. Пароли не совпадают',
     en: 'Error. Passwords do not match'
+  },
+  createError: {
+    ua: 'Не вдалося створити користувача. Перевірте з’єднання з інтернетом.',
+    ru: 'Не удалось создать пользователя. Проверьте подключение к интернету.',
+    en: 'Failed to create the user. Check your internet connection.'
+  },
+  regionLabel: {
+    ua: 'Область',
+    ru: 'Область',
+    en: 'Region'
   }
 }
