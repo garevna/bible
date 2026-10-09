@@ -4,4 +4,4 @@ coverage
 public
 .old-nuxt
 .backup-nuxt
-yarn.lock
+pnpm-lock.yaml
