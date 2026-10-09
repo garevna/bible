@@ -53,10 +53,11 @@ import EditKeywordList from '@/components/keywords/EditKeywordList.vue'
 import EditTopicList from '@/components/topics/EditTopicList.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
+import type { Note } from '@/types'
 
 /** Editor of notes.currentNote; the opener puts the note there before opening */
 const dialog = defineModel<boolean>({ default: false })
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [note: Note] }>()
 
 const notes = useNotesStore()
 const { notes: text, nestedDraggable } = storeToRefs(useLanguageStore())
@@ -64,8 +65,8 @@ const { notes: text, nestedDraggable } = storeToRefs(useLanguageStore())
 watch(dialog, (open) => !open && notes.resetCurrentNote())
 
 async function save() {
-  await notes.saveCurrentNote()
-  emit('saved')
+  const saved = await notes.saveCurrentNote()
+  saved && emit('saved', saved)
   dialog.value = false
 }
 </script>

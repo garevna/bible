@@ -4,6 +4,7 @@
     :text="tooltip"
     :small="small"
     :large="large"
+    :fab="fab"
     :color="color"
     @click="open = true"
   />
@@ -49,6 +50,7 @@ withDefaults(
     color?: string
     small?: boolean
     large?: boolean
+    fab?: boolean
     disabled?: boolean
   }>(),
   { tooltip: '', title: '', color: 'buttons' }

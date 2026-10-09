@@ -216,6 +216,8 @@ export const useNotesStore = defineStore('notes', () => {
 
     pushUnique(availableDates.value, noteDate(saved))
     availableDates.value.sort()
+
+    return saved
   }
 
   return {

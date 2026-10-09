@@ -1,6 +1,6 @@
 <template>
   <ButtonTooltip :icon="icon" :text="tooltip || text.editNoteTooltip" :small="small" @click="open" />
-  <UpdateNote v-model="dialog" @saved="emit('saved')" />
+  <UpdateNote v-model="dialog" @saved="emit('saved', $event)" />
 </template>
 
 <script setup lang="ts">
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{ note: Note; icon?: string; tooltip?: st
   tooltip: ''
 })
 
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [note: Note] }>()
 
 const notes = useNotesStore()
 const { notes: text } = storeToRefs(useLanguageStore())

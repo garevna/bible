@@ -7,7 +7,7 @@
     :fab="fab"
     @click="open"
   />
-  <UpdateNote v-model="dialog" @saved="emit('saved')" />
+  <UpdateNote v-model="dialog" @saved="emit('saved', $event)" />
 </template>
 
 <script setup lang="ts">
@@ -18,6 +18,7 @@ import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import UpdateNote from '@/components/notes/UpdateNote.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
+import type { Note } from '@/types'
 
 /** Opens the editor with a new note attached to the given verse, topic or keyword */
 const props = withDefaults(
@@ -34,7 +35,7 @@ const props = withDefaults(
   { lineRef: undefined, topicId: undefined, keywordId: undefined, icon: '$addNote', tooltip: '' }
 )
 
-const emit = defineEmits<{ saved: [] }>()
+const emit = defineEmits<{ saved: [note: Note] }>()
 
 const notes = useNotesStore()
 const { notes: text } = storeToRefs(useLanguageStore())

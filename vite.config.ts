@@ -39,6 +39,11 @@ export default defineConfig(({ command }) => ({
     })
   ],
 
+  // lazily loaded pages import it; prebundling avoids a full reload in dev the first time
+  optimizeDeps: {
+    include: ['vuedraggable']
+  },
+
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
