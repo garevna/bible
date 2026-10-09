@@ -23,7 +23,6 @@
           <v-text-field
             v-model="login"
             variant="outlined"
-            color="success"
             :label="signUp.loginLabel"
             :loading="loginStatus === 'in-test' ? 'warning' : false"
             :append-inner-icon="loginStatus === 'not-tested' && login.trim() ? '$submit' : ''"
@@ -38,7 +37,6 @@
           <v-text-field
             v-model="password"
             variant="outlined"
-            color="success"
             :type="showPass ? 'text' : 'password'"
             :label="signUp.passwordLabel"
             :prepend-inner-icon="showPass ? 'mdi-eye' : 'mdi-eye-off'"
@@ -52,7 +50,6 @@
           <v-text-field
             v-model="passwordDouble"
             variant="outlined"
-            color="success"
             :type="showPass ? 'text' : 'password'"
             :label="signUp.doublePasswordLabel"
             :prepend-inner-icon="showPass ? 'mdi-eye' : 'mdi-eye-off'"

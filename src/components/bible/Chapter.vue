@@ -116,8 +116,23 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.chapter {
+  width: 100%;
+  border-collapse: collapse;
+}
+
 .chapter td {
-  vertical-align: top;
+  vertical-align: middle;
+  padding: 6px 0;
+}
+
+/* light separators make it clear which verse the action buttons belong to */
+.chapter tr + tr td {
+  border-top: solid 1px #eee;
+}
+
+.chapter p {
+  margin: 0;
 }
 
 .line-number--normal,

@@ -108,3 +108,17 @@ p {
 ::-webkit-scrollbar-thumb:hover {
   background: #72bf44;
 }
+
+/* inputs: thin blue outline with a soft glow on focus */
+.v-field--variant-outlined.v-field--focused .v-field__outline {
+  --v-field-border-width: 1px;
+  --v-field-border-opacity: 1;
+}
+
+.v-field--variant-outlined.v-field--focused {
+  box-shadow: 0 0 0 3px rgb(0 144 176 / 18%);
+}
+
+.v-field--variant-outlined .v-field__overlay {
+  display: none;
+}

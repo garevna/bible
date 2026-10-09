@@ -1,6 +1,6 @@
 <template>
   <PickerDialog
-    icon="$addTopic"
+    icon="$newTopic"
     :tooltip="topics.addTopicTooltip"
     :title="topics.createNewTopicLabel"
     :disabled="!title.trim()"

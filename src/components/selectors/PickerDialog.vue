@@ -6,6 +6,8 @@
     :large="large"
     :fab="fab"
     :color="color"
+    :badge="badge"
+    :badge-icon="badgeIcon"
     @click="open = true"
   />
 
@@ -51,9 +53,11 @@ withDefaults(
     small?: boolean
     large?: boolean
     fab?: boolean
+    badge?: string
+    badgeIcon?: string
     disabled?: boolean
   }>(),
-  { tooltip: '', title: '', color: 'buttons' }
+  { tooltip: '', title: '', color: 'buttons', badge: undefined, badgeIcon: undefined }
 )
 
 const emit = defineEmits<{ ok: [] }>()

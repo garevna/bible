@@ -11,7 +11,6 @@
           <v-text-field
             v-model="login"
             variant="outlined"
-            color="success"
             :label="signIn.loginLabel"
             :loading="loginStatus === 'in-test' ? 'warning' : false"
             :append-inner-icon="loginStatus === 'not-tested' ? '$submit' : ''"
@@ -32,7 +31,6 @@
           <v-text-field
             v-model="password"
             variant="outlined"
-            color="success"
             :type="showPass ? 'text' : 'password'"
             :label="signIn.passwordLabel"
             :prepend-inner-icon="showPass ? 'mdi-eye' : 'mdi-eye-off'"

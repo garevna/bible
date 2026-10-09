@@ -23,5 +23,6 @@ const { notes } = storeToRefs(useLanguageStore())
 <style scoped>
 .line-actions {
   min-width: 120px;
+  justify-content: flex-end;
 }
 </style>

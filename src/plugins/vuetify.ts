@@ -9,8 +9,9 @@ import { uk, en, ru } from 'vuetify/locale'
 const iconAliases = {
   add: 'mdi-plus-box',
   addNote: 'mdi-note-plus',
-  addTopic: 'mdi-playlist-plus',
-  addKeyword: 'mdi-pound-box',
+  addTopic: 'mdi-paperclip-plus',
+  newTopic: 'mdi-playlist-plus',
+  addKeyword: 'mdi-paperclip-plus',
   back: 'mdi-chevron-left',
   bible: 'mdi-cross',
   book: 'mdi-book-open-page-variant',
@@ -34,7 +35,7 @@ const iconAliases = {
   main: 'mdi-menu',
   notes: 'mdi-note-edit-outline',
   note: 'mdi-note',
-  remove: 'mdi-attachment-remove',
+  remove: 'mdi-paperclip-remove',
   reset: 'mdi-close',
   return: 'mdi-page-previous',
   save: 'mdi-content-save-outline',
@@ -86,8 +87,15 @@ export default createVuetify({
     }
   },
 
+  // inputs: outlined with a thin blue focus ring instead of the thick dark border
+  // (styles/main.css) and without the grey background of the filled variant
   defaults: {
     VCard: { flat: true, color: 'transparent' },
-    VTooltip: { location: 'bottom' }
+    VTooltip: { location: 'bottom' },
+    VTextField: { variant: 'outlined', color: 'secondary' },
+    VTextarea: { variant: 'outlined', color: 'secondary' },
+    VAutocomplete: { variant: 'outlined', color: 'secondary' },
+    VFileInput: { variant: 'outlined', color: 'secondary' },
+    VSelect: { variant: 'outlined', color: 'secondary' }
   }
 })
