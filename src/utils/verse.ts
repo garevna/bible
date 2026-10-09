@@ -1,3 +1,4 @@
+import { getVersesByRefs } from '@/db'
 import type { VerseRef } from '@/types'
 
 /**
@@ -7,4 +8,11 @@ import type { VerseRef } from '@/types'
  */
 export function getVerseHTML({ _id, bookName, chapterNum, line, verse }: VerseRef) {
   return `${verse} <small class="link-to-verse" data-verse-id="${_id}">(${bookName} ${chapterNum}:${line + 1})</small>`
+}
+
+/** Verses for the refs, each with an html line that links back to the Bible */
+export async function versesWithLinks(refs: string[]) {
+  if (!refs.length) return []
+  const verses = await getVersesByRefs(refs)
+  return verses.map((verse) => ({ ...verse, html: getVerseHTML(verse) }))
 }

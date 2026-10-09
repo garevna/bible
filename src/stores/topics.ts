@@ -59,7 +59,7 @@ export const useTopicsStore = defineStore('topics', () => {
 
     await app.withProgress(async () => {
       await putRecord('topics', record)
-      await useFirebaseStore().saveFirebaseDocument('topics', record)
+      useFirebaseStore().saveFirebaseDocument('topics', record)
     })
 
     const index = topicList.value.findIndex((item) => item._id === record._id)
@@ -77,7 +77,7 @@ export const useTopicsStore = defineStore('topics', () => {
 
   async function deleteTopic(topicId: string) {
     await app.withProgress(async () => {
-      await useFirebaseStore().deleteDocument('topics', topicId)
+      useFirebaseStore().deleteDocument('topics', topicId)
       await deleteRecord('topics', topicId)
     })
     removeById(topicList.value, topicId)

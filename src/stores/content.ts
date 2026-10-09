@@ -336,38 +336,38 @@ export const useContentStore = defineStore('content', () => {
     action === 'add' ? record.refs.push(id) : removeById(record.refs, id)
 
     await putRecord(storeName, record)
-    await useFirebaseStore().saveFirebaseDocument(storeName, record)
+    useFirebaseStore().saveFirebaseDocument(storeName, record)
     return record
   }
 
   async function addKeywordToVerse(keyword: string | Keyword, id: string) {
     const record = await app.withProgress(() => updateRefs<Keyword>('keywords', keyword, id, 'add'))
-    record && pushUnique(lineKeywords.value, record._id)
+    record && id === currentLineId.value && pushUnique(lineKeywords.value, record._id)
   }
 
   async function removeKeywordFromVerse(keyword: string | Keyword, id: string) {
     const record = await app.withProgress(() => updateRefs<Keyword>('keywords', keyword, id, 'remove'))
-    record && removeById(lineKeywords.value, record._id)
+    record && id === currentLineId.value && removeById(lineKeywords.value, record._id)
   }
 
   async function addTopicToVerse(topic: string | Topic, id: string) {
     const record = await app.withProgress(() => updateRefs<Topic>('topics', topic, id, 'add'))
-    record && pushUnique(lineTopics.value, record)
+    record && id === currentLineId.value && pushUnique(lineTopics.value, record)
   }
 
   async function removeTopicFromVerse(topic: string | Topic, id: string) {
     const record = await app.withProgress(() => updateRefs<Topic>('topics', topic, id, 'remove'))
-    record && removeById(lineTopics.value, record._id)
+    record && id === currentLineId.value && removeById(lineTopics.value, record._id)
   }
 
   async function addNoteToVerse(note: string | Note, id: string) {
     const record = await app.withProgress(() => updateRefs<Note>('notes', note, id, 'add'))
-    record && pushUnique(lineNotes.value, record)
+    record && id === currentLineId.value && pushUnique(lineNotes.value, record)
   }
 
   async function removeNoteFromVerse(note: string | Note, id: string) {
     const record = await app.withProgress(() => updateRefs<Note>('notes', note, id, 'remove'))
-    record && removeById(lineNotes.value, record._id)
+    record && id === currentLineId.value && removeById(lineNotes.value, record._id)
   }
 
   /* ---------- highlighting ---------- */

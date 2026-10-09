@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { deleteRecord, getAllKeys, getAllRecords, putRecord } from '@/db'
+import { deleteRecord, getAllKeys, getAllRecords, putRecord, searchNotes } from '@/db'
 import type { Keyword } from '@/types'
 import { removeById } from '@/utils/array'
 
@@ -24,7 +24,7 @@ export const useKeywordsStore = defineStore('keywords', () => {
 
     await app.withProgress(async () => {
       await putRecord('keywords', keyword)
-      await useFirebaseStore().saveFirebaseDocument('keywords', keyword)
+      useFirebaseStore().saveFirebaseDocument('keywords', keyword)
     })
   }
 
@@ -39,7 +39,7 @@ export const useKeywordsStore = defineStore('keywords', () => {
   async function deleteKeyword(keyword: Keyword) {
     await app.withProgress(async () => {
       await deleteRecord('keywords', keyword._id)
-      await useFirebaseStore().deleteDocument('keywords', keyword._id)
+      useFirebaseStore().deleteDocument('keywords', keyword._id)
     })
     removeById(keywordList.value, keyword._id)
   }
@@ -50,6 +50,11 @@ export const useKeywordsStore = defineStore('keywords', () => {
     searchResult.value = keys.map(String).filter((keyword) => keyword.toLowerCase().includes(search))
   }
 
+  /** Notes marked with the keyword */
+  async function getKeywordNotes(keyword: string) {
+    return (await app.withProgress(() => searchNotes({ keyword }))) ?? []
+  }
+
   return {
     keywordList,
     searchResult,
@@ -57,6 +62,7 @@ export const useKeywordsStore = defineStore('keywords', () => {
     putKeyword,
     createKeyword,
     deleteKeyword,
-    searchKeywords
+    searchKeywords,
+    getKeywordNotes
   }
 })

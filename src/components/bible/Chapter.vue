@@ -17,9 +17,14 @@
               v-html="item.html || escape(item.verse)"
             />
           </td>
+          <td v-if="user.signed">
+            <LineActions :line-ref="item._id" />
+          </td>
         </tr>
       </tbody>
     </table>
+
+    <LineDetails v-model="details" />
 
     <div v-if="user.signed" class="highlighter-bar">
       <v-btn-toggle v-model="marker" mandatory density="comfortable" bg-color="#ddd" class="elevation-4">
@@ -43,12 +48,12 @@ import Highlighter, {
   highlightColors,
   type HighlighterColor
 } from '@/components/bible/Highlighter.vue'
+import LineActions from '@/components/bible/LineActions.vue'
+import LineDetails from '@/components/bible/LineDetails.vue'
 import { cursor as cursorTemplate } from '@/configs'
 import { useContentStore } from '@/stores/content'
 import { useUserStore } from '@/stores/user'
 import type { Verse } from '@/types'
-
-const emit = defineEmits<{ 'open-verse': [verse: Verse] }>()
 
 const content = useContentStore()
 const user = useUserStore()
@@ -56,6 +61,7 @@ const goTo = useGoTo()
 
 const colors: HighlighterColor[] = ['magenta', 'yellow', 'cyan', 'green']
 const marker = ref<HighlighterColor | null>(null)
+const details = ref(false)
 
 const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
@@ -81,10 +87,13 @@ watch(marker, (color) => {
   setListeners(true)
 })
 
-function openVerse(verse: Verse) {
+/** Opens the keywords, topics and notes of the clicked verse */
+async function openVerse(verse: Verse) {
   // a click that finishes a highlighting selection must not open the verse
-  if (marker.value) return
-  emit('open-verse', verse)
+  if (marker.value || !user.signed) return
+  content.setCurrentVerse(verse)
+  await content.getLineDetails(verse._id)
+  details.value = true
 }
 
 /** Scrolls to the verse the user navigated to (from a note, topic or keyword) */

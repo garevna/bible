@@ -38,5 +38,10 @@ export const notes = {
     ua: 'Зберегти',
     ru: 'Сохранить',
     en: 'save/update'
+  },
+  deleteNote: {
+    ua: 'Видалити нотатку',
+    ru: 'Удалить заметку',
+    en: 'Delete note'
   }
 }

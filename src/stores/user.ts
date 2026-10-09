@@ -169,7 +169,7 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function updateProfile(data: Partial<Omit<User, 'login' | 'password'>>) {
-    signed.value && (await useFirebaseStore().updateUserData(data))
+    signed.value && useFirebaseStore().updateUserData(data)
     updateLocalStorage()
   }
 

@@ -113,7 +113,7 @@ export const useNotesStore = defineStore('notes', () => {
     const record = clone(note)
     await app.withProgress(async () => {
       await putRecord('notes', record)
-      await useFirebaseStore().saveFirebaseDocument('notes', record)
+      useFirebaseStore().saveFirebaseDocument('notes', record)
     })
   }
 
@@ -121,7 +121,7 @@ export const useNotesStore = defineStore('notes', () => {
     const noteId = idFrom(note)
     await app.withProgress(async () => {
       await deleteRecord('notes', noteId)
-      await useFirebaseStore().deleteDocument('notes', noteId)
+      useFirebaseStore().deleteDocument('notes', noteId)
     })
     removeById(notes.value, noteId)
     removeById(useContentStore().lineNotes, noteId)

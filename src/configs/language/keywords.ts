@@ -53,5 +53,10 @@ export const keywords = {
     ua: 'Прибрати зі списку',
     ru: 'Убрать из списка',
     en: 'Remove from the list'
+  },
+  deleteKeyword: {
+    ua: 'Видалити ключове слово',
+    ru: 'Удалить ключевое слово',
+    en: 'Delete keyword'
   }
 }

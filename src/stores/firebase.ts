@@ -8,7 +8,9 @@ import {
   doc,
   getDoc,
   getDocs,
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   setDoc,
   updateDoc,
   type DocumentData,
@@ -39,7 +41,10 @@ export const useFirebaseStore = defineStore('firebase', () => {
   })
 
   function initFirebase() {
-    db.value ??= getFirestore(initializeApp(firebaseConfig))
+    // the persistent cache keeps writes made offline until they reach the server
+    db.value ??= initializeFirestore(initializeApp(firebaseConfig), {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    })
   }
 
   const firestore = () => {
@@ -75,25 +80,31 @@ export const useFirebaseStore = defineStore('firebase', () => {
     await addDoc(collection(docRef, 'creds'), { login, password })
   }
 
-  async function updateUserData(data: Partial<Omit<User, 'login' | 'password'>>) {
+  /*
+   * IndexedDB is the source of truth; Firestore gets a copy in the background.
+   * Firestore write promises resolve only after the server acknowledges them, so awaiting
+   * them would hang every save while offline. The SDK queues the writes and sends them later.
+   */
+
+  function updateUserData(data: Partial<Omit<User, 'login' | 'password'>>) {
     if (!userRef.value) return
-    await updateDoc(userRef.value, data)
+    updateDoc(userRef.value, data).catch((error) => console.warn('Error updating user\n', error))
   }
 
-  async function saveFirebaseDocument(collectionName: UserStoreName, data: DocumentData & { _id?: string }) {
+  function saveFirebaseDocument(collectionName: UserStoreName, data: DocumentData & { _id?: string }) {
     const collectionRef = getUserCollectionRef(collectionName)
     if (!collectionRef) return
 
-    await setDoc(doc(collectionRef, data._id ?? Date.now().toString()), data).catch((error) =>
+    setDoc(doc(collectionRef, data._id ?? Date.now().toString()), data).catch((error) =>
       console.warn('Error writing document\n', error)
     )
   }
 
-  async function deleteDocument(collectionName: UserStoreName, docId: string) {
+  function deleteDocument(collectionName: UserStoreName, docId: string) {
     const collectionRef = getUserCollectionRef(collectionName)
     if (!collectionRef) return
 
-    await deleteDoc(doc(collectionRef, docId)).catch((error) =>
+    deleteDoc(doc(collectionRef, docId)).catch((error) =>
       console.warn(`Failed to delete ${docId} from ${collectionName}:\n`, error)
     )
   }

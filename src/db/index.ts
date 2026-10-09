@@ -168,8 +168,12 @@ export interface NotesFilter {
   date?: string | null
 }
 
-/** Note ids are creation timestamps, so the date filter compares them as ISO dates */
-export const noteDate = (note: Pick<Note, '_id'>) => new Date(Number(note._id)).toISOString().slice(0, 10)
+/** 'YYYY-MM-DD' of the date in the local time zone */
+export const localISODate = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+/** Note ids are creation timestamps, so the date filter compares their local dates */
+export const noteDate = (note: Pick<Note, '_id'>) => localISODate(new Date(Number(note._id)))
 
 export const searchNotes = ({ lineRef, keyword, topic, date }: NotesFilter) =>
   filterRecords<Note>(
