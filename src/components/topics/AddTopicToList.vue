@@ -1,7 +1,6 @@
 <template>
   <PickerDialog
     :icon="icon"
-    badge-icon="$topic"
     :tooltip="tooltip || topics.addTopicTooltip"
     :title="topics.select"
     :small="small"

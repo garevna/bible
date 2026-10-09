@@ -197,6 +197,14 @@ export const useNotesStore = defineStore('notes', () => {
     removeById(currentNoteVerses.value, verseId)
   }
 
+  /** Adds verses to the note being edited, keeping their Bible order */
+  async function addVersesToCurrentNote(verseIds: string[]) {
+    if (!currentNote.value) return
+    verseIds.forEach((id) => pushUnique(currentNote.value!.refs, id))
+    currentNote.value.refs.sort()
+    await getCurrentNoteVerses()
+  }
+
   /** Saves the edited note and refreshes the lists that show it */
   async function saveCurrentNote() {
     const note = currentNote.value
@@ -248,6 +256,7 @@ export const useNotesStore = defineStore('notes', () => {
     addKeywordToCurrentNote,
     removeKeywordFromCurrentNote,
     removeVerseFromCurrentNote,
+    addVersesToCurrentNote,
     saveCurrentNote
   }
 })

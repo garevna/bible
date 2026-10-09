@@ -48,8 +48,8 @@ export const useSearchStore = defineStore('search', () => {
     return index.value
   }
 
-  function inScope(verse: Verse) {
-    switch (scope.value) {
+  function inScope(verse: Verse, value: SearchScope) {
+    switch (value) {
       case 'old':
         return verse.covenant === 0
       case 'new':
@@ -61,20 +61,23 @@ export const useSearchStore = defineStore('search', () => {
     }
   }
 
-  /** Verses that contain all words of the query (as word parts), in Bible order */
+  /** A query is searchable when it has a word of two or more letters */
+  const searchable = (wordList: string[]) => wordList.some((word) => word.length >= 2)
+
+  /** Verses that contain all words (as word parts), in Bible order */
+  async function findVerses(wordList: string[], value: SearchScope = 'all') {
+    if (!searchable(wordList)) return []
+    const verses = await loadIndex()
+    return verses
+      .filter(({ verse, text }) => inScope(verse, value) && wordList.every((word) => text.includes(word)))
+      .map(({ verse }) => verse)
+  }
+
+  /** Runs the query of the Search page */
   async function search() {
     words.value = queryWords(query.value ?? '')
     shown.value = PAGE
-
-    if (!words.value.some((word) => word.length >= 2)) {
-      found.value = []
-      return
-    }
-
-    const verses = await loadIndex()
-    found.value = verses
-      .filter(({ verse, text }) => inScope(verse) && words.value.every((word) => text.includes(word)))
-      .map(({ verse }) => verse)
+    found.value = await findVerses(words.value, scope.value)
   }
 
   const results = computed(() =>
@@ -90,5 +93,5 @@ export const useSearchStore = defineStore('search', () => {
     shown.value += PAGE
   }
 
-  return { query, scope, words, results, total, hasMore, search, showMore }
+  return { query, scope, words, results, total, hasMore, search, showMore, findVerses, searchable }
 })

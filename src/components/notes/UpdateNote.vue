@@ -20,19 +20,23 @@
           @update:model-value="notes.updateCurrentNoteText($event ?? '')"
         />
 
-        <div v-if="notes.currentNoteVerses.length" class="mb-8">
-          <div v-for="verse of notes.currentNoteVerses" :key="verse._id" class="d-flex align-start">
+        <fieldset class="field-set">
+          <legend>{{ text.versesHeader }}</legend>
+
+          <div v-for="verse of notes.currentNoteVerses" :key="verse._id" class="d-flex align-center">
             <ButtonTooltip
               icon="$remove"
               color="delete"
               small
               class="delete-icon"
-              :text="nestedDraggable.removeFromNoteTooltip"
+              :text="text.removeVerse"
               @click="notes.removeVerseFromCurrentNote(verse._id)"
             />
-            <p class="ml-2 mt-2" v-html="verse.html" />
+            <p class="ml-2 my-1" v-html="verse.html" />
           </div>
-        </div>
+
+          <AddVersesToNote />
+        </fieldset>
 
         <EditKeywordList for-note />
 
@@ -50,6 +54,7 @@ import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import EditKeywordList from '@/components/keywords/EditKeywordList.vue'
+import AddVersesToNote from '@/components/notes/AddVersesToNote.vue'
 import EditTopicList from '@/components/topics/EditTopicList.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
@@ -60,7 +65,7 @@ const dialog = defineModel<boolean>({ default: false })
 const emit = defineEmits<{ saved: [note: Note] }>()
 
 const notes = useNotesStore()
-const { notes: text, nestedDraggable } = storeToRefs(useLanguageStore())
+const { notes: text } = storeToRefs(useLanguageStore())
 
 watch(dialog, (open) => !open && notes.resetCurrentNote())
 

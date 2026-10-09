@@ -4,7 +4,7 @@
 
     <div v-for="keyword in list" :key="keyword" class="d-flex align-center">
       <ButtonTooltip
-        icon="$remove"
+        icon="$removeKeyword"
         color="delete"
         small
         class="delete-icon"

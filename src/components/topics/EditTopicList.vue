@@ -4,7 +4,7 @@
 
     <div v-for="topic in list" :key="topic._id" class="d-flex align-center">
       <ButtonTooltip
-        icon="$remove"
+        icon="$removeTopic"
         color="delete"
         small
         class="delete-icon"

@@ -43,5 +43,60 @@ export const notes = {
     ua: 'Видалити нотатку',
     ru: 'Удалить заметку',
     en: 'Delete note'
+  },
+  versesHeader: {
+    ua: 'Вірші з Біблії',
+    ru: 'Стихи из Библии',
+    en: 'Bible verses'
+  },
+  addVerses: {
+    ua: 'Додати вірші',
+    ru: 'Добавить стихи',
+    en: 'Add verses'
+  },
+  removeVerse: {
+    ua: 'Прибрати вірш з нотатки',
+    ru: 'Убрать стих из заметки',
+    en: 'Remove the verse from the note'
+  },
+  bySearch: {
+    ua: 'Пошук за текстом',
+    ru: 'Поиск по тексту',
+    en: 'Search by text'
+  },
+  byReference: {
+    ua: 'За посиланням',
+    ru: 'По ссылке',
+    en: 'By reference'
+  },
+  covenant: {
+    ua: 'Заповіт',
+    ru: 'Завет',
+    en: 'Testament'
+  },
+  book: {
+    ua: 'Книга',
+    ru: 'Книга',
+    en: 'Book'
+  },
+  chapter: {
+    ua: 'Розділ',
+    ru: 'Глава',
+    en: 'Chapter'
+  },
+  verse: {
+    ua: 'Вірш',
+    ru: 'Стих',
+    en: 'Verse'
+  },
+  toVerse: {
+    ua: 'по вірш',
+    ru: 'по стих',
+    en: 'to verse'
+  },
+  addSelected: {
+    ua: 'Додати',
+    ru: 'Добавить',
+    en: 'Add'
   }
 }

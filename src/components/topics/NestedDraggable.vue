@@ -28,7 +28,7 @@
           />
           <ButtonTooltip
             v-else
-            icon="$remove"
+            :icon="kind === 'note' ? '$remove' : '$removeTopic'"
             color="delete"
             small
             class="delete-icon"
@@ -52,7 +52,7 @@
           <div class="d-flex align-center flex-wrap mt-1">
             <ConfirmButton
               v-if="showControls"
-              icon="$remove"
+              icon="$removeTopic"
               :text="text.removeFromTopicTooltip"
               @confirm="emit('remove', element)"
             />

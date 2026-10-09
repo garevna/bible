@@ -1,7 +1,6 @@
 <template>
   <PickerDialog
     :icon="icon"
-    badge="#"
     :tooltip="tooltip || keywords.lineActionsTooltip"
     :title="keywords.select"
     :small="small"
