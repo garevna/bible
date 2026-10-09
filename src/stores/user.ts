@@ -58,7 +58,17 @@ export const useUserStore = defineStore('user', () => {
   const email = ref<string | null>(null)
 
   const signed = computed(() => Boolean(uid.value))
-  const avatar = computed(() => userPhoto.value || defaultAvatar)
+  /** photo of the user, or '' when there is none (the old default picture counts as none) */
+  const avatar = computed(() => (userPhoto.value && userPhoto.value !== defaultAvatar ? userPhoto.value : ''))
+  /** 'ІФ' from 'Ірина Филиппова', 'R' from 'reader@example.com' */
+  const initials = computed(() =>
+    (userName.value || email.value || '?')
+      .split(/[\s@.]+/)
+      .filter(Boolean)
+      .slice(0, userName.value ? 2 : 1)
+      .map((part) => part[0]!.toUpperCase())
+      .join('')
+  )
   /** what the header shows */
   const displayName = computed(() => userName.value || email.value || '')
 
@@ -73,7 +83,7 @@ export const useUserStore = defineStore('user', () => {
 
   function setUser(user: User) {
     userName.value = user.userName ?? null
-    userPhoto.value = user.avatar || defaultAvatar
+    userPhoto.value = user.avatar || null
     city.value = user.city ?? null
     country.value = user.country ?? null
     uid.value = user.uid
@@ -106,7 +116,7 @@ export const useUserStore = defineStore('user', () => {
   /** Profile for a new account: what the sign up form or the Google account gives */
   const newProfile = (authUser: AuthUser, data: Profile = {}): Profile => ({
     userName: data.userName || authUser.displayName || '',
-    avatar: data.avatar || authUser.photoURL || defaultAvatar,
+    avatar: data.avatar || authUser.photoURL || '',
     city: data.city ?? '',
     country: data.country ?? '',
     lang: data.lang ?? lang.value,
@@ -234,6 +244,7 @@ export const useUserStore = defineStore('user', () => {
     email,
     signed,
     avatar,
+    initials,
     displayName,
     setUser,
     initUser,

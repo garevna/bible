@@ -76,11 +76,13 @@ export function readRecord<T = any>(page: Page, storeName: string, key: string) 
 
 /** Drags with real mouse moves, as SortableJS needs */
 export async function dragTo(page: Page, source: Locator, target: Locator, offset = { x: 40, y: 0 }) {
+  await source.scrollIntoViewIfNeeded()
   const from = (await source.boundingBox())!
   const to = (await target.boundingBox())!
   const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 }
   await page.mouse.move(start.x, start.y)
   await page.mouse.down()
+  await page.waitForTimeout(100)
   // SortableJS reacts to separate pointer moves over time, not to one jump
   const end = { x: to.x + offset.x, y: to.y + to.height / 2 + offset.y }
   const steps = 20

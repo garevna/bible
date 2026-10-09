@@ -26,7 +26,7 @@ pnpm dev
 | `pnpm test:e2e`  | e2e-тести (Playwright)             |
 | `pnpm typecheck` | vue-tsc                            |
 
-У продакшн-збірці `base` = `/bible-ukr/` (GitHub Pages), змінюється через `BASE_PATH`.
+Шлях сайту задає `BASE_PATH` під час збірки: `/bible/` на `garevna.github.io` (за замовчуванням у CI), `/` на власному домені. Деплой на GitHub Pages — автоматично з гілки `main` (`.github/workflows/ci.yml`).
 
 ## Firebase
 

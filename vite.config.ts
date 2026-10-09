@@ -17,9 +17,9 @@ function vuetifyComponents() {
   )
 }
 
-// GitHub Pages serves the app from /bible-ukr/, as the Vue 2 version did
+// the site path: /bible/ on garevna.github.io, / on its own domain (BASE_PATH in CI)
 export default defineConfig(({ command }) => ({
-  base: command === 'build' ? (process.env.BASE_PATH ?? '/bible-ukr/') : '/',
+  base: command === 'build' ? process.env.BASE_PATH || '/' : '/',
 
   plugins: [
     vue(),

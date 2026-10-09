@@ -1,9 +1,25 @@
-name: CI
+name: CI / Deploy
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
+  workflow_dispatch:
+
+# Firebase web config comes from the repository variables
+# (Settings > Secrets and variables > Actions > Variables). It is not secret:
+# it ends up in the built JavaScript anyway; access is guarded by firestore.rules.
+env:
+  VITE_API_KEY: ${{ vars.VITE_API_KEY }}
+  VITE_API_ID: ${{ vars.VITE_API_ID }}
+  VITE_API_DOMAIN: ${{ vars.VITE_API_DOMAIN }}
+  VITE_PROJECT_ID: ${{ vars.VITE_PROJECT_ID }}
+  VITE_STORAGE_BACKET: ${{ vars.VITE_STORAGE_BACKET }}
+  VITE_MESSAGING_SENDER_ID: ${{ vars.VITE_MESSAGING_SENDER_ID }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
@@ -47,3 +63,47 @@ jobs:
           name: playwright-results
           path: test-results
           retention-days: 7
+
+  deploy:
+    # only the main branch is published, after the checks pass
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Enable pnpm
+        run: corepack enable pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm exec vite build
+        env:
+          # /bible/ on garevna.github.io; set the BASE_PATH variable to / for an own domain
+          BASE_PATH: ${{ vars.BASE_PATH || '/bible/' }}
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
