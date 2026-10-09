@@ -5,3 +5,5 @@ public
 .old-nuxt
 .backup-nuxt
 pnpm-lock.yaml
+test-results
+playwright-report

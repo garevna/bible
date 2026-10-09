@@ -3,6 +3,7 @@
     <template #activator="{ props: tooltip }">
       <v-btn
         v-bind="{ ...tooltip, ...$attrs }"
+        :aria-label="text || undefined"
         icon
         :size="large ? 'large' : small ? 'small' : 'default'"
         :color="color"

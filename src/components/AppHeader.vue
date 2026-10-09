@@ -18,6 +18,7 @@
         <v-btn
           v-bind="props"
           icon="$search"
+          :aria-label="pages.search"
           size="small"
           @click="app.setPage(app.page === 'search' ? 'bible' : 'search')"
         />
@@ -29,13 +30,25 @@
     <template v-if="!user.signed">
       <v-tooltip :text="header.signIn">
         <template #activator="{ props }">
-          <v-btn v-bind="props" icon="$signIn" size="small" @click="signIn = true" />
+          <v-btn
+            v-bind="props"
+            icon="$signIn"
+            size="small"
+            :aria-label="header.signIn"
+            @click="signIn = true"
+          />
         </template>
       </v-tooltip>
 
       <v-tooltip :text="header.signUp">
         <template #activator="{ props }">
-          <v-btn v-bind="props" icon="$signUp" size="small" @click="signUp = true" />
+          <v-btn
+            v-bind="props"
+            icon="$signUp"
+            size="small"
+            :aria-label="header.signUp"
+            @click="signUp = true"
+          />
         </template>
       </v-tooltip>
     </template>
@@ -44,7 +57,13 @@
       <template #activator="{ props: menu }">
         <v-tooltip :text="common.langMenuTooltip">
           <template #activator="{ props: tooltip }">
-            <v-btn v-bind="{ ...menu, ...tooltip }" icon size="small" class="ml-2">
+            <v-btn
+              v-bind="{ ...menu, ...tooltip }"
+              icon
+              size="small"
+              class="ml-2"
+              :aria-label="common.langMenuTooltip"
+            >
               <img :src="langIcon" alt="" width="28" />
             </v-btn>
           </template>
@@ -68,7 +87,13 @@
 
     <v-menu>
       <template #activator="{ props }">
-        <v-btn v-bind="props" icon="mdi-book-cross" size="small" class="mr-2" />
+        <v-btn
+          v-bind="props"
+          icon="mdi-book-cross"
+          size="small"
+          class="mr-2"
+          :aria-label="header.translationMenu"
+        />
       </template>
 
       <v-list density="compact" bg-color="homefone">

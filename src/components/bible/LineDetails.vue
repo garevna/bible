@@ -10,7 +10,13 @@
 
       <div v-if="content.currentLineId" class="pa-4">
         <v-btn-toggle v-model="tab" mandatory color="primary" class="mb-4">
-          <v-btn v-for="item of tabs" :key="item.value" :value="item.value" :prepend-icon="item.icon">
+          <v-btn
+            v-for="item of tabs"
+            :key="item.value"
+            :value="item.value"
+            :prepend-icon="item.icon"
+            :aria-label="item.text"
+          >
             <span v-if="tab === item.value">{{ item.text }}</span>
           </v-btn>
         </v-btn-toggle>

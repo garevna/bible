@@ -24,3 +24,8 @@ pnpm-debug.log*
 .backup-nuxt
 .old-nuxt
 dev-dist
+
+# Playwright
+test-results
+playwright-report
+blob-report

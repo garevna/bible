@@ -8,7 +8,13 @@
 
     <v-tooltip :text="header.signOut">
       <template #activator="{ props }">
-        <v-btn v-bind="props" icon="$signOut" size="small" @click="user.signOut()" />
+        <v-btn
+          v-bind="props"
+          icon="$signOut"
+          size="small"
+          :aria-label="header.signOut"
+          @click="user.signOut()"
+        />
       </template>
     </v-tooltip>
   </span>

@@ -23,9 +23,20 @@ pnpm dev
 | `pnpm preview`   | перегляд зібраної версії           |
 | `pnpm lint`      | ESLint                             |
 | `pnpm test`      | unit-тести (Vitest)                |
+| `pnpm test:e2e`  | e2e-тести (Playwright)             |
 | `pnpm typecheck` | vue-tsc                            |
 
 У продакшн-збірці `base` = `/bible-ukr/` (GitHub Pages), змінюється через `BASE_PATH`.
+
+## E2E-тести
+
+Тести в `e2e/` запускаються на production-збірці (`vite build` + `vite preview` на порту 4179).
+Локально використовується встановлений Microsoft Edge, нічого завантажувати не треба.
+Щоб запустити в Chromium: `pnpm exec playwright install chromium` і `PW_CHANNEL=chromium`.
+
+Тести працюють офлайн: усі запити поза локальним сервером блокуються, тому
+в справжній Firestore нічого не потрапляє. Користувач «входить» лише в пам'яті сторінки
+(`signInLocally` у `e2e/fixtures.ts`).
 
 ## Структура
 

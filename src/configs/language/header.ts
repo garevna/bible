@@ -33,6 +33,12 @@ export const header = {
     en: 'Sign Up'
   },
 
+  translationMenu: {
+    ua: 'Переклад',
+    ru: 'Перевод',
+    en: 'Translation'
+  },
+
   signOut: {
     ua: 'Вихід',
     ru: 'Выход',
