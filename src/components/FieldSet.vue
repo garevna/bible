@@ -25,14 +25,14 @@ const { common } = storeToRefs(useLanguageStore())
 .field-set {
   position: relative;
   padding: 12px 16px;
-  border: solid 1px #ccc;
-  border-radius: 8px;
+  border: solid 1px var(--app-border);
+  border-radius: var(--app-radius);
   margin-bottom: 24px;
   min-height: 56px;
 }
 
 .field-set > legend {
-  color: #09b8;
+  color: rgb(var(--v-theme-secondary) / 50%);
   padding: 0 8px;
   font-size: 13px;
   font-weight: bold;
@@ -47,7 +47,7 @@ const { common } = storeToRefs(useLanguageStore())
 }
 
 .field-set__empty {
-  color: #999;
+  color: var(--app-text-muted);
   font-size: 13px;
   margin: 0;
 }

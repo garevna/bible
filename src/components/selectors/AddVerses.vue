@@ -231,7 +231,7 @@ defineExpose({ show: () => (open.value = true) })
 }
 
 .verse-picker :deep(mark) {
-  background: #ff07;
+  background: var(--app-mark);
   color: inherit;
 }
 

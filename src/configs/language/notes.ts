@@ -138,5 +138,55 @@ export const notes = {
     ua: 'До дати',
     ru: 'По дату',
     en: 'To'
+  },
+  byKeyword: {
+    ua: 'Ключове слово',
+    ru: 'Ключевое слово',
+    en: 'Keyword'
+  },
+  byText: {
+    ua: 'Текст',
+    ru: 'Текст',
+    en: 'Text'
+  },
+  byDate: {
+    ua: 'Дата',
+    ru: 'Дата',
+    en: 'Date'
+  },
+  byKeywordHint: {
+    ua: 'Пошук нотаток за ключовим словом. Почніть вводити слово й виберіть його зі списку.',
+    ru: 'Поиск заметок по ключевому слову. Начните вводить слово и выберите его из списка.',
+    en: 'Find notes by a keyword. Start typing it and pick it from the list.'
+  },
+  byTextHint: {
+    ua: 'Пошук нотаток за фрагментом тексту: знайдуться нотатки, у яких є всі введені слова.',
+    ru: 'Поиск заметок по фрагменту текста: найдутся заметки, в которых есть все введённые слова.',
+    en: 'Find notes by a piece of text: the notes that contain all the words.'
+  },
+  byDateHint: {
+    ua: 'Пошук нотаток за датою створення. Дні з нотатками виділені; можна вибрати інтервал у кілька днів.',
+    ru: 'Поиск заметок по дате создания. Дни с заметками выделены; можно выбрать интервал в несколько дней.',
+    en: 'Find notes by the creation date. Days with notes are marked; you can pick an interval of several days.'
+  },
+  interval: {
+    ua: 'Інтервал',
+    ru: 'Интервал',
+    en: 'Interval'
+  },
+  days: {
+    ua: 'днів',
+    ru: 'дней',
+    en: 'days'
+  },
+  prevMonth: {
+    ua: 'Попередній місяць',
+    ru: 'Предыдущий месяц',
+    en: 'Previous month'
+  },
+  nextMonth: {
+    ua: 'Наступний місяць',
+    ru: 'Следующий месяц',
+    en: 'Next month'
   }
 }

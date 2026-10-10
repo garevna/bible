@@ -1,41 +1,37 @@
 <template>
   <ButtonTooltip icon="$calendar" :text="selector.datePrompt" @click="open = true" />
 
-  <v-dialog v-model="open" width="360">
-    <v-date-picker
-      :model-value="pickerValue"
-      :allowed-dates="isDateAvailable"
-      :first-day-of-week="1"
-      color="primary"
+  <AppDialog v-model="open" :title="selector.datePrompt" icon="$calendar" max-width="420">
+    <NotesCalendar
+      :model-value="range"
+      :available-dates="availableDates"
+      :allow-interval="false"
       @update:model-value="pick"
     />
-  </v-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
-import { localISODate } from '@/db'
+import NotesCalendar, { type DateRange } from '@/components/selectors/NotesCalendar.vue'
 import { useLanguageStore } from '@/stores/language'
 
-/** Date as 'YYYY-MM-DD'; only dates from `availableDates` can be picked */
+/** Date as 'YYYY-MM-DD'; the days that have notes are marked */
 const date = defineModel<string | null>({ default: null })
-const props = defineProps<{ availableDates: string[] }>()
+defineProps<{ availableDates: string[] }>()
 
 const { selector } = storeToRefs(useLanguageStore())
 
 const open = ref(false)
 
-const pickerValue = computed(() => (date.value ? new Date(`${date.value}T00:00:00`) : null))
+const range = computed<DateRange>(() => ({ from: date.value, to: date.value }))
 
-const isDateAvailable = (value: unknown) =>
-  value instanceof Date && props.availableDates.includes(localISODate(value))
-
-function pick(value: unknown) {
-  if (!(value instanceof Date)) return
-  date.value = localISODate(value)
+function pick(value: DateRange) {
+  date.value = value.from
   open.value = false
 }
 </script>

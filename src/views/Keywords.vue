@@ -138,13 +138,13 @@ async function remove(keyword: Keyword) {
 
 <style scoped>
 .keyword-panel {
-  border: solid 1px #e4e4e4;
+  border: solid 1px var(--app-border);
   margin-bottom: 4px;
-  border-radius: 8px !important;
+  border-radius: var(--app-radius) !important;
 }
 
 .keyword-verse + .keyword-verse {
-  border-top: solid 1px #eee;
+  border-top: solid 1px var(--app-border-light);
 }
 
 .keyword-verse {

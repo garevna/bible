@@ -57,7 +57,7 @@ const { common } = storeToRefs(useLanguageStore())
 
 <style scoped>
 .app-dialog {
-  border-radius: 12px !important;
+  border-radius: var(--app-radius-large) !important;
 }
 
 .app-dialog__title {

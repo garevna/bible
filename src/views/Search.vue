@@ -81,7 +81,7 @@ watch(
 }
 
 .result :deep(mark) {
-  background: #ff07;
+  background: var(--app-mark);
   color: inherit;
   padding: 0 1px;
   border-radius: 2px;

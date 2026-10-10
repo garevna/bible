@@ -75,8 +75,8 @@ const topic = ref<Topic | null>(null)
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  background: #ddd;
-  border-radius: 8px;
+  background: var(--app-border);
+  border-radius: var(--app-radius);
   padding: 2px 8px;
 }
 </style>

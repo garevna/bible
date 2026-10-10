@@ -139,12 +139,22 @@ test.describe('existing notes in topics', () => {
     await page.getByRole('button', { name: 'Додати нотатки' }).click()
     const picker = dialog(page)
     const candidates = picker.locator('.candidate')
+    // nothing is listed until a search is set
+    await expect(candidates).toHaveCount(0)
+
+    // by the creation date: all three notes are from today, which is marked in the calendar
+    await picker.getByRole('tab', { name: 'Дата' }).click()
+    const today = picker.locator('.calendar__day--today')
+    await expect(today).toHaveClass(/calendar__day--available/)
+    await today.click()
     await expect(candidates).toHaveCount(3)
 
+    await picker.getByRole('tab', { name: 'Текст' }).click()
     await picker.getByPlaceholder('Слова з тексту нотатки').fill('авраама')
     await expect(candidates).toHaveCount(1)
-    await picker.getByPlaceholder('Слова з тексту нотатки').fill('')
-    await picker.locator('input').nth(1).fill('віра')
+
+    await picker.getByRole('tab', { name: 'Ключове слово' }).click()
+    await picker.locator('input').first().fill('віра')
     await page.locator('.v-overlay--active .v-list-item', { hasText: /^віра$/ }).click()
     await expect(candidates).toHaveCount(2)
 

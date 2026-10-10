@@ -49,6 +49,6 @@ watch(
 .initials {
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--app-on-primary);
 }
 </style>

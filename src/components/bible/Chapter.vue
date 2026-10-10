@@ -128,7 +128,7 @@ onBeforeUnmount(() => {
 
 /* light separators make it clear which verse the action buttons belong to */
 .chapter tr + tr td {
-  border-top: solid 1px #eee;
+  border-top: solid 1px var(--app-border-light);
 }
 
 .chapter p {
@@ -149,20 +149,20 @@ onBeforeUnmount(() => {
 }
 
 .line-number--normal {
-  border: solid 1px #ddd;
-  color: #999;
+  border: solid 1px var(--app-border);
+  color: var(--app-text-muted);
 }
 
 .line-number--emph {
-  border: solid 2px #09b;
+  border: solid 2px rgb(var(--v-theme-secondary));
   font-weight: bold;
-  background: #09bb;
-  color: #eef;
+  background: rgb(var(--v-theme-secondary) / 73%);
+  color: var(--app-on-secondary);
 }
 
 .line-text--emph {
   font-weight: bold;
-  color: #09b;
+  color: rgb(var(--v-theme-secondary));
 }
 
 .highlighter-bar {

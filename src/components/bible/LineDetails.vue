@@ -72,7 +72,7 @@ watch(dialog, (open) => !open && content.resetCurrentVerse())
 .verse-quote {
   border-left: solid 3px rgb(var(--v-theme-secondary));
   padding: 4px 0 4px 12px;
-  color: #444;
+  color: var(--app-text);
   font-size: 15px;
 }
 </style>

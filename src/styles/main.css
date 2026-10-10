@@ -3,7 +3,7 @@ html {
 }
 
 .v-application {
-  font-family: Montserrat, Helvetica, sans-serif;
+  font-family: var(--app-font-main);
 }
 
 p {
@@ -16,7 +16,7 @@ p {
   display: inline-block;
   cursor: pointer;
   font-weight: bold;
-  color: #09b;
+  color: rgb(var(--v-theme-secondary));
 }
 
 .link-to-verse::after {
@@ -27,7 +27,7 @@ p {
   height: 2px;
   bottom: 0;
   left: 0;
-  background-color: #09b9;
+  background-color: rgb(var(--v-theme-secondary) / 56%);
   transform-origin: bottom right;
   transition: transform 0.25s ease-out;
 }
@@ -46,39 +46,39 @@ p {
 }
 
 .draggable-item {
-  border: solid 1px #ddd;
+  border: solid 1px var(--app-border);
   border-radius: 4px;
   padding: 8px 16px;
   cursor: grab;
 }
 
 .draggable-item:hover {
-  background-color: #ddd5;
+  background-color: var(--app-hover);
 }
 
 .drop-placeholder {
-  border: dashed 2px #f0f;
+  border: dashed 2px rgb(var(--v-theme-secondary));
 }
 
 .chosen-item {
-  border: solid 1px #005;
+  border: solid 1px rgb(var(--v-theme-secondary));
 }
 
 .dragging-item {
-  border: solid 2px #f0f;
+  border: solid 2px rgb(var(--v-theme-secondary));
 }
 
 .expanded-item-header {
-  color: #09b;
+  color: rgb(var(--v-theme-secondary));
   font-weight: bold;
 }
 
 .v-tooltip > .v-overlay__content {
-  background: #292b;
+  background: var(--app-tooltip);
 }
 
 .v-pagination__item .v-btn {
-  border: solid 1px #ddd;
+  border: solid 1px var(--app-border);
   font-size: 13px;
 }
 
@@ -86,13 +86,13 @@ p {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #20731c;
+  background: var(--app-scrollbar-track);
 }
 ::-webkit-scrollbar-thumb {
-  background: #4caf50;
+  background: var(--app-primary);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #72bf44;
+  background: var(--app-buttons);
 }
 
 /* inputs: thin blue outline with a soft glow on focus */
@@ -116,10 +116,10 @@ p {
 
 /* tabs: the inactive one has a light grey border, the active one is light blue */
 .app-tab.v-tab {
-  border: solid 1px #ddd;
+  border: solid 1px var(--app-border);
   border-bottom-color: rgb(var(--v-theme-secondary));
   border-radius: 10px 10px 0 0 !important;
-  color: #888;
+  color: var(--app-text-muted);
   font-size: 16px;
   font-weight: 500;
   text-transform: none;
@@ -154,5 +154,5 @@ p {
 }
 
 .row-item + .row-item {
-  border-top: solid 1px #eee;
+  border-top: solid 1px var(--app-border-light);
 }

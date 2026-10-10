@@ -158,7 +158,7 @@ const langIcon = computed(
   left: 50%;
   transform: translate(-50%, 0);
   top: 40px;
-  border-radius: 8px;
+  border-radius: var(--app-radius);
   max-width: 360px;
   min-width: 160px;
   padding: 16px 16px 8px;
@@ -177,6 +177,6 @@ const langIcon = computed(
 }
 
 .bottom-border {
-  border-bottom: solid 1px #fff8 !important;
+  border-bottom: solid 1px var(--app-surface) !important;
 }
 </style>

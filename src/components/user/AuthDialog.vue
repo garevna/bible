@@ -208,7 +208,7 @@ async function reset() {
 
 <style scoped>
 .auth-card {
-  border-radius: 12px !important;
+  border-radius: var(--app-radius-large) !important;
 }
 
 .auth-button {
@@ -222,7 +222,7 @@ async function reset() {
 
 .forgot-link {
   font-size: 13px;
-  color: #888;
+  color: var(--app-text-muted);
 }
 
 .forgot-link:hover {

@@ -86,7 +86,7 @@ async function rename(topic: Topic) {
 
 <style scoped>
 .topic-row {
-  border-bottom: solid 1px #eee;
+  border-bottom: solid 1px var(--app-border-light);
 }
 
 .topic-title {
@@ -94,6 +94,6 @@ async function rename(topic: Topic) {
 }
 
 .topic-title:hover {
-  color: #09b;
+  color: rgb(var(--v-theme-secondary));
 }
 </style>

@@ -57,54 +57,40 @@ const iconAliases = {
   verses: 'mdi-book-cross'
 }
 
-export default createVuetify({
-  icons: {
-    defaultSet: 'mdi',
-    aliases: { ...aliases, ...iconAliases },
-    sets: { mdi }
-  },
+/** Vuetify with the colors of the theme (see src/theme) */
+export const createAppVuetify = (colors: Record<string, string>) =>
+  createVuetify({
+    icons: {
+      defaultSet: 'mdi',
+      aliases: { ...aliases, ...iconAliases },
+      sets: { mdi }
+    },
 
-  locale: {
-    locale: 'uk',
-    fallback: 'en',
-    messages: { uk, en, ru }
-  },
+    locale: {
+      locale: 'uk',
+      fallback: 'en',
+      messages: { uk, en, ru }
+    },
 
-  theme: {
-    defaultTheme: 'light',
-    themes: {
-      light: {
-        dark: false,
-        colors: {
-          primary: '#4CAF50',
-          secondary: '#0090B0',
-          buttons: '#72BF44',
-          greentext: '#20731C',
-          deepgreen: '#007700',
-          homefone: '#FAFAFA',
-          background: '#FAFAFA',
-          warning: '#FFAA00',
-          delete: '#990000',
-          comment: '#A0A0A0',
-          // white text and icons on the green and blue buttons
-          'on-primary': '#FFFFFF',
-          'on-secondary': '#FFFFFF',
-          'on-buttons': '#FFFFFF',
-          'on-delete': '#FFFFFF'
+    theme: {
+      defaultTheme: 'light',
+      themes: {
+        light: {
+          dark: false,
+          colors
         }
       }
-    }
-  },
+    },
 
-  // inputs: outlined with a thin blue focus ring instead of the thick dark border
-  // (styles/main.css) and without the grey background of the filled variant
-  defaults: {
-    VCard: { flat: true, color: 'transparent' },
-    VTooltip: { location: 'bottom' },
-    VTextField: { variant: 'outlined', color: 'secondary' },
-    VTextarea: { variant: 'outlined', color: 'secondary' },
-    VAutocomplete: { variant: 'outlined', color: 'secondary' },
-    VFileInput: { variant: 'outlined', color: 'secondary' },
-    VSelect: { variant: 'outlined', color: 'secondary' }
-  }
-})
+    // inputs: outlined with a thin blue focus ring instead of the thick dark border
+    // (styles/main.css) and without the grey background of the filled variant
+    defaults: {
+      VCard: { flat: true, color: 'transparent' },
+      VTooltip: { location: 'bottom' },
+      VTextField: { variant: 'outlined', color: 'secondary' },
+      VTextarea: { variant: 'outlined', color: 'secondary' },
+      VAutocomplete: { variant: 'outlined', color: 'secondary' },
+      VFileInput: { variant: 'outlined', color: 'secondary' },
+      VSelect: { variant: 'outlined', color: 'secondary' }
+    }
+  })

@@ -46,7 +46,7 @@ export default defineConfig(({ command }) => ({
       },
       workbox: {
         // bible-*.json are 4-8 MB each and are stored in IndexedDB after the first load
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', 'theme.json'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024
       }
     })

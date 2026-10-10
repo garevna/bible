@@ -10,7 +10,7 @@
         <template #activator="{ props }">
           <v-btn
             v-bind="props"
-            icon="mdi-plus"
+            icon="mdi-menu"
             variant="tonal"
             color="buttons"
             size="small"

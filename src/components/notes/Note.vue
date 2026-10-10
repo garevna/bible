@@ -74,10 +74,10 @@ async function remove() {
 
 <style scoped>
 .note {
-  border: solid 1px #ddd;
-  border-radius: 8px;
+  border: solid 1px var(--app-border);
+  border-radius: var(--app-radius);
   padding: 12px 16px;
-  background: #fff8;
+  background: var(--app-surface);
 }
 
 .note-text {
@@ -86,10 +86,10 @@ async function remove() {
 }
 
 .note-verse {
-  border: solid 1px #e4e4e4;
+  border: solid 1px var(--app-border);
   border-radius: 6px;
   padding: 8px 12px;
   margin-bottom: 8px;
-  background: #fff;
+  background: var(--app-surface);
 }
 </style>

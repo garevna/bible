@@ -66,7 +66,7 @@ const covenantBooks = computed(() => content.books?.[content.covenantIndex] ?? [
 }
 
 .book-menu-item:hover {
-  background: #09b4;
-  color: #09b;
+  background: rgb(var(--v-theme-secondary) / 25%);
+  color: rgb(var(--v-theme-secondary));
 }
 </style>
