@@ -1,6 +1,6 @@
 <template>
-  <div class="mx-auto my-4 px-2 pb-16" style="max-width: 760px">
-    <div class="d-flex align-center flex-wrap ga-2 mb-4">
+  <div class="page mx-auto" style="max-width: 760px">
+    <div class="d-flex align-center flex-wrap ga-2 mb-6">
       <PickerDialog
         icon="$addKeyword"
         :label="text.newKeyword"

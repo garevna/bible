@@ -1,60 +1,40 @@
 <template>
-  <v-btn
-    v-if="label"
-    variant="tonal"
-    color="buttons"
-    :prepend-icon="icon"
-    class="text-none"
-    @click="open = true"
-  >
-    {{ label }}
-  </v-btn>
+  <AddButton v-if="label" :label="label" :icon="icon" @click="open = true" />
   <ButtonTooltip
     v-else
     :icon="icon"
     :text="tooltip"
     :small="small"
     :large="large"
-    :fab="fab"
     :color="color"
-    :badge="badge"
-    :badge-icon="badgeIcon"
     @click="open = true"
   />
 
-  <v-dialog v-model="open" max-width="480">
-    <v-card color="homefone" class="pb-4">
-      <v-toolbar flat density="compact" color="transparent">
-        <v-toolbar-title class="text-subtitle-1 font-weight-bold">{{ title }}</v-toolbar-title>
-        <v-btn icon="$close" @click="open = false" />
-      </v-toolbar>
+  <AppDialog v-model="open" :title="title" :icon="icon" max-width="480">
+    <slot />
 
-      <div class="px-5 pb-6">
-        <slot />
-      </div>
-
-      <v-btn
-        variant="outlined"
-        color="buttons"
-        width="120"
-        class="d-block mx-auto"
+    <template #actions>
+      <DialogButtons
+        :confirm-text="confirmText || common.add"
         :disabled="disabled"
-        @click="ok"
-      >
-        {{ selector.okButton }}
-      </v-btn>
-    </v-card>
-  </v-dialog>
+        @cancel="open = false"
+        @confirm="ok"
+      />
+    </template>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AddButton from '@/components/AddButton.vue'
+import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
 
-/** Button that opens a dialog with a picker (slot) and an OK button */
+/** A button (icon, or text when `label` is set) that opens a dialog with a picker and a confirm button */
 withDefaults(
   defineProps<{
     icon: string
@@ -63,19 +43,17 @@ withDefaults(
     color?: string
     small?: boolean
     large?: boolean
-    fab?: boolean
-    badge?: string
-    badgeIcon?: string
+    disabled?: boolean
     /** a button with this text instead of an icon */
     label?: string
-    disabled?: boolean
+    confirmText?: string
   }>(),
-  { tooltip: '', title: '', color: 'buttons', badge: undefined, badgeIcon: undefined, label: undefined }
+  { tooltip: '', title: '', color: 'buttons', label: undefined, confirmText: '' }
 )
 
 const emit = defineEmits<{ ok: [] }>()
 
-const { selector } = storeToRefs(useLanguageStore())
+const { common } = storeToRefs(useLanguageStore())
 
 const open = ref(false)
 

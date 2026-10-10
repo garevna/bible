@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto px-2" style="max-width: 1008px">
+  <div class="page mx-auto" style="max-width: 1008px">
     <div class="d-flex align-center justify-end my-2">
       <v-btn variant="text" :disabled="content.covenantIndex !== 0" @click="content.resetBook()">
         <small>{{ covenantTitles[0] }}</small>

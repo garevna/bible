@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto pt-8 px-2 pb-16" style="max-width: 960px">
+  <div class="page mx-auto" style="max-width: 960px">
     <v-text-field
       v-model="search.query"
       :placeholder="text.placeholder"

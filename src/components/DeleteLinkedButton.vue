@@ -1,33 +1,25 @@
 <template>
   <ButtonTooltip icon="$delete" color="delete" small class="delete-icon" :text="tooltip" @click="ask" />
 
-  <v-dialog v-model="open" max-width="440">
-    <v-card color="homefone" class="pa-2">
-      <v-card-title class="text-subtitle-1 font-weight-bold text-wrap">
-        {{ format(common.deleteConfirm, { name }) }}
-      </v-card-title>
+  <AppDialog v-model="open" :title="format(common.deleteConfirm, { name })" icon="$delete" max-width="460">
+    <v-alert v-if="count" type="warning" variant="tonal" density="compact">
+      {{ format(common.linkedNotes, { name, count }) }}
+    </v-alert>
+    <p v-else class="my-0">{{ common.cannotUndo }}</p>
 
-      <v-card-text v-if="count">
-        <v-alert type="warning" variant="tonal" density="compact">
-          {{ format(common.linkedNotes, { name, count }) }}
-        </v-alert>
-      </v-card-text>
-
-      <v-card-actions class="justify-end">
-        <v-btn variant="text" @click="open = false">{{ common.cancel }}</v-btn>
-        <v-btn variant="tonal" color="delete" prepend-icon="$delete" @click="confirm">{{
-          common.delete
-        }}</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <DialogButtons :confirm-text="common.delete" danger @cancel="open = false" @confirm="confirm" />
+    </template>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
 import { format } from '@/utils/format'

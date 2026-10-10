@@ -1,23 +1,23 @@
 <template>
-  <v-btn v-if="label" variant="tonal" color="buttons" :prepend-icon="icon" class="text-none" @click="open">
-    {{ label }}
-  </v-btn>
-  <ButtonTooltip
-    v-else
-    :icon="icon"
-    :text="tooltip || text.createNoteTooltip"
-    :small="small"
-    :large="large"
-    :fab="fab"
-    @click="open"
-  />
-  <UpdateNote v-model="dialog" @saved="emit('saved', $event)" />
+  <template v-if="!hideActivator">
+    <AddButton v-if="label" :label="label" :icon="icon" @click="open" />
+    <ButtonTooltip
+      v-else
+      :icon="icon"
+      :text="tooltip || text.createNoteTooltip"
+      :small="small"
+      :large="large"
+      @click="open"
+    />
+  </template>
+  <UpdateNote v-model="dialog" is-new @saved="emit('saved', $event)" />
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AddButton from '@/components/AddButton.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import UpdateNote from '@/components/notes/UpdateNote.vue'
 import { useLanguageStore } from '@/stores/language'
@@ -34,9 +34,10 @@ const props = withDefaults(
     tooltip?: string
     small?: boolean
     large?: boolean
-    fab?: boolean
     /** a button with this text instead of an icon */
     label?: string
+    /** no own button: the parent opens it with show() (e.g. from a menu) */
+    hideActivator?: boolean
   }>(),
   {
     lineRef: undefined,
@@ -59,4 +60,6 @@ async function open() {
   await notes.startNewNote({ lineRef: props.lineRef, topicId: props.topicId, keywordId: props.keywordId })
   dialog.value = true
 }
+
+defineExpose({ show: open })
 </script>

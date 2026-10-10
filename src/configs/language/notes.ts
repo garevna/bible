@@ -108,5 +108,35 @@ export const notes = {
     ua: 'Нотаток за цими умовами немає',
     ru: 'Заметок по этим условиям нет',
     en: 'No notes match these conditions'
+  },
+  textPlaceholder: {
+    ua: 'Текст нотатки',
+    ru: 'Текст заметки',
+    en: 'Note text'
+  },
+  addExistingNotes: {
+    ua: 'Додати нотатки',
+    ru: 'Добавить заметки',
+    en: 'Add notes'
+  },
+  addExistingTitle: {
+    ua: 'Додати нотатки до теми',
+    ru: 'Добавить заметки в тему',
+    en: 'Add notes to the topic'
+  },
+  searchNotesText: {
+    ua: 'Слова з тексту нотатки',
+    ru: 'Слова из текста заметки',
+    en: 'Words from the note text'
+  },
+  fromDate: {
+    ua: 'Від дати',
+    ru: 'С даты',
+    en: 'From'
+  },
+  toDate: {
+    ua: 'До дати',
+    ru: 'По дату',
+    en: 'To'
   }
 }

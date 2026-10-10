@@ -45,20 +45,6 @@ p {
   opacity: 0.8;
 }
 
-.field-set {
-  padding: 8px;
-  border: solid 1px #ccc;
-  border-radius: 4px;
-  margin-bottom: 32px;
-}
-
-.field-set > legend {
-  color: #09b8;
-  padding: 0 8px;
-  font-size: 13px;
-  font-weight: bold;
-}
-
 .draggable-item {
   border: solid 1px #ddd;
   border-radius: 4px;
@@ -149,4 +135,24 @@ p {
   color: rgb(var(--v-theme-secondary));
   border-color: rgb(var(--v-theme-secondary));
   border-bottom-width: 2px;
+}
+
+/* every page: below the floating page title, above the bottom bars */
+.page {
+  padding: 48px 16px 120px;
+}
+
+/* the one vertical rhythm: 8 / 16 / 24 px */
+.section + .section {
+  margin-top: 24px;
+}
+
+/* rows of a list inside a framed block */
+.row-item {
+  min-height: 36px;
+  padding: 2px 0;
+}
+
+.row-item + .row-item {
+  border-top: solid 1px #eee;
 }

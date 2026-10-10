@@ -85,7 +85,12 @@ export default createVuetify({
           background: '#FAFAFA',
           warning: '#FFAA00',
           delete: '#990000',
-          comment: '#A0A0A0'
+          comment: '#A0A0A0',
+          // white text and icons on the green and blue buttons
+          'on-primary': '#FFFFFF',
+          'on-secondary': '#FFFFFF',
+          'on-buttons': '#FFFFFF',
+          'on-delete': '#FFFFFF'
         }
       }
     }

@@ -46,8 +46,20 @@ export const useTopicsStore = defineStore('topics', () => {
   const currentTopic = ref<Topic | null>(null)
   const currentTopicData = ref<TopicItem[]>([])
 
+  /** number of notes in each topic, by topic id */
+  const noteCounts = ref<Record<string, number>>({})
+
   async function getTopics() {
-    topicList.value = (await app.withProgress(() => getAllRecords<Topic>('topics'))) ?? []
+    await app.withProgress(async () => {
+      const [topics, notes] = await Promise.all([
+        getAllRecords<Topic>('topics'),
+        getAllRecords<Note>('notes')
+      ])
+      topicList.value = topics
+      noteCounts.value = notes
+        .flatMap((note) => note.topics)
+        .reduce<Record<string, number>>((counts, id) => ({ ...counts, [id]: (counts[id] ?? 0) + 1 }), {})
+    })
   }
 
   async function getTopicIdList() {
@@ -128,6 +140,23 @@ export const useTopicsStore = defineStore('topics', () => {
   }
 
   /** Loads the notes and verses of the current topic */
+  /** Adds existing notes to the current topic; they appear at the end of its list */
+  async function addNotesToTopic(noteIds: string[]) {
+    const topic = currentTopic.value
+    if (!topic) return
+
+    const notesStore = useNotesStore()
+    await app.withProgress(async () => {
+      for (const noteId of noteIds) {
+        const note = await getRecord<Note>('notes', noteId)
+        if (!note || note.topics.includes(topic._id)) continue
+        note.topics.push(topic._id)
+        await notesStore.putNote(note)
+      }
+    })
+    await getTopicData()
+  }
+
   async function getTopicData() {
     const topic = currentTopic.value
     if (!topic) return
@@ -193,6 +222,7 @@ export const useTopicsStore = defineStore('topics', () => {
 
   return {
     topicList,
+    noteCounts,
     topicIdList,
     searchResult,
     currentTopic,
@@ -208,6 +238,7 @@ export const useTopicsStore = defineStore('topics', () => {
     applyOrder,
     updateOrder,
     getTopicData,
+    addNotesToTopic,
     initTopic,
     gotoTopic,
     returnToTopicList,

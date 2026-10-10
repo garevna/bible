@@ -19,7 +19,7 @@ test.describe('creating keywords, topics and notes', () => {
 
     // the "+" button next to the text
     await picker.getByRole('button', { name: 'Додати ключове слово «Бог»' }).click()
-    await picker.getByRole('button', { name: 'OK' }).click()
+    await picker.getByRole('button', { name: 'Додати', exact: true }).click()
 
     expect((await readRecord(page, 'keywords', 'Бог')).refs).toEqual(['1.000.000.000'])
     expect((await readRecord(page, 'keywords', 'Боже')).refs).toEqual([])
@@ -29,8 +29,8 @@ test.describe('creating keywords, topics and notes', () => {
     await page.locator('.line-actions').nth(1).getByRole('button', { name: 'Додати тему' }).click()
     const picker = dialog(page)
     await picker.locator('input').fill('Нова тема')
-    await expect(picker.getByRole('button', { name: 'OK' })).toBeEnabled()
-    await picker.getByRole('button', { name: 'OK' }).click()
+    await expect(picker.getByRole('button', { name: 'Додати', exact: true })).toBeEnabled()
+    await picker.getByRole('button', { name: 'Додати', exact: true }).click()
 
     const topics = await withStores(page, async (stores) => {
       await stores.topics.getTopics()
@@ -61,7 +61,7 @@ test.describe('creating keywords, topics and notes', () => {
 
     await page.getByRole('button', { name: 'Нове ключове слово' }).click()
     await dialog(page).locator('input').fill('блаженство')
-    await dialog(page).getByRole('button', { name: 'OK' }).click()
+    await dialog(page).getByRole('button', { name: 'Додати', exact: true }).click()
     await expect(page.locator('.v-expansion-panel-title', { hasText: '#блаженство' })).toBeVisible()
 
     // verses by reference: Matthew 5:3-4
@@ -110,5 +110,74 @@ test.describe('creating keywords, topics and notes', () => {
     await expect(page.locator('.nested-list > .draggable-item')).toHaveCount(1)
     await expect(verse(page, '1.000.004.002')).toHaveCount(0)
     await expect(page.locator('.nested-list')).toContainText('Блаженні вбогі духом')
+  })
+})
+
+test.describe('existing notes in topics', () => {
+  test('notes are found by text or keyword and added to a topic; the list shows their number', async ({
+    page
+  }) => {
+    await openBible(page)
+    await signInLocally(page)
+    await withStores(page, async (stores) => {
+      await stores.keywords.createKeyword('віра')
+      for (const [text, keyword] of [
+        ['Про віру Авраама', 'віра'],
+        ['Про надію', null],
+        ['Ще одна думка', 'віра']
+      ]) {
+        await stores.notes.startNewNote(keyword ? { keywordId: keyword } : {})
+        stores.notes.updateCurrentNoteText(text)
+        await stores.notes.saveCurrentNote()
+        await new Promise((resolve) => setTimeout(resolve, 5)) // note ids are timestamps
+      }
+      await stores.topics.createTopic('Віра')
+      localStorage.setItem('topic', stores.topics.topicList[0]._id)
+      await stores.app.setPage('topic')
+    })
+
+    await page.getByRole('button', { name: 'Додати нотатки' }).click()
+    const picker = dialog(page)
+    const candidates = picker.locator('.candidate')
+    await expect(candidates).toHaveCount(3)
+
+    await picker.getByPlaceholder('Слова з тексту нотатки').fill('авраама')
+    await expect(candidates).toHaveCount(1)
+    await picker.getByPlaceholder('Слова з тексту нотатки').fill('')
+    await picker.locator('input').nth(1).fill('віра')
+    await page.locator('.v-overlay--active .v-list-item', { hasText: /^віра$/ }).click()
+    await expect(candidates).toHaveCount(2)
+
+    await candidates.locator('input[type=checkbox]').first().check()
+    await candidates.locator('input[type=checkbox]').last().check()
+    await picker.getByRole('button', { name: 'Додати (2)' }).click()
+
+    await expect(page.locator('.nested-list > .draggable-item')).toHaveCount(2)
+
+    await page
+      .getByRole('button', { name: 'Повернутися' })
+      .or(page.locator('.mdi-page-previous'))
+      .first()
+      .click()
+    await expect(page.locator('.topic-row .v-chip')).toHaveText('2')
+  })
+})
+
+test.describe('phone layout', () => {
+  test.use({ viewport: { width: 390, height: 800 } })
+
+  test('the add actions of a topic are in a menu', async ({ page }) => {
+    await openBible(page)
+    await signInLocally(page)
+    await withStores(page, async (stores) => {
+      await stores.topics.createTopic('Тема на телефоні')
+      localStorage.setItem('topic', stores.topics.topicList[0]._id)
+      await stores.app.setPage('topic')
+    })
+
+    await expect(page.getByRole('button', { name: 'Нова нотатка' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Додати', exact: true }).click()
+    await page.locator('.v-overlay--active .v-list-item', { hasText: 'Додати вірші' }).click()
+    await expect(dialog(page)).toContainText('За посиланням')
   })
 })

@@ -9,7 +9,8 @@ import {
   localISODate,
   noteDate,
   putRecord,
-  searchNotes
+  searchNotes,
+  type NotesFilter
 } from '@/db'
 import type { Note, Topic, VerseRef } from '@/types'
 import { clone, idFrom, pushUnique, removeById } from '@/utils/array'
@@ -85,6 +86,12 @@ export const useNotesStore = defineStore('notes', () => {
   async function getAvailableDates() {
     const keys = (await app.withProgress(() => getAllKeys('notes'))) ?? []
     availableDates.value = Array.from(new Set(keys.map((key) => noteDate({ _id: String(key) })))).sort()
+  }
+
+  /** Notes for a picker: any filter, the newest first; the page filter stays as it is */
+  async function findNotes(filter: NotesFilter) {
+    const found = (await app.withProgress(() => searchNotes(filter))) ?? []
+    return found.sort((a, b) => Number(b._id) - Number(a._id))
   }
 
   async function getNotes() {
@@ -278,6 +285,7 @@ export const useNotesStore = defineStore('notes', () => {
     init,
     getAvailableDates,
     getNotes,
+    findNotes,
     updateDate,
     updateKeyword,
     updateTopic,

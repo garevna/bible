@@ -1,58 +1,60 @@
 <template>
-  <v-dialog v-model="dialog" max-width="960">
-    <v-card color="homefone" class="pa-4">
-      <v-toolbar flat density="compact" color="transparent">
-        <v-spacer />
-        <v-btn icon="$close" @click="dialog = false" />
-      </v-toolbar>
+  <AppDialog
+    v-model="dialog"
+    :title="isNew ? text.newNote : text.editNoteTooltip"
+    :icon="isNew ? '$addNote' : '$editNote'"
+    max-width="900"
+  >
+    <template v-if="notes.currentNote">
+      <v-textarea
+        :model-value="notes.currentNote.text"
+        :placeholder="text.textPlaceholder"
+        auto-grow
+        autofocus
+        clearable
+        counter
+        rows="4"
+        clear-icon="mdi-close-circle"
+        class="mb-6"
+        @update:model-value="notes.updateCurrentNoteText($event ?? '')"
+      />
 
-      <div v-if="notes.currentNote" class="pa-0 pa-md-8">
-        <EditTopicList for-note />
-
-        <v-textarea
-          :model-value="notes.currentNote.text"
-          class="mb-8"
-          auto-grow
-          autofocus
-          clearable
-          counter
-          clear-icon="mdi-close-circle"
-          @update:model-value="notes.updateCurrentNoteText($event ?? '')"
-        />
-
-        <fieldset class="field-set">
-          <legend>{{ text.versesHeader }}</legend>
-
-          <div v-for="verse of notes.currentNoteVerses" :key="verse._id" class="d-flex align-center">
-            <ButtonTooltip
-              icon="$remove"
-              color="delete"
-              small
-              class="delete-icon"
-              :text="text.removeVerse"
-              @click="notes.removeVerseFromCurrentNote(verse._id)"
-            />
-            <p class="ml-2 my-1" v-html="verse.html" />
-          </div>
-
+      <FieldSet :title="text.versesHeader" :empty="!notes.currentNoteVerses.length">
+        <template #action>
           <AddVerses @add="notes.addVersesToCurrentNote" />
-        </fieldset>
+        </template>
 
-        <EditKeywordList for-note />
+        <div v-for="verse of notes.currentNoteVerses" :key="verse._id" class="d-flex align-center row-item">
+          <p class="flex-grow-1 my-0" v-html="verse.html" />
+          <ButtonTooltip
+            icon="$remove"
+            color="delete"
+            small
+            class="delete-icon"
+            :text="text.removeVerse"
+            @click="notes.removeVerseFromCurrentNote(verse._id)"
+          />
+        </div>
+      </FieldSet>
 
-        <v-btn variant="outlined" color="buttons" width="160" class="d-block mt-5 mx-auto" @click="save">
-          {{ text.saveButton }}
-        </v-btn>
-      </div>
-    </v-card>
-  </v-dialog>
+      <EditTopicList for-note />
+      <EditKeywordList for-note />
+    </template>
+
+    <template #actions>
+      <DialogButtons :confirm-text="common.save" @cancel="dialog = false" @confirm="save" />
+    </template>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
 import { watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import DialogButtons from '@/components/DialogButtons.vue'
+import FieldSet from '@/components/FieldSet.vue'
 import EditKeywordList from '@/components/keywords/EditKeywordList.vue'
 import AddVerses from '@/components/selectors/AddVerses.vue'
 import EditTopicList from '@/components/topics/EditTopicList.vue'
@@ -62,10 +64,11 @@ import type { Note } from '@/types'
 
 /** Editor of notes.currentNote; the opener puts the note there before opening */
 const dialog = defineModel<boolean>({ default: false })
+defineProps<{ isNew?: boolean }>()
 const emit = defineEmits<{ saved: [note: Note] }>()
 
 const notes = useNotesStore()
-const { notes: text } = storeToRefs(useLanguageStore())
+const { common, notes: text } = storeToRefs(useLanguageStore())
 
 watch(dialog, (open) => !open && notes.resetCurrentNote())
 

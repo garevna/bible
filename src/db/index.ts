@@ -1,5 +1,7 @@
 import type { Book, Keyword, Note, Topic, Verse, VerseRef } from '@/types'
 
+import { normalize, queryWords } from '@/utils/search'
+
 import { dbKeys, dbName, storeNames, type StoreName } from './config'
 
 export * from './config'
@@ -166,6 +168,11 @@ export interface NotesFilter {
   keyword?: string | null
   topic?: string | null
   date?: string | null
+  /** words of the note text (case, apostrophes and punctuation are ignored) */
+  text?: string | null
+  /** dates as 'YYYY-MM-DD', inclusive */
+  from?: string | null
+  to?: string | null
 }
 
 /** 'YYYY-MM-DD' of the date in the local time zone */
@@ -175,15 +182,21 @@ export const localISODate = (date: Date) =>
 /** Note ids are creation timestamps, so the date filter compares their local dates */
 export const noteDate = (note: Pick<Note, '_id'>) => localISODate(new Date(Number(note._id)))
 
-export const searchNotes = ({ lineRef, keyword, topic, date }: NotesFilter) =>
-  filterRecords<Note>(
-    'notes',
-    (note) =>
+export function searchNotes({ lineRef, keyword, topic, date, text, from, to }: NotesFilter) {
+  const words = queryWords(text ?? '')
+  return filterRecords<Note>('notes', (note) => {
+    const day = noteDate(note)
+    return (
       (!lineRef || note.refs.includes(lineRef)) &&
       (!keyword || note.keywords.includes(keyword)) &&
       (!topic || note.topics.includes(topic)) &&
-      (!date || noteDate(note) === date)
-  )
+      (!date || day === date) &&
+      (!from || day >= from) &&
+      (!to || day <= to) &&
+      (!words.length || words.every((word) => normalize(note.text).includes(word)))
+    )
+  })
+}
 
 /** Verses with the title of their book and the 1-based chapter number */
 export async function getVersesByRefs(refs: string[]): Promise<VerseRef[]> {

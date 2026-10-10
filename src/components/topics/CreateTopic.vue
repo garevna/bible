@@ -4,7 +4,7 @@
     :tooltip="topics.addTopicTooltip"
     :title="topics.createNewTopicLabel"
     :disabled="!title.trim()"
-    fab
+    :label="topics.newTopic"
     @ok="create"
   >
     <v-text-field

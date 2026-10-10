@@ -1,6 +1,6 @@
 <template>
-  <div class="mx-auto my-7 px-2 pb-16" style="max-width: 600px">
-    <div class="d-flex justify-end mb-4">
+  <div class="page mx-auto" style="max-width: 640px">
+    <div class="d-flex mb-6">
       <CreateTopic />
     </div>
 
@@ -33,7 +33,13 @@
 
       <template v-else>
         <span class="topic-title flex-grow-1 mx-2" @click="topics.gotoTopic(topic)">{{ topic.title }}</span>
-        <v-chip size="x-small" class="mr-2">{{ topic.refs.length }}</v-chip>
+        <v-tooltip :text="format(text.notesInTopic, { count: topics.noteCounts[topic._id] ?? 0 })">
+          <template #activator="{ props }">
+            <v-chip v-bind="props" size="small" variant="tonal" prepend-icon="$note" class="mr-2">
+              {{ topics.noteCounts[topic._id] ?? 0 }}
+            </v-chip>
+          </template>
+        </v-tooltip>
         <ButtonTooltip
           icon="$edit"
           color="primary"
@@ -56,6 +62,7 @@ import CreateTopic from '@/components/topics/CreateTopic.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useTopicsStore } from '@/stores/topics'
 import type { Topic } from '@/types'
+import { format } from '@/utils/format'
 
 const topics = useTopicsStore()
 const { common, topics: text } = storeToRefs(useLanguageStore())

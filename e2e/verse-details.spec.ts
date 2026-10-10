@@ -18,19 +18,19 @@ test.describe('signed in: verse details, notes and keywords', () => {
     const picker = dialog(page)
     await picker.locator('input').fill('родовід')
     await picker.locator('input').press('Enter')
-    await picker.getByRole('button', { name: 'OK' }).click()
+    await picker.getByRole('button', { name: 'Додати', exact: true }).click()
     await expect(details.locator('.field-set')).toContainText('#родовід')
 
     // topic
-    await details.getByRole('button', { name: 'Теми' }).click()
+    await details.getByRole('tab', { name: 'Теми' }).click()
     await details.getByRole('button', { name: 'Додати тему' }).click()
     await dialog(page).locator('input').fill('Родовід Ісуса')
     await dialog(page).locator('input').press('Enter')
-    await dialog(page).getByRole('button', { name: 'OK' }).click()
+    await dialog(page).getByRole('button', { name: 'Додати', exact: true }).click()
     await expect(details.locator('.v-window-item--active')).toContainText('Родовід Ісуса')
 
     // note
-    await details.getByRole('button', { name: 'Нотатки' }).click()
+    await details.getByRole('tab', { name: 'Нотатки' }).click()
     await details.getByRole('button', { name: 'Написати замітку до вірша' }).last().click()
     await dialog(page).getByRole('textbox').first().fill('Тестова нотатка')
     await dialog(page).getByRole('button', { name: 'Зберегти' }).click()
@@ -85,7 +85,7 @@ test.describe('signed in: verse details, notes and keywords', () => {
       .click()
     await dialog(page).locator('input').fill('покоління')
     await dialog(page).locator('input').press('Enter')
-    await dialog(page).getByRole('button', { name: 'OK' }).click()
+    await dialog(page).getByRole('button', { name: 'Додати', exact: true }).click()
 
     await page.locator('.v-bottom-navigation').getByRole('button', { name: 'Ключові слова' }).click()
     await page.locator('.v-expansion-panel-title', { hasText: '#покоління' }).click()

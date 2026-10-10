@@ -1,8 +1,11 @@
 <template>
-  <fieldset class="field-set">
-    <legend>{{ text.listHeader }}</legend>
+  <FieldSet :title="text.listHeader" :empty="!list.length">
+    <template #action>
+      <AddKeywordToList :line-ref="lineRef" :for-note="forNote" small :tooltip="text.addToListTooltip" />
+    </template>
 
-    <div v-for="keyword in list" :key="keyword" class="d-flex align-center">
+    <div v-for="keyword in list" :key="keyword" class="d-flex align-center row-item">
+      <span class="flex-grow-1">#{{ keyword }}</span>
       <ButtonTooltip
         icon="$removeKeyword"
         color="delete"
@@ -11,11 +14,8 @@
         :text="text.removeFromListTooltip"
         @click="remove(keyword)"
       />
-      <span class="ml-2">#{{ keyword }}</span>
     </div>
-
-    <AddKeywordToList :line-ref="lineRef" :for-note="forNote" large :tooltip="text.addToListTooltip" />
-  </fieldset>
+  </FieldSet>
 </template>
 
 <script setup lang="ts">
@@ -23,6 +23,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import FieldSet from '@/components/FieldSet.vue'
 import AddKeywordToList from '@/components/keywords/AddKeywordToList.vue'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'

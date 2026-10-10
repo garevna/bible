@@ -43,5 +43,25 @@ export const common = {
     ua: 'Посилання на «{name}» є в нотатках: {count}. Їх буде прибрано з цих нотаток, самі нотатки залишаться.',
     ru: 'Ссылки на «{name}» есть в заметках: {count}. Они будут убраны из этих заметок, сами заметки останутся.',
     en: '“{name}” is linked from {count} note(s). The links will be removed from those notes; the notes stay.'
+  },
+  save: {
+    ua: 'Зберегти',
+    ru: 'Сохранить',
+    en: 'Save'
+  },
+  add: {
+    ua: 'Додати',
+    ru: 'Добавить',
+    en: 'Add'
+  },
+  cannotUndo: {
+    ua: 'Цю дію не можна скасувати.',
+    ru: 'Это действие нельзя отменить.',
+    en: 'This cannot be undone.'
+  },
+  close: {
+    ua: 'Закрити',
+    ru: 'Закрыть',
+    en: 'Close'
   }
 }

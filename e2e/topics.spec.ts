@@ -6,9 +6,9 @@ test('topic: notes and verses are reordered by drag and drop and saved', async (
 
   // create the topic in the UI
   await page.locator('.v-bottom-navigation').getByRole('button', { name: 'Теми' }).click()
-  await page.getByRole('button', { name: 'Додати тему' }).click()
+  await page.getByRole('button', { name: 'Нова тема' }).click()
   await dialog(page).locator('input').fill('Родовід')
-  await dialog(page).getByRole('button', { name: 'OK' }).click()
+  await dialog(page).getByRole('button', { name: 'Додати', exact: true }).click()
   await expect(page.locator('.topic-title')).toHaveText('Родовід')
 
   // two verses and a note with one verse in the topic

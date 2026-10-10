@@ -1,5 +1,5 @@
 <template>
-  <div class="mx-auto pt-6 pb-16 px-2" style="max-width: 960px">
+  <div class="page mx-auto" style="max-width: 960px">
     <div class="d-flex align-center flex-wrap ga-2">
       <CreateNote
         :label="text.newNote"
@@ -10,7 +10,7 @@
       <ControlsView v-model="showControls" />
     </div>
 
-    <div class="mt-6">
+    <div class="mt-6 notes-list">
       <p v-if="!notes.notes.length" class="pa-4 text-medium-emphasis">{{ text.noNotes }}</p>
 
       <Note v-for="note of notes.notes" :key="note._id" :note="note" :show-controls="showControls" />

@@ -1,127 +1,117 @@
 <template>
-  <v-btn
-    v-if="label"
-    variant="tonal"
-    color="buttons"
-    prepend-icon="$addVerse"
-    class="text-none"
-    @click="open = true"
-  >
-    {{ label }}
-  </v-btn>
-  <ButtonTooltip v-else icon="$addVerse" :text="text.addVerses" large @click="open = true" />
+  <template v-if="!hideActivator">
+    <AddButton v-if="label" :label="label" icon="$addVerse" @click="open = true" />
+    <ButtonTooltip v-else icon="$addVerse" :text="text.addVerses" small @click="open = true" />
+  </template>
 
-  <v-dialog v-model="open" max-width="760" scrollable>
-    <v-card color="homefone">
-      <v-toolbar flat density="compact" color="transparent">
-        <v-toolbar-title class="text-subtitle-1 font-weight-bold">{{ text.addVerses }}</v-toolbar-title>
-        <v-btn icon="$close" @click="open = false" />
-      </v-toolbar>
-
-      <v-tabs v-model="tab" color="secondary" class="px-4">
-        <v-tab value="search" prepend-icon="$search">{{ text.bySearch }}</v-tab>
-        <v-tab value="reference" prepend-icon="$book">{{ text.byReference }}</v-tab>
+  <AppDialog v-model="open" :title="text.addVerses" icon="$addVerse" max-width="760">
+    <template #subheader>
+      <v-tabs v-model="tab" hide-slider density="comfortable" selected-class="app-tab--active" class="px-6">
+        <v-tab value="search" class="app-tab" prepend-icon="$search">{{ text.bySearch }}</v-tab>
+        <v-tab value="reference" class="app-tab" prepend-icon="$book">{{ text.byReference }}</v-tab>
       </v-tabs>
+    </template>
 
-      <v-card-text class="verse-picker">
-        <v-window v-model="tab">
-          <!-- full-text search: tick the verses to add -->
-          <v-window-item value="search" class="pt-2">
-            <v-text-field
-              v-model="query"
-              :placeholder="searchText.placeholder"
-              prepend-inner-icon="$search"
-              density="compact"
-              clearable
-              hide-details
-              autofocus
-              class="mb-3"
-            />
-            <p v-if="query && !search.searchable(words)" class="text-medium-emphasis">
-              {{ searchText.tooShort }}
-            </p>
-            <p v-else-if="query" class="text-medium-emphasis mb-2">
-              {{ searchText.found }}: {{ found.length }}
-            </p>
+    <v-window v-model="tab" class="verse-picker">
+      <!-- full-text search: tick the verses to add -->
+      <v-window-item value="search" class="pt-2">
+        <v-text-field
+          v-model="query"
+          :placeholder="searchText.placeholder"
+          prepend-inner-icon="$search"
+          density="compact"
+          clearable
+          hide-details
+          autofocus
+          class="mb-3"
+        />
+        <p v-if="query && !search.searchable(words)" class="text-medium-emphasis">
+          {{ searchText.tooShort }}
+        </p>
+        <p v-else-if="query" class="text-medium-emphasis mb-2">{{ searchText.found }}: {{ found.length }}</p>
 
-            <div v-for="verse of found.slice(0, shown)" :key="verse._id" class="d-flex align-start">
-              <v-checkbox-btn v-model="ticked" :value="verse._id" color="secondary" density="compact" />
-              <p class="mt-2">
-                <small class="text-secondary font-weight-bold mr-1">{{ reference(verse) }}</small>
-                <span v-html="markWords(verse.verse, words)" />
-              </p>
-            </div>
+        <div v-for="verse of found.slice(0, shown)" :key="verse._id" class="d-flex align-start">
+          <v-checkbox-btn v-model="ticked" :value="verse._id" color="secondary" density="compact" />
+          <p class="mt-2">
+            <small class="text-secondary font-weight-bold mr-1">{{ reference(verse) }}</small>
+            <span v-html="markWords(verse.verse, words)" />
+          </p>
+        </div>
 
-            <div v-if="found.length > shown" class="text-center">
-              <v-btn variant="text" color="buttons" @click="shown += 50">{{ searchText.showMore }}</v-btn>
-            </div>
-          </v-window-item>
+        <div v-if="found.length > shown" class="text-center">
+          <v-btn variant="text" color="buttons" @click="shown += 50">{{ searchText.showMore }}</v-btn>
+        </div>
+      </v-window-item>
 
-          <!-- by reference: testament, book, chapter, verse range -->
-          <v-window-item value="reference" class="pt-2">
-            <div class="d-flex flex-wrap ga-2">
-              <v-select
-                v-model="covenant"
-                :items="covenantItems"
-                :label="text.covenant"
-                density="compact"
-                class="field-covenant"
-                @update:model-value="selectBook(0)"
-              />
-              <v-autocomplete
-                :model-value="bookNum"
-                :items="bookItems"
-                :label="text.book"
-                density="compact"
-                class="field-wide"
-                @update:model-value="selectBook"
-              />
-              <v-select
-                v-model="chapter"
-                :items="range(chapterCount)"
-                :label="text.chapter"
-                density="compact"
-                class="field"
-              />
-              <v-select
-                v-model="fromVerse"
-                :items="range(chapterVerses.length)"
-                :label="text.verse"
-                density="compact"
-                class="field"
-              />
-              <v-select
-                v-model="toVerse"
-                :items="range(chapterVerses.length).filter((num) => num >= fromVerse)"
-                :label="text.toVerse"
-                density="compact"
-                clearable
-                class="field"
-              />
-            </div>
+      <!-- by reference: testament, book, chapter, verse range -->
+      <v-window-item value="reference" class="pt-2">
+        <div class="d-flex flex-wrap ga-2">
+          <v-select
+            v-model="covenant"
+            :items="covenantItems"
+            :label="text.covenant"
+            density="compact"
+            class="field-covenant"
+            @update:model-value="selectBook(0)"
+          />
+          <v-autocomplete
+            :model-value="bookNum"
+            :items="bookItems"
+            :label="text.book"
+            density="compact"
+            class="field-wide"
+            @update:model-value="selectBook"
+          />
+          <v-select
+            v-model="chapter"
+            :items="range(chapterCount)"
+            :label="text.chapter"
+            density="compact"
+            class="field"
+          />
+          <v-select
+            v-model="fromVerse"
+            :items="range(chapterVerses.length)"
+            :label="text.verse"
+            density="compact"
+            class="field"
+          />
+          <v-select
+            v-model="toVerse"
+            :items="range(chapterVerses.length).filter((num) => num >= fromVerse)"
+            :label="text.toVerse"
+            density="compact"
+            clearable
+            class="field"
+          />
+        </div>
 
-            <p v-for="verse of rangeVerses" :key="verse._id" class="mb-1">
-              <small class="text-secondary font-weight-bold mr-1">{{ verse.line + 1 }}</small
-              >{{ verse.verse }}
-            </p>
-          </v-window-item>
-        </v-window>
-      </v-card-text>
+        <p v-for="verse of rangeVerses" :key="verse._id" class="mb-1">
+          <small class="text-secondary font-weight-bold mr-1">{{ verse.line + 1 }}</small
+          >{{ verse.verse }}
+        </p>
+      </v-window-item>
+    </v-window>
 
-      <v-card-actions class="justify-center pb-4">
-        <v-btn variant="outlined" color="buttons" width="160" :disabled="!selection.length" @click="add">
-          {{ text.addSelected }} ({{ selection.length }})
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <DialogButtons
+        :confirm-text="`${text.addSelected} (${selection.length})`"
+        :disabled="!selection.length"
+        @cancel="open = false"
+        @confirm="add"
+      />
+    </template>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AddButton from '@/components/AddButton.vue'
+import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import DialogButtons from '@/components/DialogButtons.vue'
 import { getRecordsByIndex } from '@/db'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
@@ -131,7 +121,8 @@ import { getChapterRef } from '@/utils/refs'
 import { markWords, queryWords } from '@/utils/search'
 
 /** Picks Bible verses, found by text or chosen by reference, and emits their ids */
-defineProps<{ label?: string }>()
+/** hideActivator: no own button, the parent opens it with show() (e.g. from a menu) */
+defineProps<{ label?: string; hideActivator?: boolean }>()
 const emit = defineEmits<{ add: [verseIds: string[]] }>()
 
 const content = useContentStore()
@@ -230,12 +221,13 @@ function add() {
   emit('add', [...selection.value])
   open.value = false
 }
+
+defineExpose({ show: () => (open.value = true) })
 </script>
 
 <style scoped>
 .verse-picker {
   min-height: 360px;
-  max-height: 60vh;
 }
 
 .verse-picker :deep(mark) {

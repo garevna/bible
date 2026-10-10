@@ -1,8 +1,11 @@
 <template>
-  <fieldset class="field-set">
-    <legend>{{ text.listHeader }}</legend>
+  <FieldSet :title="text.listHeader" :empty="!list.length">
+    <template #action>
+      <AddTopicToList :line-ref="lineRef" :for-note="forNote" small />
+    </template>
 
-    <div v-for="topic in list" :key="topic._id" class="d-flex align-center">
+    <div v-for="topic in list" :key="topic._id" class="d-flex align-center row-item">
+      <span class="flex-grow-1">{{ topic.title }}</span>
       <ButtonTooltip
         icon="$removeTopic"
         color="delete"
@@ -11,11 +14,8 @@
         :text="text.removeFromListTooltip"
         @click="remove(topic._id)"
       />
-      <span class="ml-2">{{ topic.title }}</span>
     </div>
-
-    <AddTopicToList :line-ref="lineRef" :for-note="forNote" large />
-  </fieldset>
+  </FieldSet>
 </template>
 
 <script setup lang="ts">
@@ -23,6 +23,7 @@ import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import FieldSet from '@/components/FieldSet.vue'
 import AddTopicToList from '@/components/topics/AddTopicToList.vue'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'

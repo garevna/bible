@@ -165,6 +165,17 @@ const langIcon = computed(
   text-align: center;
 }
 
+/* narrow screens: the header is full of buttons, so the title hangs below it */
+@media (max-width: 700px) {
+  .view-title {
+    top: 64px;
+    min-width: 120px;
+    padding: 4px 16px 6px;
+    border-radius: 0 0 8px 8px;
+    font-size: 14px;
+  }
+}
+
 .bottom-border {
   border-bottom: solid 1px #fff8 !important;
 }
