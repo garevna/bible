@@ -36,28 +36,29 @@
       >
         {{ nestedDraggable.addToTopic }}
       </v-btn>
-      <template v-else-if="!compact">
+      <v-btn
+        v-else-if="!compact"
+        variant="tonal"
+        color="buttons"
+        icon="mdi-chevron-left"
+        size="small"
+        :aria-label="nestedDraggable.closeMenu"
+        @click="addMenu = false"
+      />
+      <!-- always mounted, so the buttons slide in from the left one after another -->
+      <TransitionGroup v-if="!compact" name="slide-in" appear>
         <v-btn
+          v-for="(item, index) of addMenu ? addItems : []"
+          :key="item.text"
           variant="tonal"
           color="buttons"
-          icon="mdi-chevron-left"
-          size="small"
-          :aria-label="nestedDraggable.closeMenu"
-          @click="addMenu = false"
-        />
-        <v-slide-x-transition group>
-          <v-btn
-            v-for="item of addItems"
-            :key="item.text"
-            variant="tonal"
-            color="buttons"
-            class="text-none"
-            @click="choose(item.open)"
-          >
-            {{ item.text }}
-          </v-btn>
-        </v-slide-x-transition>
-      </template>
+          class="text-none"
+          :style="{ '--delay': `${index * 70}ms` }"
+          @click="choose(item.open)"
+        >
+          {{ item.text }}
+        </v-btn>
+      </TransitionGroup>
 
       <CreateNote
         ref="newNote"
@@ -184,6 +185,27 @@ async function addVerses(verseIds: string[]) {
 </script>
 
 <style scoped>
+.slide-in-enter-active {
+  transition:
+    transform 0.3s ease-out,
+    opacity 0.3s ease-out;
+  transition-delay: var(--delay, 0ms);
+}
+
+/* closing: all at once */
+.slide-in-leave-active {
+  transition: opacity 0.15s ease-in;
+}
+
+.slide-in-enter-from {
+  opacity: 0;
+  transform: translateX(-32px);
+}
+
+.slide-in-leave-to {
+  opacity: 0;
+}
+
 .topic-title {
   font-size: 16px;
   font-weight: bold;
