@@ -186,7 +186,7 @@ test.describe('existing notes in topics', () => {
 test.describe('phone layout', () => {
   test.use({ viewport: { width: 390, height: 800 } })
 
-  test('the add menu of a topic opens, closes and fits the screen', async ({ page }) => {
+  test('the ways to add to a topic are in a dropdown menu', async ({ page }) => {
     await openBible(page)
     await signInLocally(page)
     await withStores(page, async (stores) => {
@@ -195,18 +195,11 @@ test.describe('phone layout', () => {
       await stores.app.setPage('topic')
     })
 
-    const choices = page.getByRole('button', { name: /^(Нову нотатку|Існуючу нотатку|Вірші з Біблії)$/ })
-    await expect(choices).toHaveCount(0)
+    // no row of buttons on a phone
+    await expect(page.getByRole('button', { name: 'Вірші з Біблії' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Додати в тему' }).click()
-    await expect(choices).toHaveCount(3)
-    await page.getByRole('button', { name: 'Згорнути' }).click()
-    await expect(choices).toHaveCount(0)
-
-    // a choice closes the menu and opens its dialog
-    await page.getByRole('button', { name: 'Додати в тему' }).click()
-    await page.getByRole('button', { name: 'Вірші з Біблії' }).click()
+    await page.locator('.v-overlay--active .v-list-item', { hasText: 'Вірші з Біблії' }).click()
     await expect(dialog(page)).toContainText('За посиланням')
-    await expect(page.getByRole('button', { name: 'Додати в тему' })).toBeVisible()
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 })

@@ -4,12 +4,30 @@
       <v-btn icon="$return" variant="text" color="primary" @click="topics.returnToTopicList()" />
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
       <ControlsView v-model="showControls" />
+
+      <!-- phones: the ways to add in a dropdown menu on the right -->
+      <v-menu v-if="compact && topics.currentTopic" location="bottom end">
+        <template #activator="{ props }">
+          <v-btn
+            v-bind="props"
+            icon="mdi-menu"
+            variant="tonal"
+            color="buttons"
+            size="small"
+            :aria-label="nestedDraggable.addToTopic"
+          />
+        </template>
+        <v-list density="compact" bg-color="homefone">
+          <v-list-subheader>{{ nestedDraggable.addToTopic }}</v-list-subheader>
+          <v-list-item v-for="item of addItems" :key="item.text" :title="item.text" @click="item.open()" />
+        </v-list>
+      </v-menu>
     </div>
 
-    <!-- "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
+    <!-- wider screens: "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
     <div v-if="topics.currentTopic" class="add-menu d-flex flex-wrap align-center ga-2 mt-4 mb-6">
       <v-btn
-        v-if="!addMenu"
+        v-if="!compact && !addMenu"
         variant="tonal"
         color="buttons"
         class="text-none"
@@ -18,7 +36,7 @@
       >
         {{ nestedDraggable.addToTopic }}
       </v-btn>
-      <template v-else>
+      <template v-else-if="!compact">
         <v-btn
           variant="tonal"
           color="buttons"
@@ -79,6 +97,7 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useDisplay } from 'vuetify'
 
 import ControlsView from '@/components/ControlsView.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
@@ -103,6 +122,9 @@ const showControls = ref(true)
 const newNote = useTemplateRef<InstanceType<typeof CreateNote>>('newNote')
 const existingNotes = useTemplateRef<InstanceType<typeof AddExistingNotes>>('existingNotes')
 const verses = useTemplateRef<InstanceType<typeof AddVerses>>('verses')
+
+/** phones: a dropdown menu instead of the row of buttons */
+const { smAndDown: compact } = useDisplay()
 
 const addMenu = ref(false)
 
