@@ -16,8 +16,8 @@
     :class="['nested-list', { 'nested-list--note': kind === 'note' }]"
   >
     <template #item="{ element }">
-      <!-- no padding: the icons are pressed to the frame, the content has margins around it -->
       <div class="draggable-item topic-item mb-2">
+        <!-- no padding: the icons are pressed to the frame, the content has margins around it -->
         <!-- top: move on the left; edit (a note) or unlink (a verse) on the right -->
         <div v-if="showControls" class="d-flex align-center">
           <v-icon class="drag-handle" color="buttons" :aria-label="text.moveTooltip">$drag</v-icon>
