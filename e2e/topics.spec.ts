@@ -74,3 +74,34 @@ test('topics can be renamed', async ({ page }) => {
   await input.press('Enter')
   await expect(page.locator('.topic-title')).toHaveText('Нова назва')
 })
+
+test('the reading mode shows only the texts and verses, and is remembered', async ({ page }) => {
+  await openBible(page)
+  await signInLocally(page)
+  await withStores(page, async (stores) => {
+    await stores.keywords.createKeyword('проповідь')
+    await stores.topics.createTopic('Проповідь')
+    const topic = stores.topics.topicList[0]
+    await stores.notes.startNewNote({ topicId: topic._id, keywordId: 'проповідь', lineRef: '1.000.000.000' })
+    stores.notes.updateCurrentNoteText('Вступ')
+    await stores.notes.saveCurrentNote()
+    localStorage.setItem('topic', topic._id)
+    await stores.app.setPage('topic')
+  })
+
+  await page.getByRole('button', { name: 'Режим читання' }).click()
+  await expect(page.getByRole('button', { name: 'Додати в тему' })).toBeHidden()
+  await expect(page.getByRole('button', { name: 'Зберегти' })).toHaveCount(0)
+  await expect(page.locator('.drag-handle')).toHaveCount(0)
+
+  // the verses still open; the keywords do not show
+  await page.getByRole('button', { name: 'Показати вірші (1)' }).click()
+  await expect(page.locator('.nested-list--note > .draggable-item')).toHaveCount(1)
+  await expect(page.getByText('#проповідь')).toHaveCount(0)
+
+  await withStores(page, (stores) => stores.app.setPage('topics'))
+  await withStores(page, (stores) => stores.app.setPage('topic'))
+  await expect(page.getByRole('button', { name: 'Режим редагування' })).toBeVisible()
+  await page.getByRole('button', { name: 'Режим редагування' }).click()
+  await expect(page.getByRole('button', { name: 'Додати в тему' })).toBeVisible()
+})

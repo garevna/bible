@@ -1,12 +1,12 @@
 export const showControls = {
-  hide: {
-    ua: 'Приховати елементи управління',
-    ru: 'Спрятать элементы управления',
-    en: 'Hide controls'
+  readMode: {
+    ua: 'Режим читання',
+    ru: 'Режим чтения',
+    en: 'Reading mode'
   },
-  show: {
-    ua: 'Показати елементи управління',
-    ru: 'Показать элементы управления',
-    en: 'Show controls'
+  editMode: {
+    ua: 'Режим редагування',
+    ru: 'Режим редактирования',
+    en: 'Editing mode'
   }
 }

@@ -3,10 +3,10 @@
     <div class="d-flex align-center">
       <v-btn icon="$return" variant="text" color="primary" @click="topics.returnToTopicList()" />
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
-      <ControlsView v-model="showControls" />
+      <ControlsView v-model="showControls" storage-key="topicMode" />
 
-      <!-- phones: the ways to add in a dropdown menu on the right -->
-      <v-menu v-if="compact && topics.currentTopic" location="bottom end">
+      <!-- editing mode, phones: the ways to add in a dropdown menu on the right -->
+      <v-menu v-if="showControls && compact && topics.currentTopic" location="bottom end">
         <template #activator="{ props }">
           <v-btn
             v-bind="props"
@@ -24,8 +24,11 @@
       </v-menu>
     </div>
 
-    <!-- wider screens: "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
-    <div v-if="topics.currentTopic" class="add-menu d-flex flex-wrap align-center ga-2 mt-4 mb-6">
+    <!-- editing mode, wider screens: "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
+    <div
+      v-if="topics.currentTopic && showControls"
+      class="add-menu d-flex flex-wrap align-center ga-2 mt-4 mb-6"
+    >
       <v-btn
         v-if="!compact && collapsed"
         variant="tonal"
@@ -63,7 +66,10 @@
           {{ item.text }}
         </v-btn>
       </TransitionGroup>
+    </div>
 
+    <!-- the dialogs of the add menu -->
+    <template v-if="topics.currentTopic">
       <CreateNote
         ref="newNote"
         :topic-id="topics.currentTopic._id"
@@ -72,19 +78,20 @@
       />
       <AddExistingNotes ref="existingNotes" hide-activator />
       <AddVerses ref="verses" hide-activator @add="addVerses" />
-    </div>
+    </template>
 
     <p v-if="!topics.currentTopicData.length" class="text-medium-emphasis">{{ common.noData }}</p>
 
     <NestedDraggable
       :items="topics.currentTopicData"
       :show-controls="showControls"
+      :class="{ 'mt-6': !showControls }"
       @remove="removeItem"
       @remove-from-note="removeVerseFromNote"
       @note-saved="updateNote"
     />
 
-    <div class="text-center mt-8">
+    <div v-if="showControls" class="text-center mt-8">
       <v-btn
         variant="flat"
         color="primary"

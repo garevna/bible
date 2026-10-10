@@ -7,7 +7,7 @@
         :keyword-id="notes.keyword ?? undefined"
       />
       <NotesFilterOptions class="flex-grow-1" />
-      <ControlsView v-model="showControls" />
+      <ControlsView v-model="showControls" storage-key="notesMode" />
     </div>
 
     <div class="mt-6 notes-list">

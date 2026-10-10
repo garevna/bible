@@ -56,7 +56,10 @@
               @remove="(verse: TopicItem) => emit('remove-from-note', element, verse)"
             />
 
-            <div v-if="expanded.has(element._id) && element.keywords.length" class="d-flex flex-wrap mt-2">
+            <div
+              v-if="showControls && expanded.has(element._id) && element.keywords.length"
+              class="d-flex flex-wrap mt-2"
+            >
               <v-chip
                 v-for="keyword of element.keywords"
                 :key="keyword"
@@ -130,10 +133,13 @@ import { format } from '@/utils/format'
  * Verses can be moved between the topic and its notes, notes only within the topic.
  * The lists are changed in place; the topic page saves them.
  */
-withDefaults(defineProps<{ items: TopicItem[]; kind?: 'topic' | 'note'; showControls?: boolean }>(), {
-  kind: 'topic',
-  showControls: true
-})
+const props = withDefaults(
+  defineProps<{ items: TopicItem[]; kind?: 'topic' | 'note'; showControls?: boolean }>(),
+  {
+    kind: 'topic',
+    showControls: true
+  }
+)
 
 const emit = defineEmits<{
   remove: [item: TopicItem]
@@ -146,7 +152,9 @@ const { nestedDraggable: text } = storeToRefs(useLanguageStore())
 /** ids of the notes whose verses are open; all are closed at first */
 const expanded = ref(new Set<string>())
 
-const hasContent = (note: TopicNoteItem) => Boolean(note.verses.length || note.keywords.length)
+/** keywords are for search, so the reading mode shows only the verses */
+const hasContent = (note: TopicNoteItem) =>
+  Boolean(note.verses.length || (props.showControls && note.keywords.length))
 
 function toggle(id: string) {
   const next = new Set(expanded.value)

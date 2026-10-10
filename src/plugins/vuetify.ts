@@ -32,7 +32,8 @@ const iconAliases = {
   editTopic: 'mdi-playlist-edit',
   eye: 'mdi-eye',
   hash: 'mdi-pound',
-  hide: 'mdi-cog-off-outline',
+  /** switches to the reading mode (no controls) */
+  readMode: 'mdi-book-open-page-variant-outline',
   keywords: 'mdi-folder-pound-outline',
   keyword: 'mdi-pound',
   main: 'mdi-menu',
@@ -51,7 +52,8 @@ const iconAliases = {
   save: 'mdi-content-save-outline',
   search: 'mdi-magnify',
   send: 'mdi-send-variant',
-  show: 'mdi-cog-outline',
+  /** switches to the editing mode */
+  editMode: 'mdi-pencil-outline',
   signIn: 'mdi-login',
   signUp: 'mdi-account-plus',
   signOut: 'mdi-logout',
