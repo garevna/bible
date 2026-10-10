@@ -81,9 +81,9 @@
             <v-btn
               v-if="hasContent(element)"
               variant="text"
-              size="small"
+              height="44"
               color="secondary"
-              class="note-toggle"
+              class="note-toggle px-3"
               :aria-expanded="expanded.has(element._id)"
               :aria-label="
                 expanded.has(element._id)
@@ -96,14 +96,13 @@
                 :model-value="element.verses.length > 0"
                 :content="element.verses.length"
                 color="secondary"
-                offset-x="-4"
-                offset-y="-2"
+                class="verses-badge"
               >
-                <v-icon icon="$noteVerses" />
+                <v-icon icon="$noteVerses" size="28" />
               </v-badge>
               <v-icon
                 :icon="expanded.has(element._id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
-                class="ml-4"
+                class="ml-5"
               />
             </v-btn>
           </div>
@@ -180,6 +179,14 @@ function canMove(event: { to: HTMLElement; draggedContext: { element: TopicItem 
 .drag-handle {
   cursor: grab;
   margin: 6px;
+}
+
+/* the number sits on the top right edge of the icon, not over it */
+.verses-badge :deep(.v-badge__badge) {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-size: 11px;
 }
 
 .note-text {
