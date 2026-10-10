@@ -27,12 +27,12 @@
     <!-- wider screens: "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
     <div v-if="topics.currentTopic" class="add-menu d-flex flex-wrap align-center ga-2 mt-4 mb-6">
       <v-btn
-        v-if="!compact && !addMenu"
+        v-if="!compact && collapsed"
         variant="tonal"
         color="buttons"
         class="text-none"
         append-icon="mdi-chevron-right"
-        @click="addMenu = true"
+        @click="openAddMenu"
       >
         {{ nestedDraggable.addToTopic }}
       </v-btn>
@@ -46,14 +46,18 @@
         @click="addMenu = false"
       />
       <!-- always mounted, so the buttons slide in from the left one after another -->
-      <TransitionGroup v-if="!compact" name="slide-in" appear>
+      <TransitionGroup v-if="!compact" name="slide-in" @after-leave="onButtonGone">
         <v-btn
           v-for="(item, index) of addMenu ? addItems : []"
           :key="item.text"
+          :data-index="index"
           variant="tonal"
           color="buttons"
           class="text-none"
-          :style="{ '--delay': `${index * 70}ms` }"
+          :style="{
+            '--delay': `${index * 70}ms`,
+            '--leave-delay': `${(addItems.length - 1 - index) * 50}ms`
+          }"
           @click="choose(item.open)"
         >
           {{ item.text }}
@@ -128,6 +132,18 @@ const verses = useTemplateRef<InstanceType<typeof AddVerses>>('verses')
 const { smAndDown: compact } = useDisplay()
 
 const addMenu = ref(false)
+/** true once the buttons have slid back, then "Add to topic ›" replaces "‹" */
+const collapsed = ref(true)
+
+function openAddMenu() {
+  collapsed.value = false
+  addMenu.value = true
+}
+
+/** the first button slides back last */
+function onButtonGone(el: Element) {
+  if (!addMenu.value && (el as HTMLElement).dataset.index === '0') collapsed.value = true
+}
 
 const addItems = computed(() => [
   { text: nestedDraggable.value.addNewNote, open: () => newNote.value?.show() },
@@ -192,9 +208,12 @@ async function addVerses(verseIds: string[]) {
   transition-delay: var(--delay, 0ms);
 }
 
-/* closing: all at once */
+/* closing: back to the left, the last one first */
 .slide-in-leave-active {
-  transition: opacity 0.15s ease-in;
+  transition:
+    transform 0.2s ease-in,
+    opacity 0.2s ease-in;
+  transition-delay: var(--leave-delay, 0ms);
 }
 
 .slide-in-enter-from {
@@ -204,6 +223,7 @@ async function addVerses(verseIds: string[]) {
 
 .slide-in-leave-to {
   opacity: 0;
+  transform: translateX(-32px);
 }
 
 .topic-title {
