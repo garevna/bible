@@ -4,41 +4,51 @@
       <v-btn icon="$return" variant="text" color="primary" @click="topics.returnToTopicList()" />
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
       <ControlsView v-model="showControls" />
-
-      <!-- narrow screens: the add actions in a menu on the right -->
-      <v-menu v-if="compact && topics.currentTopic" location="bottom end">
-        <template #activator="{ props }">
-          <v-btn
-            v-bind="props"
-            icon="mdi-menu"
-            variant="tonal"
-            color="buttons"
-            size="small"
-            :aria-label="common.add"
-          />
-        </template>
-        <v-list density="compact" bg-color="homefone">
-          <v-list-item prepend-icon="$addNote" :title="notesText.newNote" @click="newNote?.show()" />
-          <v-list-item
-            prepend-icon="$note"
-            :title="notesText.addExistingNotes"
-            @click="existingNotes?.show()"
-          />
-          <v-list-item prepend-icon="$addVerse" :title="notesText.addVerses" @click="verses?.show()" />
-        </v-list>
-      </v-menu>
     </div>
 
-    <div v-if="topics.currentTopic" :class="compact ? '' : 'd-flex flex-wrap ga-2 mt-4'" class="mb-6">
+    <!-- "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
+    <div v-if="topics.currentTopic" class="add-menu d-flex flex-wrap align-center ga-2 mt-4 mb-6">
+      <v-btn
+        v-if="!addMenu"
+        variant="tonal"
+        color="buttons"
+        class="text-none"
+        append-icon="mdi-chevron-right"
+        @click="addMenu = true"
+      >
+        {{ nestedDraggable.addToTopic }}
+      </v-btn>
+      <template v-else>
+        <v-btn
+          variant="tonal"
+          color="buttons"
+          icon="mdi-chevron-left"
+          size="small"
+          :aria-label="nestedDraggable.closeMenu"
+          @click="addMenu = false"
+        />
+        <v-slide-x-transition group>
+          <v-btn
+            v-for="item of addItems"
+            :key="item.text"
+            variant="tonal"
+            color="buttons"
+            class="text-none"
+            @click="choose(item.open)"
+          >
+            {{ item.text }}
+          </v-btn>
+        </v-slide-x-transition>
+      </template>
+
       <CreateNote
         ref="newNote"
-        :label="notesText.newNote"
         :topic-id="topics.currentTopic._id"
-        :hide-activator="compact"
+        hide-activator
         @saved="topics.getTopicData()"
       />
-      <AddExistingNotes ref="existingNotes" :hide-activator="compact" />
-      <AddVerses ref="verses" :label="notesText.addVerses" :hide-activator="compact" @add="addVerses" />
+      <AddExistingNotes ref="existingNotes" hide-activator />
+      <AddVerses ref="verses" hide-activator @add="addVerses" />
     </div>
 
     <p v-if="!topics.currentTopicData.length" class="text-medium-emphasis">{{ common.noData }}</p>
@@ -69,7 +79,6 @@
 <script setup lang="ts">
 import { computed, ref, useTemplateRef } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDisplay } from 'vuetify'
 
 import ControlsView from '@/components/ControlsView.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
@@ -87,17 +96,27 @@ import { versesWithLinks } from '@/utils/verse'
 const topics = useTopicsStore()
 const content = useContentStore()
 const notes = useNotesStore()
-const { common, nestedDraggable, notes: notesText } = storeToRefs(useLanguageStore())
+const { common, nestedDraggable } = storeToRefs(useLanguageStore())
 
 const showControls = ref(true)
-
-/** phones: the add buttons go into a menu */
-const { smAndDown } = useDisplay()
-const compact = computed(() => smAndDown.value)
 
 const newNote = useTemplateRef<InstanceType<typeof CreateNote>>('newNote')
 const existingNotes = useTemplateRef<InstanceType<typeof AddExistingNotes>>('existingNotes')
 const verses = useTemplateRef<InstanceType<typeof AddVerses>>('verses')
+
+const addMenu = ref(false)
+
+const addItems = computed(() => [
+  { text: nestedDraggable.value.addNewNote, open: () => newNote.value?.show() },
+  { text: nestedDraggable.value.addExistingNote, open: () => existingNotes.value?.show() },
+  { text: nestedDraggable.value.addBibleVerses, open: () => verses.value?.show() }
+])
+
+/** a choice closes the menu and opens its dialog */
+function choose(open: () => void) {
+  addMenu.value = false
+  open()
+}
 
 const noteRecord = ({ _id, text, keywords, topics, verses }: TopicNoteItem): Note => ({
   _id,

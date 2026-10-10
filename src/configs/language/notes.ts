@@ -114,6 +114,11 @@ export const notes = {
     ru: 'Текст заметки',
     en: 'Note text'
   },
+  alreadyInTopic: {
+    ua: 'вже в темі',
+    ru: 'уже в теме',
+    en: 'already in the topic'
+  },
   addExistingNotes: {
     ua: 'Додати нотатки',
     ru: 'Добавить заметки',

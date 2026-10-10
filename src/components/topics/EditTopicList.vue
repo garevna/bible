@@ -1,13 +1,13 @@
 <template>
   <FieldSet :title="text.listHeader" :empty="!list.length">
     <template #action>
-      <AddTopicToList :line-ref="lineRef" :for-note="forNote" small />
+      <AddTopicToList :line-ref="lineRef" :for-note="forNote" activator-icon="$link" large />
     </template>
 
     <div v-for="topic in list" :key="topic._id" class="d-flex align-center row-item">
       <span class="flex-grow-1">{{ topic.title }}</span>
       <ButtonTooltip
-        icon="$removeTopic"
+        icon="$unlink"
         color="delete"
         small
         class="delete-icon"

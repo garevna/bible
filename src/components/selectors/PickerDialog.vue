@@ -2,7 +2,7 @@
   <AddButton v-if="label" :label="label" :icon="icon" @click="open = true" />
   <ButtonTooltip
     v-else
-    :icon="icon"
+    :icon="activatorIcon || icon"
     :text="tooltip"
     :small="small"
     :large="large"
@@ -38,6 +38,8 @@ import { useLanguageStore } from '@/stores/language'
 withDefaults(
   defineProps<{
     icon: string
+    /** the button icon when it differs from the dialog one */
+    activatorIcon?: string
     tooltip?: string
     title?: string
     color?: string
@@ -48,7 +50,7 @@ withDefaults(
     label?: string
     confirmText?: string
   }>(),
-  { tooltip: '', title: '', color: 'buttons', label: undefined, confirmText: '' }
+  { activatorIcon: undefined, tooltip: '', title: '', color: 'buttons', label: undefined, confirmText: '' }
 )
 
 const emit = defineEmits<{ ok: [] }>()

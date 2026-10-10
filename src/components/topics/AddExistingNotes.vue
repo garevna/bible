@@ -49,16 +49,25 @@
     <template v-if="searched">
       <p v-if="!candidates.length" class="text-medium-emphasis my-0">{{ text.noNotes }}</p>
 
-      <label v-for="note of candidates.slice(0, shown)" :key="note._id" class="candidate d-flex align-start">
+      <label
+        v-for="note of candidates.slice(0, shown)"
+        :key="note._id"
+        class="candidate d-flex align-start"
+        :class="{ 'candidate--in-topic': inTopic(note) }"
+      >
         <v-checkbox-btn
-          v-model="ticked"
-          :value="note._id"
+          :model-value="inTopic(note) || ticked.includes(note._id)"
+          :disabled="inTopic(note)"
           color="secondary"
           density="compact"
           class="flex-grow-0"
+          @update:model-value="tick(note._id, $event)"
         />
         <div class="flex-grow-1 py-2">
           <v-chip size="x-small" variant="tonal" class="mr-2">{{ noteDate(note) }}</v-chip>
+          <v-chip v-if="inTopic(note)" size="x-small" color="secondary" variant="tonal" class="mr-2">
+            {{ text.alreadyInTopic }}
+          </v-chip>
           <span class="candidate-text">{{ note.text }}</span>
           <div v-if="note.keywords.length" class="mt-1">
             <v-chip v-for="item in note.keywords" :key="item" size="x-small" variant="tonal" class="mr-1">
@@ -130,11 +139,10 @@ const filter = computed<NotesFilter | null>(() => {
 })
 const searched = computed(() => Boolean(filter.value))
 
-/** notes that are not in the topic yet */
-const candidates = computed(() => {
-  const topicId = topics.currentTopic?._id
-  return found.value.filter((note) => !topicId || !note.topics.includes(topicId))
-})
+/** found notes; the ones already in the topic are shown but cannot be ticked */
+const candidates = found
+
+const inTopic = (note: Note) => Boolean(topics.currentTopic && note.topics.includes(topics.currentTopic._id))
 
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(filter, (value) => {
@@ -149,11 +157,17 @@ watch(filter, (value) => {
   }, 300)
 })
 
-watch(open, (value) => {
+watch(open, async (value) => {
   if (!value) return
   ticked.value = []
   notes.getAvailableDates()
+  // the notes may have changed since the last search (e.g. were added to the topic)
+  if (filter.value) found.value = await notes.findNotes(filter.value)
 })
+
+function tick(id: string, value: boolean | null) {
+  ticked.value = value ? [...ticked.value, id] : ticked.value.filter((item) => item !== id)
+}
 
 async function add() {
   const ids = [...ticked.value]
@@ -173,6 +187,11 @@ defineExpose({ show: () => (open.value = true) })
 
 .candidate {
   cursor: pointer;
+}
+
+.candidate--in-topic {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .candidate + .candidate {

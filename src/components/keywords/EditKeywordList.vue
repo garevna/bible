@@ -1,13 +1,19 @@
 <template>
   <FieldSet :title="text.listHeader" :empty="!list.length">
     <template #action>
-      <AddKeywordToList :line-ref="lineRef" :for-note="forNote" small :tooltip="text.addToListTooltip" />
+      <AddKeywordToList
+        :line-ref="lineRef"
+        :for-note="forNote"
+        activator-icon="$link"
+        large
+        :tooltip="text.addToListTooltip"
+      />
     </template>
 
     <div v-for="keyword in list" :key="keyword" class="d-flex align-center row-item">
       <span class="flex-grow-1">#{{ keyword }}</span>
       <ButtonTooltip
-        icon="$removeKeyword"
+        icon="$unlink"
         color="delete"
         small
         class="delete-icon"

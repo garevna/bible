@@ -40,7 +40,9 @@ const { common } = storeToRefs(useLanguageStore())
 
 .field-set__action {
   position: absolute;
-  top: -22px;
+  /* centered on the top line of the frame */
+  top: -10px;
+  transform: translateY(-50%);
   right: 12px;
   background: rgb(var(--v-theme-homefone));
   padding: 0 4px;

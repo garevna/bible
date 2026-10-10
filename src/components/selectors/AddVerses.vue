@@ -1,7 +1,14 @@
 <template>
   <template v-if="!hideActivator">
     <AddButton v-if="label" :label="label" icon="$addVerse" @click="open = true" />
-    <ButtonTooltip v-else icon="$addVerse" :text="text.addVerses" small @click="open = true" />
+    <ButtonTooltip
+      v-else
+      :icon="activatorIcon || '$addVerse'"
+      :text="text.addVerses"
+      :small="!large"
+      :large="large"
+      @click="open = true"
+    />
   </template>
 
   <AppDialog v-model="open" :title="text.addVerses" icon="$addVerse" max-width="760">
@@ -122,7 +129,7 @@ import { markWords, queryWords } from '@/utils/search'
 
 /** Picks Bible verses, found by text or chosen by reference, and emits their ids */
 /** hideActivator: no own button, the parent opens it with show() (e.g. from a menu) */
-defineProps<{ label?: string; hideActivator?: boolean }>()
+defineProps<{ label?: string; hideActivator?: boolean; activatorIcon?: string; large?: boolean }>()
 const emit = defineEmits<{ add: [verseIds: string[]] }>()
 
 const content = useContentStore()

@@ -16,9 +16,11 @@
     :class="['nested-list', { 'nested-list--note': kind === 'note' }]"
   >
     <template #item="{ element }">
-      <div class="draggable-item mb-2">
+      <!-- no padding: the icons are pressed to the frame, the content has margins around it -->
+      <div class="draggable-item topic-item mb-2">
+        <!-- top: move on the left; edit (a note) or unlink (a verse) on the right -->
         <div v-if="showControls" class="d-flex align-center">
-          <v-icon class="drag-handle mr-2" color="buttons">$drag</v-icon>
+          <v-icon class="drag-handle" color="buttons" :aria-label="text.moveTooltip">$drag</v-icon>
           <v-spacer />
           <DialogToUpdateNote
             v-if="element.type === 'note'"
@@ -28,7 +30,7 @@
           />
           <ButtonTooltip
             v-else
-            :icon="kind === 'note' ? '$remove' : '$removeTopic'"
+            icon="$unlink"
             color="delete"
             small
             class="delete-icon"
@@ -37,51 +39,24 @@
           />
         </div>
 
-        <p v-if="element.type !== 'note'" v-html="element.html" />
+        <p v-if="element.type !== 'note'" class="ma-5" v-html="element.html" />
 
-        <!-- a note shows its text; the verses and keywords open with the button on the right -->
         <template v-else>
-          <div class="d-flex align-start">
-            <p class="note-text flex-grow-1">{{ element.text }}</p>
-            <v-btn
-              v-if="element.verses.length || element.keywords.length"
-              variant="text"
-              size="small"
-              color="secondary"
-              class="note-toggle ml-2"
-              prepend-icon="mdi-paperclip"
-              :append-icon="expanded.has(element._id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
-              :aria-expanded="expanded.has(element._id)"
-              :aria-label="
-                expanded.has(element._id)
-                  ? text.hideVerses
-                  : format(text.showVerses, { count: element.verses.length })
-              "
-              @click="toggle(element._id)"
-            >
-              {{ element.verses.length }}
-            </v-btn>
-          </div>
+          <!-- a note shows its text; the verses and keywords open with the button in the bottom right corner -->
+          <div class="ma-5">
+            <p class="note-text">{{ element.text }}</p>
 
-          <!-- an empty note stays a drop target while editing -->
-          <NestedDraggable
-            v-if="expanded.has(element._id) || (showControls && !element.verses.length)"
-            :items="element.verses"
-            kind="note"
-            :show-controls="showControls"
-            class="ml-3 ml-sm-5 ml-md-12"
-            @remove="(verse: TopicItem) => emit('remove-from-note', element, verse)"
-          />
-
-          <div v-if="showControls || expanded.has(element._id)" class="d-flex align-center flex-wrap mt-1">
-            <ConfirmButton
-              v-if="showControls"
-              icon="$removeTopic"
-              :text="text.removeFromTopicTooltip"
-              @confirm="emit('remove', element)"
+            <!-- an empty note stays a drop target while editing -->
+            <NestedDraggable
+              v-if="expanded.has(element._id) || (showControls && !element.verses.length)"
+              :items="element.verses"
+              kind="note"
+              :show-controls="showControls"
+              class="mt-4 ml-3 ml-sm-5 ml-md-12"
+              @remove="(verse: TopicItem) => emit('remove-from-note', element, verse)"
             />
-            <v-spacer />
-            <template v-if="expanded.has(element._id)">
+
+            <div v-if="expanded.has(element._id) && element.keywords.length" class="d-flex flex-wrap mt-2">
               <v-chip
                 v-for="keyword of element.keywords"
                 :key="keyword"
@@ -91,7 +66,46 @@
               >
                 #{{ keyword }}
               </v-chip>
-            </template>
+            </div>
+          </div>
+
+          <!-- bottom: unlink from the topic on the left, the verses on the right -->
+          <div v-if="showControls || hasContent(element)" class="d-flex align-center">
+            <ConfirmButton
+              v-if="showControls"
+              icon="$unlink"
+              :text="text.removeFromTopicTooltip"
+              @confirm="emit('remove', element)"
+            />
+            <v-spacer />
+            <v-btn
+              v-if="hasContent(element)"
+              variant="text"
+              size="small"
+              color="secondary"
+              class="note-toggle"
+              :aria-expanded="expanded.has(element._id)"
+              :aria-label="
+                expanded.has(element._id)
+                  ? text.hideVerses
+                  : format(text.showVerses, { count: element.verses.length })
+              "
+              @click="toggle(element._id)"
+            >
+              <v-badge
+                :model-value="element.verses.length > 0"
+                :content="element.verses.length"
+                color="secondary"
+                offset-x="-4"
+                offset-y="-2"
+              >
+                <v-icon icon="$noteVerses" />
+              </v-badge>
+              <v-icon
+                :icon="expanded.has(element._id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+                class="ml-4"
+              />
+            </v-btn>
           </div>
         </template>
       </div>
@@ -133,6 +147,8 @@ const { nestedDraggable: text } = storeToRefs(useLanguageStore())
 /** ids of the notes whose verses are open; all are closed at first */
 const expanded = ref(new Set<string>())
 
+const hasContent = (note: TopicNoteItem) => Boolean(note.verses.length || note.keywords.length)
+
 function toggle(id: string) {
   const next = new Set(expanded.value)
   if (!next.delete(id)) next.add(id)
@@ -155,17 +171,19 @@ function canMove(event: { to: HTMLElement; draggedContext: { element: TopicItem 
   min-height: 24px;
 }
 
+/* the global .draggable-item padding is dropped: the icons are pressed to the frame */
+.topic-item {
+  padding: 0;
+  cursor: default;
+}
+
 .drag-handle {
   cursor: grab;
+  margin: 6px;
 }
 
 .note-text {
   white-space: pre-wrap;
   margin-bottom: 0;
-}
-
-.note-toggle {
-  flex-shrink: 0;
-  margin-top: -4px;
 }
 </style>

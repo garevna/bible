@@ -26,9 +26,9 @@ const iconAliases = {
   delete: 'mdi-delete-forever',
   dotsMenu: 'mdi-dots-vertical',
   down: 'mdi-arrow-down',
-  drag: 'mdi-drag',
+  drag: 'mdi-cursor-move',
   edit: 'mdi-pencil-box',
-  editNote: 'mdi-note-edit',
+  editNote: 'mdi-pencil-circle',
   editTopic: 'mdi-playlist-edit',
   eye: 'mdi-eye',
   hash: 'mdi-pound',
@@ -39,6 +39,12 @@ const iconAliases = {
   notes: 'mdi-note-edit-outline',
   note: 'mdi-note',
   remove: 'mdi-paperclip-remove',
+  /** link a verse, topic or keyword to a note or verse (the + on a frame) */
+  link: 'mdi-plus-circle-outline',
+  /** unlink it */
+  unlink: 'mdi-minus-circle-outline',
+  /** a note's verses (with their number in a badge) */
+  noteVerses: 'mdi-script-text-outline',
   deleteNote: 'mdi-note-remove-outline',
   reset: 'mdi-close',
   return: 'mdi-page-previous',

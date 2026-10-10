@@ -1,6 +1,7 @@
 <template>
   <PickerDialog
     :icon="icon"
+    :activator-icon="activatorIcon"
     :tooltip="tooltip || topics.addTopicTooltip"
     :title="topics.select"
     :small="small"
@@ -30,11 +31,12 @@ const props = withDefaults(
     lineRef?: string
     forNote?: boolean
     icon?: string
+    activatorIcon?: string
     tooltip?: string
     small?: boolean
     large?: boolean
   }>(),
-  { lineRef: undefined, icon: '$addTopic', tooltip: '' }
+  { lineRef: undefined, icon: '$addTopic', activatorIcon: undefined, tooltip: '' }
 )
 
 const emit = defineEmits<{ selected: [topic: Topic] }>()

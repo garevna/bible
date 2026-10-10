@@ -1,6 +1,7 @@
 <template>
   <PickerDialog
     :icon="icon"
+    :activator-icon="activatorIcon"
     :tooltip="tooltip || keywords.lineActionsTooltip"
     :title="keywords.select"
     :small="small"
@@ -29,11 +30,12 @@ const props = withDefaults(
     lineRef?: string
     forNote?: boolean
     icon?: string
+    activatorIcon?: string
     tooltip?: string
     small?: boolean
     large?: boolean
   }>(),
-  { lineRef: undefined, icon: '$addKeyword', tooltip: '' }
+  { lineRef: undefined, icon: '$addKeyword', activatorIcon: undefined, tooltip: '' }
 )
 
 const content = useContentStore()

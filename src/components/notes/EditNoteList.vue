@@ -1,14 +1,14 @@
 <template>
   <FieldSet :title="text.listHeader" :empty="!content.lineNotes.length">
     <template #action>
-      <CreateNote :line-ref="lineRef" small :tooltip="text.addNoteToVerseTooltip" />
+      <CreateNote :line-ref="lineRef" icon="$link" large :tooltip="text.addNoteToVerseTooltip" />
     </template>
 
     <div v-for="note in content.lineNotes" :key="note._id" class="d-flex align-center row-item">
       <span class="note-text flex-grow-1">{{ note.text }}</span>
       <DialogToUpdateNote :note="note" small />
       <ButtonTooltip
-        icon="$remove"
+        icon="$unlink"
         color="delete"
         small
         class="delete-icon"

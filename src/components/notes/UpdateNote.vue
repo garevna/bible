@@ -21,13 +21,13 @@
 
       <FieldSet :title="text.versesHeader" :empty="!notes.currentNoteVerses.length">
         <template #action>
-          <AddVerses @add="notes.addVersesToCurrentNote" />
+          <AddVerses activator-icon="$link" large @add="notes.addVersesToCurrentNote" />
         </template>
 
         <div v-for="verse of notes.currentNoteVerses" :key="verse._id" class="d-flex align-center row-item">
           <p class="flex-grow-1 my-0" v-html="verse.html" />
           <ButtonTooltip
-            icon="$remove"
+            icon="$unlink"
             color="delete"
             small
             class="delete-icon"

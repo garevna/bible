@@ -9,6 +9,36 @@ export const nestedDraggable = {
     ru: 'Сохранить',
     en: 'Save'
   },
+  addToTopic: {
+    ua: 'Додати в тему',
+    ru: 'Добавить в тему',
+    en: 'Add to topic'
+  },
+  addNewNote: {
+    ua: 'Нову нотатку',
+    ru: 'Новую заметку',
+    en: 'A new note'
+  },
+  addExistingNote: {
+    ua: 'Існуючу нотатку',
+    ru: 'Существующую заметку',
+    en: 'An existing note'
+  },
+  addBibleVerses: {
+    ua: 'Вірші з Біблії',
+    ru: 'Стихи из Библии',
+    en: 'Bible verses'
+  },
+  closeMenu: {
+    ua: 'Згорнути',
+    ru: 'Свернуть',
+    en: 'Collapse'
+  },
+  moveTooltip: {
+    ua: 'Перетягнути',
+    ru: 'Перетащить',
+    en: 'Drag'
+  },
   editNoteTooltip: {
     ua: 'Редагувати нотатку',
     ru: 'Редактировать заметку',

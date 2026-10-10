@@ -102,7 +102,8 @@ test.describe('creating keywords, topics and notes', () => {
       await stores.app.setPage('topic')
     })
 
-    await page.getByRole('button', { name: 'Додати вірші' }).click()
+    await page.getByRole('button', { name: 'Додати в тему' }).click()
+    await page.getByRole('button', { name: 'Вірші з Біблії' }).click()
     await dialog(page).getByPlaceholder('Слова з тексту Біблії').fill('блаженні вбогі')
     await dialog(page).locator('.v-window-item--active input[type=checkbox]').first().check()
     await dialog(page).getByRole('button', { name: 'Додати (1)' }).click()
@@ -136,7 +137,8 @@ test.describe('existing notes in topics', () => {
       await stores.app.setPage('topic')
     })
 
-    await page.getByRole('button', { name: 'Додати нотатки' }).click()
+    await page.getByRole('button', { name: 'Додати в тему' }).click()
+    await page.getByRole('button', { name: 'Існуючу нотатку' }).click()
     const picker = dialog(page)
     const candidates = picker.locator('.candidate')
     // nothing is listed until a search is set
@@ -164,6 +166,14 @@ test.describe('existing notes in topics', () => {
 
     await expect(page.locator('.nested-list > .draggable-item')).toHaveCount(2)
 
+    // found again, the added notes are marked as already in the topic and cannot be ticked
+    await page.getByRole('button', { name: 'Додати в тему' }).click()
+    await page.getByRole('button', { name: 'Існуючу нотатку' }).click()
+    await expect(candidates).toHaveCount(2)
+    await expect(candidates.filter({ hasText: 'вже в темі' })).toHaveCount(2)
+    await expect(candidates.locator('input[type=checkbox]').first()).toBeDisabled()
+    await picker.getByRole('button', { name: 'Скасувати' }).click()
+
     await page
       .getByRole('button', { name: 'Повернутися' })
       .or(page.locator('.mdi-page-previous'))
@@ -176,7 +186,7 @@ test.describe('existing notes in topics', () => {
 test.describe('phone layout', () => {
   test.use({ viewport: { width: 390, height: 800 } })
 
-  test('the add actions of a topic are in a menu', async ({ page }) => {
+  test('the add menu of a topic opens, closes and fits the screen', async ({ page }) => {
     await openBible(page)
     await signInLocally(page)
     await withStores(page, async (stores) => {
@@ -185,9 +195,18 @@ test.describe('phone layout', () => {
       await stores.app.setPage('topic')
     })
 
-    await expect(page.getByRole('button', { name: 'Нова нотатка' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Додати', exact: true }).click()
-    await page.locator('.v-overlay--active .v-list-item', { hasText: 'Додати вірші' }).click()
+    const choices = page.getByRole('button', { name: /^(Нову нотатку|Існуючу нотатку|Вірші з Біблії)$/ })
+    await expect(choices).toHaveCount(0)
+    await page.getByRole('button', { name: 'Додати в тему' }).click()
+    await expect(choices).toHaveCount(3)
+    await page.getByRole('button', { name: 'Згорнути' }).click()
+    await expect(choices).toHaveCount(0)
+
+    // a choice closes the menu and opens its dialog
+    await page.getByRole('button', { name: 'Додати в тему' }).click()
+    await page.getByRole('button', { name: 'Вірші з Біблії' }).click()
     await expect(dialog(page)).toContainText('За посиланням')
+    await expect(page.getByRole('button', { name: 'Додати в тему' })).toBeVisible()
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
   })
 })
