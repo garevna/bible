@@ -1,14 +1,16 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { NodeTypes, type ElementNode, type TemplateChildNode } from '@vue/compiler-core'
-import { parse } from '@vue/compiler-sfc'
+import { parse, type ElementNode, type TemplateChildNode } from 'vue/compiler-sfc'
 import { describe, expect, it } from 'vitest'
 
 /**
  * vuedraggable throws "Item slot must have only one child" when the #item slot has more than one node.
  * The dev server keeps HTML comments, the production build drops them, so e2e on the build cannot see it.
  */
+/** NodeTypes of @vue/compiler-core (a const enum, so it is not available at run time) */
+const NodeTypes = { ELEMENT: 1, TEXT: 2, DIRECTIVE: 7 } as const
+
 const vueFiles = (dir: string): string[] =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
     entry.isDirectory()
