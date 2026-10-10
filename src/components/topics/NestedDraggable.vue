@@ -37,11 +37,35 @@
           />
         </div>
 
-        <p v-if="element.type === 'note'" class="note-text">{{ element.text }}</p>
-        <p v-else v-html="element.html" />
+        <p v-if="element.type !== 'note'" v-html="element.html" />
 
-        <template v-if="element.type === 'note'">
+        <!-- a note shows its text; the verses and keywords open with the button on the right -->
+        <template v-else>
+          <div class="d-flex align-start">
+            <p class="note-text flex-grow-1">{{ element.text }}</p>
+            <v-btn
+              v-if="element.verses.length || element.keywords.length"
+              variant="text"
+              size="small"
+              color="secondary"
+              class="note-toggle ml-2"
+              prepend-icon="mdi-paperclip"
+              :append-icon="expanded.has(element._id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"
+              :aria-expanded="expanded.has(element._id)"
+              :aria-label="
+                expanded.has(element._id)
+                  ? text.hideVerses
+                  : format(text.showVerses, { count: element.verses.length })
+              "
+              @click="toggle(element._id)"
+            >
+              {{ element.verses.length }}
+            </v-btn>
+          </div>
+
+          <!-- an empty note stays a drop target while editing -->
           <NestedDraggable
+            v-if="expanded.has(element._id) || (showControls && !element.verses.length)"
             :items="element.verses"
             kind="note"
             :show-controls="showControls"
@@ -49,7 +73,7 @@
             @remove="(verse: TopicItem) => emit('remove-from-note', element, verse)"
           />
 
-          <div class="d-flex align-center flex-wrap mt-1">
+          <div v-if="showControls || expanded.has(element._id)" class="d-flex align-center flex-wrap mt-1">
             <ConfirmButton
               v-if="showControls"
               icon="$removeTopic"
@@ -57,9 +81,17 @@
               @confirm="emit('remove', element)"
             />
             <v-spacer />
-            <v-chip v-for="keyword of element.keywords" :key="keyword" size="small" color="#999" class="ma-1">
-              #{{ keyword }}
-            </v-chip>
+            <template v-if="expanded.has(element._id)">
+              <v-chip
+                v-for="keyword of element.keywords"
+                :key="keyword"
+                size="small"
+                variant="tonal"
+                class="ma-1"
+              >
+                #{{ keyword }}
+              </v-chip>
+            </template>
           </div>
         </template>
       </div>
@@ -68,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import draggable from 'vuedraggable'
 
@@ -77,6 +110,7 @@ import DialogToUpdateNote from '@/components/notes/DialogToUpdateNote.vue'
 import { useLanguageStore } from '@/stores/language'
 import type { TopicItem, TopicNoteItem } from '@/stores/topics'
 import type { Note } from '@/types'
+import { format } from '@/utils/format'
 
 /**
  * Items of a topic (kind = 'topic') or the verses of a note inside it (kind = 'note').
@@ -95,6 +129,15 @@ const emit = defineEmits<{
 }>()
 
 const { nestedDraggable: text } = storeToRefs(useLanguageStore())
+
+/** ids of the notes whose verses are open; all are closed at first */
+const expanded = ref(new Set<string>())
+
+function toggle(id: string) {
+  const next = new Set(expanded.value)
+  if (!next.delete(id)) next.add(id)
+  expanded.value = next
+}
 
 const allowedTargets: Record<TopicItem['type'], string[]> = {
   verse: ['topic', 'note'],
@@ -118,5 +161,11 @@ function canMove(event: { to: HTMLElement; draggedContext: { element: TopicItem 
 
 .note-text {
   white-space: pre-wrap;
+  margin-bottom: 0;
+}
+
+.note-toggle {
+  flex-shrink: 0;
+  margin-top: -4px;
 }
 </style>

@@ -23,5 +23,15 @@ export const nestedDraggable = {
     ua: 'Прибрати з теми',
     ru: 'Удалить из темы',
     en: 'Remove from topic'
+  },
+  showVerses: {
+    ua: 'Показати вірші ({count})',
+    ru: 'Показать стихи ({count})',
+    en: 'Show verses ({count})'
+  },
+  hideVerses: {
+    ua: 'Сховати вірші',
+    ru: 'Скрыть стихи',
+    en: 'Hide verses'
   }
 }

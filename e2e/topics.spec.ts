@@ -25,7 +25,11 @@ test('topic: notes and verses are reordered by drag and drop and saved', async (
   const top = page.locator('.nested-list:not(.nested-list--note) > .draggable-item')
   const inNote = page.locator('.nested-list--note > .draggable-item')
   await expect(top).toHaveCount(3)
+  // the note is closed: its text and the number of verses, the verse opens with the button
+  await expect(inNote).toHaveCount(0)
+  await page.getByRole('button', { name: 'Показати вірші (1)' }).click()
   await expect(inNote).toHaveCount(1)
+  await expect(page.getByRole('button', { name: 'Сховати вірші' })).toHaveAttribute('aria-expanded', 'true')
 
   // drag the last verse into the note (the emulated drag is repeated if SortableJS missed it)
   await expect(async () => {
@@ -54,6 +58,7 @@ test('topic: notes and verses are reordered by drag and drop and saved', async (
   await expect(page.locator('p[id="1.000.000.000"]')).toBeVisible()
   await signInLocally(page)
   await withStores(page, (stores) => stores.app.setPage('topic'))
+  await page.getByRole('button', { name: 'Показати вірші (2)' }).click()
   await expect(page.locator('.nested-list--note > .draggable-item')).toHaveCount(2)
 })
 
