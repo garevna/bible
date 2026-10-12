@@ -4,16 +4,8 @@ import { expect, openBible, signInLocally, test, withStores } from './fixtures'
 
 /** The worker (see playwright.config.ts) with a few users; signInLocally signs in as e2e-uid */
 async function fakeWorker(page: Page, role: 'admin' | 'reader') {
+  // the worker does not list the owners
   const users = [
-    {
-      uid: 'owner-uid',
-      email: 'owner@example.com',
-      emailVerified: true,
-      name: 'Ірина',
-      role: 'admin',
-      owner: true,
-      lastSeen: Date.now()
-    },
     {
       uid: 'e2e-uid',
       email: 'e2e@example.com',
@@ -68,10 +60,9 @@ test('an administrator gives a role and takes a temporary admin off the list', a
 
   await page.getByRole('button', { name: 'Адміністрування' }).click()
   const rows = page.locator('.user-row')
-  await expect(rows).toHaveCount(3)
+  await expect(rows).toHaveCount(2)
 
-  // the owner and the administrator's own role cannot be changed
-  await expect(rows.filter({ hasText: 'власник' }).locator('.v-select')).toHaveClass(/v-input--disabled/)
+  // the administrator's own role cannot be changed
   await expect(rows.filter({ hasText: 'це ви' }).locator('.v-select')).toHaveClass(/v-input--disabled/)
 
   const pastor = rows.filter({ hasText: 'pastor@example.com' })

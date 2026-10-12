@@ -71,13 +71,15 @@ export const view = (record: UserRecord, owners: string): UserView => ({
   owner: isOwner(record, owners)
 })
 
-/** All users, the last seen first */
+/** All users but the owners (they stay out of sight), the last seen first */
 export async function listUsers(store: UsersStore, owners: string): Promise<UserView[]> {
   const users: UserView[] = []
   let cursor: string | undefined
   do {
     const page = await store.list<UserRecord>({ prefix: 'user:', cursor })
-    page.keys.forEach(({ metadata }) => metadata && users.push(view(metadata, owners)))
+    page.keys.forEach(
+      ({ metadata }) => metadata && !isOwner(metadata, owners) && users.push(view(metadata, owners))
+    )
     cursor = page.list_complete ? undefined : page.cursor
   } while (cursor)
   return users.sort((a, b) => b.lastSeen - a.lastSeen)

@@ -30,6 +30,9 @@ type BibleJSON = { title: string; books: { title: string; chapters: string[][] }
 
 const NO_COLOR = '#0000'
 
+/** raise it when the texts in public/bible-*.json change, so they are loaded into IndexedDB again */
+const CONTENT_VERSION = '2'
+
 function readCovenantNames(): string[] {
   const stored = localStorage.getItem('covenant-names')
   if (!stored) return []
@@ -187,7 +190,9 @@ export const useContentStore = defineStore('content', () => {
   /** Loads the current translation into IndexedDB unless it is already there */
   async function refreshContent(forced = false) {
     const loaded = localStorage.getItem('content-translation')
-    const upToDate = !loaded || loaded === user.translation
+    // a new version of the texts (e.g. the verse numbers taken out of the Synodal one) is loaded again
+    const sameTexts = localStorage.getItem('content-version') === CONTENT_VERSION
+    const upToDate = !loaded || (loaded === user.translation && sameTexts)
 
     if (!forced && upToDate && covenantNames.value.length && (await testLocalDB())) {
       await getBooks()
@@ -234,6 +239,7 @@ export const useContentStore = defineStore('content', () => {
 
     await putRecords('books', bookRecords)
     localStorage.setItem('content-translation', user.translation)
+    localStorage.setItem('content-version', CONTENT_VERSION)
     await getBooks()
   }
 

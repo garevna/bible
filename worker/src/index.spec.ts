@@ -117,13 +117,11 @@ describe('worker', () => {
     expect((await call('GET', '/admin/users', 'pastor')).status).toBe(403)
 
     const list = await call('GET', '/admin/users', 'owner')
-    expect(list.body.users.map((user) => [user.uid, user.role, user.owner])).toEqual(
-      expect.arrayContaining([
-        ['owner-uid', 'admin', true],
-        ['pastor-uid', 'reader', false],
-        ['reader-uid', 'reader', false]
-      ])
-    )
+    // the owners are not listed
+    expect(list.body.users.map((user) => [user.uid, user.role]).sort()).toEqual([
+      ['pastor-uid', 'reader'],
+      ['reader-uid', 'reader']
+    ])
 
     const given = await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'admin' })
     expect(given.body.user).toMatchObject({ uid: 'pastor-uid', role: 'admin', updatedBy: 'Ірина' })
@@ -160,7 +158,7 @@ describe('worker', () => {
 
     expect(await call('DELETE', '/admin/users/pastor-uid', 'owner')).toMatchObject({ status: 200 })
     const list = await call('GET', '/admin/users', 'owner')
-    expect(list.body.users.map((user) => user.uid)).toEqual(['owner-uid'])
+    expect(list.body.users).toEqual([])
     expect((await call('GET', '/me', 'pastor')).body).toMatchObject({ role: 'reader' })
   })
 
