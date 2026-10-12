@@ -1,7 +1,7 @@
 <template>
   <div class="d-flex flex-wrap align-center ga-2 px-4">
     <v-chip v-if="notes.date" closable prepend-icon="$date" @click:close="notes.updateDate(null)">
-      {{ notes.date }}
+      {{ notes.dateTo ? `${notes.date} — ${notes.dateTo}` : notes.date }}
     </v-chip>
 
     <v-chip v-if="notes.topic" closable prepend-icon="$topic" @click:close="notes.updateTopic(null)">

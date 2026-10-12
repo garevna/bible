@@ -63,7 +63,7 @@
           variant="outlined"
           divided
         >
-          <v-btn v-for="days of [5, 7, 10]" :key="days" :value="days" size="small">{{ days }}</v-btn>
+          <v-btn v-for="days of lengths" :key="days" :value="days" size="small">{{ days }}</v-btn>
         </v-btn-toggle>
         <span class="calendar__days-label">{{ text.days }}</span>
       </span>
@@ -102,8 +102,17 @@ const locale = computed(() => ({ ua: 'uk', ru: 'ru', en: 'en' })[user.lang])
 const today = localISODate(new Date())
 const available = computed(() => new Set(props.availableDates))
 
-const interval = ref(false)
-const length = ref(5)
+const lengths = [5, 7, 10]
+
+/** an interval already chosen opens with the switch on and its length */
+const daysChosen =
+  range.value.from && range.value.to
+    ? Math.round((Date.parse(range.value.to) - Date.parse(range.value.from)) / 86_400_000) + 1
+    : 1
+const interval = ref(props.allowInterval && daysChosen > 1)
+const length = ref(
+  lengths.reduce((best, days) => (Math.abs(days - daysChosen) < Math.abs(best - daysChosen) ? days : best))
+)
 
 /** the month on screen: starts at the chosen date, or at the last day with notes, or now */
 const start = new Date(`${range.value.from ?? props.availableDates.at(-1) ?? today}T00:00:00`)

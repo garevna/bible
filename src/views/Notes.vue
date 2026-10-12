@@ -18,9 +18,10 @@
 
     <div class="notes-toolbar d-flex align-center elevation-4">
       <DatePickerDialog
-        :model-value="notes.date"
+        :from="notes.date"
+        :to="notes.dateTo"
         :available-dates="notes.availableDates"
-        @update:model-value="notes.updateDate"
+        @pick="notes.updateDate"
       />
 
       <PickerDialog

@@ -59,6 +59,11 @@ export const common = {
     ru: 'Это действие нельзя отменить.',
     en: 'This cannot be undone.'
   },
+  apply: {
+    ua: 'Застосувати',
+    ru: 'Применить',
+    en: 'Apply'
+  },
   close: {
     ua: 'Закрити',
     ru: 'Закрыть',

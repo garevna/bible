@@ -23,7 +23,10 @@ import { useFirebaseStore } from './firebase'
 export type TopicFilter = Pick<Topic, '_id' | 'title'>
 
 interface NotesSelector {
+  /** a day, or the first day of an interval */
   date: string | null
+  /** the last day of an interval */
+  dateTo: string | null
   keyword: string | null
   topic: TopicFilter | null
 }
@@ -34,12 +37,13 @@ function readSelector(): NotesSelector {
   try {
     const {
       date = null,
+      dateTo = null,
       keyword = null,
       topic = null
     } = JSON.parse(localStorage.getItem(selectorKey) || '{}')
-    return { date, keyword, topic: topic?._id ? topic : null }
+    return { date, dateTo: date ? dateTo : null, keyword, topic: topic?._id ? topic : null }
   } catch {
-    return { date: null, keyword: null, topic: null }
+    return { date: null, dateTo: null, keyword: null, topic: null }
   }
 }
 
@@ -58,6 +62,7 @@ export const useNotesStore = defineStore('notes', () => {
 
   /* filter of the Notes page */
   const date = ref<string | null>(null)
+  const dateTo = ref<string | null>(null)
   const keyword = ref<string | null>(null)
   const topic = ref<TopicFilter | null>(null)
 
@@ -71,15 +76,18 @@ export const useNotesStore = defineStore('notes', () => {
 
   const hasFilter = () => Boolean(date.value || keyword.value || topic.value)
 
+  const inDates = (day: string) =>
+    !date.value || (dateTo.value ? day >= date.value && day <= dateTo.value : day === date.value)
+
   const matchesFilter = (note: Note) =>
-    (!date.value || noteDate(note) === date.value) &&
+    inDates(noteDate(note)) &&
     (!keyword.value || note.keywords.includes(keyword.value)) &&
     (!topic.value || note.topics.includes(topic.value._id))
 
   function saveSelector() {
     localStorage.setItem(
       selectorKey,
-      JSON.stringify({ date: date.value, keyword: keyword.value, topic: topic.value })
+      JSON.stringify({ date: date.value, dateTo: dateTo.value, keyword: keyword.value, topic: topic.value })
     )
   }
 
@@ -97,12 +105,16 @@ export const useNotesStore = defineStore('notes', () => {
   async function getNotes() {
     notes.value =
       (await app.withProgress(() =>
-        searchNotes({ date: date.value, keyword: keyword.value, topic: topic.value?._id })
+        searchNotes({
+          ...(dateTo.value ? { from: date.value, to: dateTo.value } : { date: date.value }),
+          keyword: keyword.value,
+          topic: topic.value?._id
+        })
       )) ?? []
   }
 
   async function init() {
-    ;({ date: date.value, keyword: keyword.value, topic: topic.value } = readSelector())
+    ;({ date: date.value, dateTo: dateTo.value, keyword: keyword.value, topic: topic.value } = readSelector())
 
     await getAvailableDates()
 
@@ -118,7 +130,12 @@ export const useNotesStore = defineStore('notes', () => {
     await getNotes()
   }
 
-  const updateDate = (value: string | null) => updateFilter(() => (date.value = value))
+  /** a day, or an interval when `to` is given */
+  const updateDate = (value: string | null, to: string | null = null) =>
+    updateFilter(() => {
+      date.value = value
+      dateTo.value = value && to && to !== value ? to : null
+    })
   const updateKeyword = (value: string | null) => updateFilter(() => (keyword.value = value))
   const updateTopic = (value: TopicFilter | null) =>
     updateFilter(() => (topic.value = value?._id ? { _id: value._id, title: value.title } : null))
@@ -276,6 +293,7 @@ export const useNotesStore = defineStore('notes', () => {
   return {
     notes,
     date,
+    dateTo,
     keyword,
     topic,
     currentNote,

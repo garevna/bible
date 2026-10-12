@@ -2,7 +2,7 @@
   <v-dialog v-model="open" :max-width="maxWidth" scrollable>
     <v-card color="homefone" class="app-dialog">
       <!-- always visible: what this window is -->
-      <v-toolbar flat density="comfortable" color="transparent" class="app-dialog__header">
+      <v-toolbar flat density="comfortable" color="transparent" class="app-dialog__header app-dialog__fixed">
         <v-toolbar-title class="app-dialog__title">
           <v-icon v-if="icon" :icon="icon" size="small" color="secondary" class="mr-2" />{{ title }}
         </v-toolbar-title>
@@ -17,7 +17,9 @@
         />
       </v-toolbar>
       <!-- e.g. tabs: fixed too -->
-      <slot name="subheader" />
+      <div v-if="$slots.subheader" class="app-dialog__fixed">
+        <slot name="subheader" />
+      </div>
       <v-divider />
 
       <!-- the only part that scrolls -->
@@ -28,7 +30,7 @@
       <!-- always visible: the buttons -->
       <template v-if="$slots.actions">
         <v-divider />
-        <v-card-actions class="app-dialog__footer">
+        <v-card-actions class="app-dialog__footer app-dialog__fixed">
           <slot name="actions" />
         </v-card-actions>
       </template>
@@ -58,6 +60,11 @@ const { common } = storeToRefs(useLanguageStore())
 <style scoped>
 .app-dialog {
   border-radius: var(--app-radius-large) !important;
+}
+
+/* only the body gives way when the content is long */
+.app-dialog__fixed {
+  flex: 0 0 auto;
 }
 
 .app-dialog__title {
