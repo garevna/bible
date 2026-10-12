@@ -8,9 +8,15 @@ const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;
 const verseBlock = ({ text, ref }: VersePost) =>
   `<blockquote>${escape(text.trim())}\n<i>${escape(ref)}</i></blockquote>`
 
-/** One block per title, note and verse; the message HTML of Telegram (parse_mode HTML) */
+/** The title as Telegram shows it; with a picture it is the caption of the photo */
+export const titleBlock = (post: TopicPost) => `<b>${escape(post.title)}</b>`
+
+/**
+ * One block per title, note and verse; the message HTML of Telegram (parse_mode HTML).
+ * A topic with a picture has its title under the photo, so the messages go without it.
+ */
 export function topicBlocks(post: TopicPost): string[] {
-  const blocks = [`<b>${escape(post.title)}</b>`]
+  const blocks = post.image ? [] : [titleBlock(post)]
   for (const item of post.items) {
     if (item.kind === 'verse') blocks.push(verseBlock(item))
     else {
@@ -83,4 +89,35 @@ export async function sendMessages(
     }
   }
   return messages.length
+}
+
+/** "data:image/jpeg;base64,…" as a file for a multipart request */
+function imageFile(dataUrl: string): Blob {
+  const [head, base64 = ''] = dataUrl.split(',')
+  const type = head?.match(/^data:([^;]+)/)?.[1] ?? 'image/jpeg'
+  const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0))
+  return new Blob([bytes], { type })
+}
+
+/** Sends the picture with its caption (up to 1024 characters) */
+export async function sendPhoto(
+  token: string,
+  chatId: string,
+  image: string,
+  caption: string,
+  fetcher: typeof fetch = fetch
+): Promise<void> {
+  const form = new FormData()
+  form.append('chat_id', chatId)
+  form.append('caption', caption.slice(0, 1024))
+  form.append('parse_mode', 'HTML')
+  form.append('photo', imageFile(image), 'topic.jpg')
+  const response = await fetcher(`https://api.telegram.org/bot${token}/sendPhoto`, {
+    method: 'POST',
+    body: form
+  })
+  if (!response.ok) {
+    const { description } = (await response.json().catch(() => ({}))) as { description?: string }
+    throw new TelegramError(description || `Telegram: ${response.status}`)
+  }
 }

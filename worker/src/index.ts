@@ -1,6 +1,6 @@
 import { verifyIdToken, type AuthUser } from './auth'
 import { parsePost } from './post'
-import { formatTopic, sendMessages, TelegramError } from './telegram'
+import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import {
   isRole,
   listUsers,
@@ -15,7 +15,7 @@ import {
 /**
  * Worker of the Bible app.
  *   GET    /me                 the role of the signed in user (and remembers the user)
- *   POST   /telegram/preview   the messages a topic becomes (nothing is sent)
+ *   POST   /telegram/preview   the messages a topic becomes, and the caption of its picture (nothing is sent)
  *   POST   /telegram/publish   sends the topic to the Telegram channel
  *   GET    /admin/users        users who signed in, with their roles
  *   PUT    /admin/users/:uid   gives a role: { role: 'reader' | 'publisher' | 'admin' }
@@ -93,11 +93,14 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const post = parsePost(await request.json().catch(() => null))
     if (!post) return json({ error: 'bad-request' }, 400)
     const messages = formatTopic(post)
-    if (route === 'POST /telegram/preview') return json({ messages })
+    // with a picture the title is its caption
+    const caption = post.image ? titleBlock(post) : null
+    if (route === 'POST /telegram/preview') return json({ messages, caption })
     try {
-      return json({
-        sent: await sendMessages(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, messages, deps.fetcher)
-      })
+      const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId } = env
+      if (post.image && caption) await sendPhoto(token, chatId, post.image, caption, deps.fetcher)
+      const sent = await sendMessages(token, chatId, messages, deps.fetcher)
+      return json({ sent: sent + (post.image ? 1 : 0) })
     } catch (error) {
       const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
       return json({ error: 'telegram', message }, 502)

@@ -58,5 +58,25 @@ export const topics = {
     ua: 'Нотаток у темі: {count}',
     ru: 'Заметок в теме: {count}',
     en: 'Notes in the topic: {count}'
+  },
+  addImage: {
+    ua: 'Додати картинку',
+    ru: 'Добавить картинку',
+    en: 'Add a picture'
+  },
+  changeImage: {
+    ua: 'Змінити картинку',
+    ru: 'Сменить картинку',
+    en: 'Change the picture'
+  },
+  removeImage: {
+    ua: 'Прибрати картинку',
+    ru: 'Убрать картинку',
+    en: 'Remove the picture'
+  },
+  imageFailed: {
+    ua: 'Не вдалося відкрити цю картинку',
+    ru: 'Не удалось открыть эту картинку',
+    en: 'This picture could not be opened'
   }
 }

@@ -52,6 +52,8 @@ export interface Topic {
   title: string
   refs: string[]
   order: string[]
+  /** the picture in the head of the topic: a JPEG data URL */
+  image?: string
 }
 
 export interface Note {

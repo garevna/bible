@@ -13,6 +13,11 @@
       <p class="hint">{{ text.previewHint }}</p>
       <p v-if="messages.length > 1" class="hint">{{ format(text.messages, { count: messages.length }) }}</p>
       <!-- Telegram HTML: the worker escapes the texts, the tags are b, i and blockquote -->
+      <!-- a picture goes first, as a photo with the title -->
+      <div v-if="post.image" class="telegram-message telegram-photo">
+        <img :src="post.image" alt="" />
+        <div v-if="caption" class="telegram-caption" v-html="caption" />
+      </div>
       <div v-for="(message, index) of previews" :key="index" class="telegram-message" v-html="message" />
     </template>
 
@@ -52,6 +57,7 @@ const { common, publish: text } = storeToRefs(useLanguageStore())
 const open = ref(false)
 const busy = ref(false)
 const messages = ref<string[]>([])
+const caption = ref<string | null>(null)
 const sent = ref(0)
 const error = ref('')
 
@@ -60,7 +66,9 @@ const previews = computed(() =>
   messages.value.map((message) => message.replace(/\n*(<\/?blockquote>)\n*/g, '$1'))
 )
 
-const post = computed(() => topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData))
+const post = computed(() =>
+  topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData, topics.currentTopic?.image)
+)
 
 const reason = (cause: unknown) =>
   cause instanceof WorkerError && cause.message !== 'unreachable' ? cause.message : text.value.unreachable
@@ -86,7 +94,7 @@ function openDialog() {
     return
   }
   run(async () => {
-    messages.value = await worker.preview(post.value)
+    ;({ messages: messages.value, caption: caption.value } = await worker.preview(post.value))
   })
 }
 
@@ -112,6 +120,22 @@ const publishPost = () =>
   padding: 12px 16px;
   margin-bottom: 12px;
   font-size: 15px;
+}
+
+.telegram-photo {
+  padding: 0;
+  overflow: hidden;
+}
+
+.telegram-photo img {
+  display: block;
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+}
+
+.telegram-caption {
+  padding: 8px 16px;
 }
 
 .telegram-message :deep(blockquote) {

@@ -26,6 +26,8 @@
       </v-menu>
     </div>
 
+    <TopicImage v-if="topics.currentTopic" :editable="showControls" />
+
     <!-- editing mode, wider screens: "Add to topic ›" opens the three ways to add; "‹" or a choice closes them -->
     <div
       v-if="topics.currentTopic && showControls"
@@ -118,6 +120,7 @@ import CreateNote from '@/components/notes/CreateNote.vue'
 import AddVerses from '@/components/selectors/AddVerses.vue'
 import AddExistingNotes from '@/components/topics/AddExistingNotes.vue'
 import PublishTopic from '@/components/topics/PublishTopic.vue'
+import TopicImage from '@/components/topics/TopicImage.vue'
 import NestedDraggable from '@/components/topics/NestedDraggable.vue'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'

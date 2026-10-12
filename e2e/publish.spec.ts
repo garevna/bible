@@ -71,3 +71,53 @@ test('a reader is not offered publishing', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Додати в тему' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Опублікувати в Telegram' })).toHaveCount(0)
 })
+
+test('a picture is added to the head of the topic, kept, and published as a photo', async ({ page }) => {
+  const posts = await fakeWorker(page, 'publisher')
+  await openTopic(page)
+
+  // a 300×200 picture, drawn in the page
+  const dataUrl = await page.evaluate(() => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 300
+    canvas.height = 200
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#36a'
+    context.fillRect(0, 0, 300, 200)
+    return canvas.toDataURL('image/png')
+  })
+
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Додати картинку' }).click()
+  await (
+    await chooser
+  ).setFiles({
+    name: 'head.png',
+    mimeType: 'image/png',
+    buffer: Buffer.from(dataUrl.split(',')[1]!, 'base64')
+  })
+
+  await expect(page.locator('.topic-image img')).toHaveAttribute('src', /^data:image\/jpeg;base64,/)
+  const saved = await withStores(page, async (stores) => {
+    await stores.topics.getTopics()
+    return stores.topics.topicList[0].image as string
+  })
+  expect(saved).toMatch(/^data:image\/jpeg;base64,/)
+
+  // the reading mode shows the picture without the buttons
+  await page.getByRole('button', { name: 'Режим читання' }).click()
+  await expect(page.locator('.topic-image img')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Змінити картинку' })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Режим редагування' }).click()
+
+  await page.getByRole('button', { name: 'Опублікувати в Telegram' }).click()
+  const publish = dialog(page)
+  await expect(publish.locator('.telegram-photo img')).toBeVisible()
+  await publish.getByRole('button', { name: 'Опублікувати', exact: true }).click()
+  await expect(publish).toContainText('Опубліковано')
+  expect((posts[0] as { image: string }).image).toBe(saved)
+  await page.getByRole('button', { name: 'Закрити' }).last().click()
+
+  await page.getByRole('button', { name: 'Прибрати картинку' }).click()
+  await expect(page.getByRole('button', { name: 'Додати картинку' })).toBeVisible()
+})

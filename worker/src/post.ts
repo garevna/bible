@@ -12,10 +12,18 @@ export type TopicPostItem =
 export interface TopicPost {
   title: string
   items: TopicPostItem[]
+  /** the picture of the topic: a JPEG, PNG or WebP data URL */
+  image?: string
 }
 
 const MAX_ITEMS = 200
 const MAX_TEXT = 20_000
+/** Telegram takes photos up to 10 MB; the app sends pictures of 1280 px, far smaller */
+const MAX_IMAGE = 4_000_000
+const IMAGE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/
+
+const isImage = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= MAX_IMAGE && IMAGE.test(value)
 
 const isText = (value: unknown, max = MAX_TEXT): value is string =>
   typeof value === 'string' && value.length <= max
@@ -43,5 +51,6 @@ export function parsePost(body: unknown): TopicPost | null {
   const post = body as TopicPost
   if (!post || !isText(post.title, 500) || !post.title.trim()) return null
   if (!Array.isArray(post.items) || post.items.length > MAX_ITEMS || !post.items.every(isItem)) return null
-  return { title: post.title.trim(), items: post.items }
+  if (post.image !== undefined && !isImage(post.image)) return null
+  return { title: post.title.trim(), items: post.items, ...(post.image ? { image: post.image } : {}) }
 }

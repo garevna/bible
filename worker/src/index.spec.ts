@@ -171,11 +171,34 @@ describe('worker', () => {
 
     await call('PUT', '/admin/users/reader-uid', 'owner', { role: 'publisher' })
     expect((await call('POST', '/telegram/preview', 'reader', topic)).body).toEqual({
-      messages: ['<b>Тема</b>\n\n<blockquote>Вірш\n<i>Від Матвія 1:1</i></blockquote>']
+      messages: ['<b>Тема</b>\n\n<blockquote>Вірш\n<i>Від Матвія 1:1</i></blockquote>'],
+      caption: null
     })
     expect(fetcher).not.toHaveBeenCalled()
     expect((await call('POST', '/telegram/publish', 'reader', topic)).body).toEqual({ sent: 1 })
     expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+
+  it('a topic with a picture goes as a photo with the title, then the texts without it', async () => {
+    const { call, fetcher } = setup()
+    // a JPEG header is enough: Telegram is faked
+    const withImage = { ...topic, image: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==' }
+
+    expect((await call('POST', '/telegram/preview', 'owner', withImage)).body).toEqual({
+      messages: ['<blockquote>Вірш\n<i>Від Матвія 1:1</i></blockquote>'],
+      caption: '<b>Тема</b>'
+    })
+    expect((await call('POST', '/telegram/publish', 'owner', withImage)).body).toEqual({ sent: 2 })
+
+    const [photo, message] = fetcher.mock.calls as unknown as [string, RequestInit][]
+    expect(photo![0]).toMatch(/\/sendPhoto$/)
+    const form = photo![1].body as FormData
+    expect(form.get('caption')).toBe('<b>Тема</b>')
+    expect(form.get('photo')).toBeInstanceOf(Blob)
+    expect(message![0]).toMatch(/\/sendMessage$/)
+
+    const notImage = { ...topic, image: 'data:text/html;base64,PHNjcmlwdD4=' }
+    expect((await call('POST', '/telegram/publish', 'owner', notImage)).status).toBe(400)
   })
 
   it('rejects a body that is not a topic and unknown routes', async () => {

@@ -83,8 +83,9 @@ export const useWorkerStore = defineStore('worker', () => {
 
   watch(() => user.uid, loadRole, { immediate: true })
 
-  const preview = async (post: TopicPost) =>
-    (await call<{ messages: string[] }>('POST', '/telegram/preview', post)).messages
+  /** the messages of the post, and the caption of its picture */
+  const preview = (post: TopicPost) =>
+    call<{ messages: string[]; caption: string | null }>('POST', '/telegram/preview', post)
 
   const publishToTelegram = async (post: TopicPost) =>
     (await call<{ sent: number }>('POST', '/telegram/publish', post)).sent

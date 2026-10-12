@@ -67,8 +67,8 @@ export const useTopicsStore = defineStore('topics', () => {
   }
 
   async function putTopic(topic: Topic) {
-    const { _id = Date.now().toString(), title, refs = [], order = [] } = topic
-    const record: Topic = clone({ _id, title, refs, order })
+    const { _id = Date.now().toString(), title, refs = [], order = [], image } = topic
+    const record: Topic = clone({ _id, title, refs, order, ...(image ? { image } : {}) })
 
     await app.withProgress(async () => {
       await putRecord('topics', record)
@@ -115,6 +115,14 @@ export const useTopicsStore = defineStore('topics', () => {
 
   function updateCurrentTopic(data: Partial<Topic>) {
     currentTopic.value && Object.assign(currentTopic.value, data)
+  }
+
+  /** The picture of the topic is saved at once, not with the order of its items */
+  async function setCurrentTopicImage(image: string | null) {
+    if (!currentTopic.value) return
+    const { image: _old, ...topic } = currentTopic.value
+    currentTopic.value = image ? { ...topic, image } : topic
+    await putTopic(currentTopic.value)
   }
 
   /** Sorts the items by the saved order */
@@ -221,6 +229,7 @@ export const useTopicsStore = defineStore('topics', () => {
   }
 
   return {
+    setCurrentTopicImage,
     topicList,
     noteCounts,
     topicIdList,
