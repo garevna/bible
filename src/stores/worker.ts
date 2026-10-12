@@ -22,6 +22,8 @@ export interface UserView {
   role: Role
   /** the ministries the user serves in, e.g. 'Музичне служіння' */
   ministries?: string[]
+  /** the mobile number, '+380501234567' */
+  phone?: string
   /** an administrator the dashboard cannot change (the worker settings, OWNERS) */
   owner: boolean
   lastSeen: number
@@ -56,6 +58,7 @@ export interface Recipient {
   name: string
   role: Role
   ministries: string[]
+  phone: string | null
 }
 
 /** how often the number of unread messages is asked for while the app is open */
@@ -78,6 +81,9 @@ export const useWorkerStore = defineStore('worker', () => {
   const canSend = ref(false)
   /** they and the members of ministries get messages */
   const canReceive = ref(false)
+  /** the mobile number of the user; ministers are asked for it */
+  const phone = ref<string | null>(null)
+  const needsPhone = ref(false)
 
   const canPublish = computed(() => telegram.value && role.value !== 'reader')
   const isAdmin = computed(() => role.value === 'admin')
@@ -112,7 +118,8 @@ export const useWorkerStore = defineStore('worker', () => {
     role.value = 'reader'
     telegram.value = false
     ministries.value = []
-    canSend.value = canReceive.value = false
+    canSend.value = canReceive.value = needsPhone.value = false
+    phone.value = null
     if (!workerUrl || !user.signed) return
     try {
       const me = await call<{
@@ -121,12 +128,16 @@ export const useWorkerStore = defineStore('worker', () => {
         ministries?: string[]
         canSend?: boolean
         canReceive?: boolean
+        phone?: string | null
+        needsPhone?: boolean
       }>('GET', '/me')
       role.value = me.role
       telegram.value = me.telegram
       ministries.value = me.ministries ?? []
       canSend.value = Boolean(me.canSend)
       canReceive.value = Boolean(me.canReceive)
+      phone.value = me.phone ?? null
+      needsPhone.value = Boolean(me.needsPhone)
     } catch (error) {
       console.warn('The role is not known\n', error)
     }
@@ -184,10 +195,18 @@ export const useWorkerStore = defineStore('worker', () => {
   /** the users and the ministries of the church */
   const listUsers = () => call<{ users: UserView[]; ministries: string[] }>('GET', '/admin/users')
 
-  const updateUser = async (uid: string, change: { role?: Role; ministries?: string[] }) =>
-    (await call<{ user: UserView }>('PUT', `/admin/users/${encodeURIComponent(uid)}`, change)).user
+  const updateUser = async (
+    uid: string,
+    change: { role?: Role; ministries?: string[]; phone?: string | null }
+  ) => (await call<{ user: UserView }>('PUT', `/admin/users/${encodeURIComponent(uid)}`, change)).user
 
   const setUserRole = (uid: string, newRole: Role) => updateUser(uid, { role: newRole })
+
+  /** the user gives (or takes away) their own mobile number */
+  async function setMyPhone(value: string | null) {
+    phone.value = (await call<{ phone: string | null }>('PUT', '/me', { phone: value })).phone
+    needsPhone.value = canReceive.value && !phone.value
+  }
 
   const removeUser = (uid: string) => call('DELETE', `/admin/users/${encodeURIComponent(uid)}`)
 
@@ -202,6 +221,9 @@ export const useWorkerStore = defineStore('worker', () => {
     ministries,
     canSend,
     canReceive,
+    phone,
+    needsPhone,
+    setMyPhone,
     messages,
     unread,
     loadRole,

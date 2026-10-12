@@ -3,12 +3,21 @@ import type { Page, Route } from '@playwright/test'
 import { dialog, expect, openBible, signInLocally, test, withStores } from './fixtures'
 
 /** The worker (see playwright.config.ts): a publisher who writes, or a member of a ministry who reads */
-async function fakeWorker(page: Page, who: 'publisher' | 'member', inbox: unknown[] = []) {
+async function fakeWorker(
+  page: Page,
+  who: 'publisher' | 'member',
+  inbox: unknown[] = [],
+  phone: string | null = '+380501234567'
+) {
   const sent: unknown[] = []
   const read: string[] = []
   await page.route('**/worker-test/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
+    if (path === '/me' && request.method() === 'PUT') {
+      phone = request.postDataJSON().phone
+      return route.fulfill({ json: { phone } })
+    }
     if (path === '/me') {
       return route.fulfill({
         json: {
@@ -16,7 +25,9 @@ async function fakeWorker(page: Page, who: 'publisher' | 'member', inbox: unknow
           telegram: false,
           ministries: who === 'member' ? ['Музичне служіння'] : [],
           canSend: who === 'publisher',
-          canReceive: true
+          canReceive: true,
+          phone,
+          needsPhone: !phone
         }
       })
     }
@@ -155,4 +166,33 @@ test('a member of a ministry reads the message, saves the note and answers', asy
   await answer.getByLabel('Текст повідомлення').fill('Добре, підготуємо')
   await answer.getByRole('button', { name: 'Надіслати', exact: true }).click()
   await expect.poll(() => sent).toEqual([{ replyTo: 'm1', text: 'Добре, підготуємо', attachment: null }])
+})
+
+test('a minister without a mobile number is asked for it; an empty group cannot be chosen', async ({
+  page
+}) => {
+  await fakeWorker(page, 'publisher', [], null)
+  await signIn(page)
+
+  // asked once after signing in
+  const phone = dialog(page)
+  await expect(phone).toContainText('Номер мобільного')
+  await phone.getByLabel('Номер', { exact: true }).fill('050 123')
+  await expect(phone.getByRole('button', { name: 'Зберегти' })).toBeDisabled()
+  await phone.getByLabel('Номер', { exact: true }).fill('0501234567')
+  await expect(phone.getByLabel('Номер правильний')).toBeVisible()
+  await phone.getByRole('button', { name: 'Зберегти' }).click()
+  await expect.poll(() => withStores(page, (stores) => stores.worker.phone)).toBe('+380501234567')
+  await expect(page.locator('.v-badge--dot .v-badge__badge')).toBeHidden()
+
+  // the home group leaders have nobody yet
+  await withStores(page, (stores) => stores.app.setPage('messages'))
+  await page.getByRole('button', { name: 'Нове повідомлення' }).click()
+  await dialog(page).locator('.v-select', { hasText: 'Усім учасникам служіння' }).click()
+  const empty = page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер домашньої групи' })
+  await expect(empty).toHaveClass(/v-list-item--disabled/)
+  await expect(empty).toContainText('Служителів: 0')
+  await expect(
+    page.locator('.v-overlay--active .v-list-item', { hasText: 'Музичне служіння' })
+  ).toContainText('Служителів: 1')
 })

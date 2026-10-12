@@ -49,19 +49,34 @@
         class="mb-2"
       >
         <template #item="{ props: item, item: { raw } }">
-          <v-list-item v-bind="item" :subtitle="raw.ministries.join(', ')" />
+          <v-list-item v-bind="item" :subtitle="[...raw.ministries, raw.phone].filter(Boolean).join(' · ')" />
         </template>
       </v-autocomplete>
+      <!-- every ministry is listed; one without members cannot be chosen -->
       <v-select
         v-model="ministries"
-        :items="ministryItems"
+        :items="ministryOptions"
         :label="text.ministries"
         multiple
         chips
         closable-chips
         density="compact"
         class="mb-2"
-      />
+      >
+        <template #item="{ props: item, item: { raw } }">
+          <v-tooltip :text="text.emptyMinistry" :disabled="raw.members > 0" location="start">
+            <template #activator="{ props: tooltip }">
+              <div v-bind="tooltip">
+                <v-list-item
+                  v-bind="item"
+                  :disabled="raw.members === 0"
+                  :subtitle="format(text.members, { count: raw.members })"
+                />
+              </div>
+            </template>
+          </v-tooltip>
+        </template>
+      </v-select>
     </template>
 
     <v-textarea v-model="message" :label="text.text" rows="3" auto-grow counter="4000" />
@@ -127,6 +142,14 @@ const attachment = shallowRef<Attachment | null>(null)
 
 const done = ref(false)
 const sent = ref(0)
+
+/** the ministries with the number of their members (people who get messages) */
+const ministryOptions = computed(() =>
+  ministryItems.value.map((name) => {
+    const members = people.value.filter((person) => person.ministries.includes(name)).length
+    return { value: name, title: name, members, props: { disabled: members === 0 } }
+  })
+)
 
 const ready = computed(
   () =>

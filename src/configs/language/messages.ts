@@ -49,6 +49,16 @@ export const messages = {
     ru: 'Отправлено: {count}',
     en: 'Sent: {count}'
   },
+  emptyMinistry: {
+    ua: 'У групі немає жодного служителя',
+    ru: 'В группе нет ни одного служителя',
+    en: 'There is nobody in this group'
+  },
+  members: {
+    ua: 'Служителів: {count}',
+    ru: 'Служителей: {count}',
+    en: 'Members: {count}'
+  },
   reply: {
     ua: 'Відповісти',
     ru: 'Ответить',

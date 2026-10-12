@@ -15,6 +15,8 @@ export interface UserRecord {
   role: Role
   /** the ministries the user serves in (e.g. 'Музичне служіння'), given by an administrator */
   ministries?: string[]
+  /** the mobile number, '+380501234567' (ministers need one) */
+  phone?: string
   /** ms */
   lastSeen: number
   /** who gave the role and when */
@@ -108,7 +110,7 @@ export async function removeUser(store: UsersStore, owners: string, admin: UserR
 }
 
 /**
- * Gives a role and/or ministries. Owners are not changed; an administrator may put themselves
+ * Gives a role, ministries and/or a phone number. Owners are not changed; an administrator may put themselves
  * into ministries, but not change their own role (nobody locks themselves out).
  */
 export async function updateUser(
@@ -116,7 +118,7 @@ export async function updateUser(
   owners: string,
   admin: UserRecord,
   uid: string,
-  change: { role?: Role; ministries?: string[] },
+  change: { role?: Role; ministries?: string[]; phone?: string | null },
   now = Date.now()
 ): Promise<UserView> {
   const record =
@@ -125,11 +127,30 @@ export async function updateUser(
     ...record,
     ...(change.role ? { role: change.role } : {}),
     ...(change.ministries ? { ministries: change.ministries } : {}),
+    ...(change.phone !== undefined ? { phone: change.phone ?? undefined } : {}),
     updatedBy: admin.name ?? admin.email ?? admin.uid,
     updatedAt: now
   }
   await save(store, updated)
   return view(updated, owners)
+}
+
+/* ---------- phone numbers ---------- */
+
+/** '+380501234567' (E.164); the app checks the number with libphonenumber-js, the worker its form */
+export const isPhone = (value: unknown): value is string =>
+  typeof value === 'string' && /^\+[1-9]\d{7,14}$/.test(value)
+
+/** The user sets their own number (or takes it away with null) */
+export async function setOwnPhone(
+  store: UsersStore,
+  me: UserRecord,
+  phone: string | null
+): Promise<UserRecord> {
+  const { phone: _old, ...rest } = me
+  const updated: UserRecord = phone ? { ...rest, phone } : rest
+  await save(store, updated)
+  return updated
 }
 
 /* ---------- ministries ---------- */

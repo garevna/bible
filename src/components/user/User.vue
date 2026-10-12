@@ -11,18 +11,21 @@
               class="avatar-button mr-2"
               :aria-label="user.displayName"
             >
-              <v-avatar size="32" color="secondary" class="user-avatar">
-                <!-- Google photos are not shown to pages that send a referrer -->
-                <img
-                  v-if="user.avatar && !broken"
-                  :src="user.avatar"
-                  alt=""
-                  referrerpolicy="no-referrer"
-                  class="avatar-image"
-                  @error="broken = true"
-                />
-                <span v-else class="initials">{{ user.initials }}</span>
-              </v-avatar>
+              <!-- a minister without a mobile number gets a mark on the avatar -->
+              <v-badge :model-value="worker.needsPhone" color="warning" dot>
+                <v-avatar size="32" color="secondary" class="user-avatar">
+                  <!-- Google photos are not shown to pages that send a referrer -->
+                  <img
+                    v-if="user.avatar && !broken"
+                    :src="user.avatar"
+                    alt=""
+                    referrerpolicy="no-referrer"
+                    class="avatar-image"
+                    @error="broken = true"
+                  />
+                  <span v-else class="initials">{{ user.initials }}</span>
+                </v-avatar>
+              </v-badge>
             </button>
           </template>
         </v-tooltip>
@@ -31,6 +34,14 @@
       <v-list density="compact" bg-color="homefone" min-width="220">
         <v-list-item :title="user.displayName" :subtitle="user.userName ? (user.email ?? '') : ''" />
         <v-divider />
+        <v-list-item
+          v-if="worker.canReceive"
+          prepend-icon="mdi-cellphone"
+          :title="header.myPhone"
+          :subtitle="worker.phone ?? ''"
+          :base-color="worker.needsPhone ? 'warning' : undefined"
+          @click="phoneDialog = true"
+        />
         <v-list-item prepend-icon="mdi-camera-outline" :title="header.uploadPhoto" @click="uploadPhoto" />
         <v-list-item
           v-if="user.avatar"
@@ -42,6 +53,8 @@
     </v-menu>
 
     <v-snackbar v-model="failed" color="error" timeout="4000">{{ header.photoFailed }}</v-snackbar>
+
+    <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
 
     <!-- ministers: the messages, with the number of unread ones -->
     <v-tooltip v-if="worker.canReceive" :text="messagesText.title">
@@ -91,6 +104,7 @@
 import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import PhoneDialog from '@/components/PhoneDialog.vue'
 import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
@@ -110,6 +124,19 @@ watch(
 )
 
 const failed = ref(false)
+
+/** a minister without a mobile number is asked for it once a session, the mark on the avatar stays */
+const phoneDialog = ref(false)
+let asked = false
+watch(
+  () => worker.needsPhone,
+  (needed) => {
+    if (!needed || asked) return
+    asked = true
+    phoneDialog.value = true
+  },
+  { immediate: true }
+)
 
 /** a small square photo goes into the profile, so it loads fast and offline too */
 async function uploadPhoto() {

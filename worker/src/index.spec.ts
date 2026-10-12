@@ -340,6 +340,32 @@ describe('messages between ministers', () => {
     )
   })
 
+  it('ministers are asked for a mobile number; they or an administrator give it', async () => {
+    const { call } = await church()
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({ phone: null, needsPhone: true })
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({ needsPhone: false })
+
+    expect((await call('PUT', '/me', 'musician', { phone: '050 123' })).status).toBe(400)
+    expect((await call('PUT', '/me', 'musician', { phone: '+380501234567' })).body).toEqual({
+      phone: '+380501234567'
+    })
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({ needsPhone: false })
+
+    expect((await call('PUT', '/admin/users/leader-uid', 'owner', { phone: '+380671112233' })).status).toBe(
+      200
+    )
+    const people = (await call('GET', '/messages/recipients', 'pastor')).body.people as {
+      uid: string
+      phone: string | null
+    }[]
+    expect(people.map(({ uid, phone }) => [uid, phone]).sort()).toEqual([
+      ['leader-uid', '+380671112233'],
+      ['musician-uid', '+380501234567']
+    ])
+
+    expect((await call('PUT', '/me', 'musician', { phone: null })).body).toEqual({ phone: null })
+  })
+
   it('messages live for a day; a person sends at most 100 in an hour', async () => {
     const { call, clock } = await church()
     await call('POST', '/messages', 'pastor', { to: ['musician-uid'], text: 'Сьогодні' })

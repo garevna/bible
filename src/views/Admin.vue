@@ -74,6 +74,7 @@
           <div class="user-details">
             <span v-if="item.email && item.name">{{ item.email }}</span>
             <span v-if="item.email && !item.emailVerified" class="unverified">{{ text.unverified }}</span>
+            <a v-if="item.phone" :href="'tel:' + item.phone" class="phone">{{ item.phone }}</a>
             <span>{{ format(text.lastSeen, { name: day(item.lastSeen) }) }}</span>
             <span v-if="item.updatedBy">{{ format(text.changedBy, { name: item.updatedBy }) }}</span>
           </div>
@@ -105,6 +106,15 @@
           @update:model-value="changeMinistries(item, $event)"
         />
 
+        <ButtonTooltip
+          icon="mdi-cellphone-cog"
+          :text="header.myPhone"
+          color="secondary"
+          small
+          :disabled="item.owner"
+          @click="phoneOf = item"
+        />
+
         <ConfirmButton
           v-if="!locked(item)"
           icon="mdi-account-remove-outline"
@@ -114,6 +124,14 @@
         <span v-else class="remove-placeholder" />
       </div>
     </template>
+
+    <PhoneDialog
+      :model-value="Boolean(phoneOf)"
+      :number="phoneOf?.phone ?? null"
+      :title="phoneOf ? phoneOf.name || phoneOf.email || phoneOf.uid : ''"
+      :submit="(phone: string) => change(phoneOf!, { phone })"
+      @update:model-value="(value: boolean) => value || (phoneOf = null)"
+    />
   </div>
 </template>
 
@@ -124,6 +142,7 @@ import { storeToRefs } from 'pinia'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import FieldSet from '@/components/FieldSet.vue'
+import PhoneDialog from '@/components/PhoneDialog.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { ROLES, useWorkerStore, WorkerError, type Role, type UserView } from '@/stores/worker'
@@ -132,7 +151,7 @@ import { format } from '@/utils/format'
 /** The dashboard of the roles: who signed in to the app and what they may do */
 const worker = useWorkerStore()
 const user = useUserStore()
-const { admin: text, publish } = storeToRefs(useLanguageStore())
+const { admin: text, header, publish } = storeToRefs(useLanguageStore())
 
 const users = shallowRef<UserView[]>([])
 const query = ref('')
@@ -176,7 +195,7 @@ async function load() {
   busy.value = false
 }
 
-async function change(item: UserView, update: { role?: Role; ministries?: string[] }) {
+async function change(item: UserView, update: { role?: Role; ministries?: string[]; phone?: string | null }) {
   saving.value = item.uid
   await run(async () => {
     const updated = await worker.updateUser(item.uid, update)
@@ -191,6 +210,8 @@ const changeMinistries = (item: UserView, ministries: string[]) => change(item, 
 /* ---------- ministries ---------- */
 
 const ministryList = ref<string[]>([])
+/** the user whose mobile number is being entered */
+const phoneOf = shallowRef<UserView | null>(null)
 const newMinistry = ref('')
 
 const saveMinistries = (list: string[]) =>
@@ -254,6 +275,11 @@ watch(() => worker.isAdmin, load)
   gap: 2px 12px;
   color: var(--app-text-muted);
   font-size: 13px;
+}
+
+.phone {
+  color: rgb(var(--v-theme-secondary));
+  text-decoration: none;
 }
 
 .unverified {

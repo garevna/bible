@@ -4,6 +4,7 @@ import { parsePost } from './post'
 import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import {
   getMinistries,
+  isPhone,
   isRole,
   listUsers,
   parseMinistries,
@@ -11,6 +12,7 @@ import {
   RoleChangeError,
   roleOf,
   setMinistries,
+  setOwnPhone,
   touchUser,
   updateUser,
   type Role,
@@ -21,6 +23,7 @@ import {
 /**
  * Worker of the Bible app.
  *   GET    /me                   the role of the signed in user (and remembers the user)
+ *   PUT    /me                   { phone: '+380…' | null }: the user's own mobile number
  *   POST   /telegram/preview     the messages a post becomes, and the caption of its picture (nothing is sent)
  *   POST   /telegram/publish     sends the post to the Telegram channel
  *   GET    /admin/users          users who signed in, with their roles and ministries
@@ -72,7 +75,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
 }
 
 const ROUTES = [
-  /^GET \/me$/,
+  /^(GET|PUT) \/me$/,
   /^POST \/telegram\/(preview|publish)$/,
   /^GET \/admin\/users$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
@@ -121,8 +124,18 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       telegram,
       ministries: me.ministries ?? [],
       canSend: canSend(role),
-      canReceive: canReceive(me, role)
+      canReceive: canReceive(me, role),
+      phone: me.phone ?? null,
+      // ministers are asked for their mobile number until they give it
+      needsPhone: canReceive(me, role) && !me.phone
     })
+  }
+
+  if (route === 'PUT /me') {
+    const { phone } = ((await body()) ?? {}) as { phone?: unknown }
+    if (phone !== null && !isPhone(phone)) return json({ error: 'bad-request' }, 400)
+    const updated = await setOwnPhone(env.USERS, me, phone)
+    return json({ phone: updated.phone ?? null })
   }
 
   if (pathname.startsWith('/telegram/')) {
@@ -168,15 +181,19 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       await removeUser(env.USERS, env.OWNERS, me, uid)
       return json({ removed: uid })
     }
-    const change = ((await body()) ?? {}) as { role?: unknown; ministries?: unknown }
+    const change = ((await body()) ?? {}) as { role?: unknown; ministries?: unknown; phone?: unknown }
     const ministries = change.ministries === undefined ? undefined : parseMinistries(change.ministries)
-    if ((change.role !== undefined && !isRole(change.role)) || ministries === null) {
+    const badPhone = change.phone !== undefined && change.phone !== null && !isPhone(change.phone)
+    if ((change.role !== undefined && !isRole(change.role)) || ministries === null || badPhone) {
       return json({ error: 'bad-request' }, 400)
     }
-    if (change.role === undefined && ministries === undefined) return json({ error: 'bad-request' }, 400)
+    if (change.role === undefined && ministries === undefined && change.phone === undefined) {
+      return json({ error: 'bad-request' }, 400)
+    }
     const user = await updateUser(env.USERS, env.OWNERS, me, uid, {
       ...(isRole(change.role) ? { role: change.role } : {}),
-      ...(ministries ? { ministries } : {})
+      ...(ministries ? { ministries } : {}),
+      ...(change.phone !== undefined ? { phone: change.phone as string | null } : {})
     })
     return json({ user })
   } catch (error) {
@@ -217,11 +234,12 @@ async function handleMessages(
   if (pathname === '/messages/recipients') {
     if (!canSend(role)) return json({ people: [], ministries: [] })
     return json({
-      people: receivers.map(({ uid, name, email, role: userRole, ministries }) => ({
+      people: receivers.map(({ uid, name, email, role: userRole, ministries, phone }) => ({
         uid,
         name: name ?? email ?? uid,
         role: userRole,
-        ministries: ministries ?? []
+        ministries: ministries ?? [],
+        phone: phone ?? null
       })),
       ministries: await getMinistries(env.USERS)
     })

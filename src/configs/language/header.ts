@@ -49,6 +49,36 @@ export const header = {
     ru: 'Свободный доступ: перевод в общественном достоянии',
     en: 'Free to use: the translation is in the public domain'
   },
+  myPhone: {
+    ua: 'Номер мобільного',
+    ru: 'Номер мобильного',
+    en: 'Mobile number'
+  },
+  phoneNeeded: {
+    ua: 'Служителям потрібен номер мобільного, щоб пастор і адміністратори могли з вами зв’язатися.',
+    ru: 'Служителям нужен номер мобильного, чтобы пастор и администраторы могли с вами связаться.',
+    en: 'Ministers need a mobile number, so that the pastor and the administrators can reach you.'
+  },
+  country: {
+    ua: 'Країна',
+    ru: 'Страна',
+    en: 'Country'
+  },
+  phone: {
+    ua: 'Номер',
+    ru: 'Номер',
+    en: 'Number'
+  },
+  valid: {
+    ua: 'Номер правильний',
+    ru: 'Номер правильный',
+    en: 'The number is valid'
+  },
+  invalid: {
+    ua: 'Номер неправильний',
+    ru: 'Номер неправильный',
+    en: 'The number is not valid'
+  },
   uploadPhoto: {
     ua: 'Завантажити фото',
     ru: 'Загрузить фото',
