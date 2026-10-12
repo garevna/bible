@@ -97,14 +97,14 @@ Google-акаунта, через кому. Email із реєстрації за
 
 ### На Cloudflare
 
-Сервер уже розгорнуто: (акаунт Cloudflare, вхід через GitHub).
+Сервер уже розгорнуто: `https://bible-worker.garevna.workers.dev` (акаунт Cloudflare, вхід через GitHub).
 
-1.  — один раз, відкриється браузер.
-2.  — заповнені , і з
-    потрапляють у секрети Cloudflare (значення ніде не друкуються).
-3.  — після змін у .
-4.  Адреса сервера — змінна репозиторію (GitHub > Settings > Secrets and variables >
-    Actions > Variables); з нею кнопка публікації є на сайті після деплою.
+1. `pnpm --filter bible-worker exec wrangler login` — один раз, відкриється браузер.
+2. `pnpm worker:secrets` — заповнені `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` і `PUBLISHERS` з
+   `worker/.dev.vars` потрапляють у секрети Cloudflare (значення ніде не друкуються).
+3. `pnpm worker:deploy` — після змін у `worker/`.
+4. Адреса сервера — змінна репозиторію `VITE_WORKER_URL` (GitHub > Settings > Secrets and variables >
+   Actions > Variables); з нею кнопка публікації є на сайті після деплою.
 
 ## Структура
 
