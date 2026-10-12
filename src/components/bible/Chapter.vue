@@ -67,14 +67,39 @@ const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;
 
 /** While a highlighter is chosen, every text selection in the chapter gets painted */
 async function onSelectionDone() {
+  clearTimeout(settleTimer)
   await content.selectionChange()
   document.getSelection()?.removeAllRanges()
 }
 
+/*
+ * A mouse paints when its button is let go. On a phone the text is selected by a long press and then
+ * by dragging the handles, and none of it ends with a touch event of the page (Android even cancels it),
+ * so there the selection is painted once it has stopped changing for a moment.
+ */
+const SETTLE = 800
+let settleTimer: ReturnType<typeof setTimeout> | undefined
+let mouseSelecting = false
+
+const onMouseDown = () => (mouseSelecting = true)
+
+function onMouseUp() {
+  mouseSelecting = false
+  onSelectionDone()
+}
+
+function onSelectionChange() {
+  if (mouseSelecting) return
+  clearTimeout(settleTimer)
+  settleTimer = setTimeout(onSelectionDone, SETTLE)
+}
+
 function setListeners(on: boolean) {
   const method = on ? 'addEventListener' : 'removeEventListener'
-  document[method]('mouseup', onSelectionDone)
-  document[method]('touchend', onSelectionDone)
+  document[method]('mousedown', onMouseDown)
+  document[method]('mouseup', onMouseUp)
+  document[method]('selectionchange', onSelectionChange)
+  on || clearTimeout(settleTimer)
 }
 
 watch(marker, (color) => {

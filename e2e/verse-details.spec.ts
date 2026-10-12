@@ -59,6 +59,22 @@ test.describe('signed in: verse details, notes and keywords', () => {
     expect(record.colored).toEqual([{ start: 0, end: 5, color: '#ff07' }])
   })
 
+  test('on a phone the selection is painted once it stops changing (no mouse events)', async ({ page }) => {
+    await page.locator('.highlighter-bar .v-btn').nth(2).click()
+    // a long press and the handles: the selection changes, no mouseup or touchend follows
+    await page.evaluate((id) => {
+      const text = document.getElementById(id)!.firstChild!
+      const range = document.createRange()
+      range.setStart(text, 0)
+      range.setEnd(text, 3)
+      document.getSelection()!.removeAllRanges()
+      document.getSelection()!.addRange(range)
+      range.setEnd(text, 6)
+    }, verseId)
+
+    await expect(verse(page, verseId).locator('span[style*="background"]')).toHaveText('Авраам')
+  })
+
   test('shows notes on the Notes page and opens their verses', async ({ page }) => {
     await page
       .locator('.line-actions')

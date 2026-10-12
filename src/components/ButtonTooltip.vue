@@ -17,6 +17,7 @@
         :icon="icon"
         :size="size || (large ? 'large' : small ? 'small' : 'default')"
         :color="color"
+        class="mx-1 mx-md-2 mx-lg-3"
         variant="text"
         :disabled="disabled"
         @click.stop="emit('click')"
