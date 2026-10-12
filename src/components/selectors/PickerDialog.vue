@@ -11,7 +11,10 @@
   />
 
   <AppDialog v-model="open" :title="title" :icon="icon" max-width="480">
-    <slot />
+    <!-- room for the dropdown of the picker, so it does not cover the buttons -->
+    <div class="picker-body">
+      <slot />
+    </div>
 
     <template #actions>
       <DialogButtons
@@ -64,3 +67,9 @@ function ok() {
   open.value = false
 }
 </script>
+
+<style scoped>
+.picker-body {
+  min-height: 140px;
+}
+</style>

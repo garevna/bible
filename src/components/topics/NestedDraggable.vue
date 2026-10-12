@@ -101,7 +101,7 @@
                 color="secondary"
                 class="verses-badge"
               >
-                <v-icon icon="$noteVerses" size="28" />
+                <v-icon icon="$verse" size="28" />
               </v-badge>
               <v-icon
                 :icon="expanded.has(element._id) ? 'mdi-chevron-up' : 'mdi-chevron-down'"

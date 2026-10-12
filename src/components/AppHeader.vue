@@ -40,7 +40,7 @@
         </template>
       </v-tooltip>
 
-      <v-tooltip :text="header.signUp">
+      <!-- <v-tooltip :text="header.signUp">
         <template #activator="{ props }">
           <v-btn
             v-bind="props"
@@ -50,7 +50,7 @@
             @click="signUp = true"
           />
         </template>
-      </v-tooltip>
+      </v-tooltip> -->
     </template>
 
     <v-menu>
@@ -60,11 +60,11 @@
             <v-btn
               v-bind="{ ...menu, ...tooltip }"
               icon
-              size="small"
+              size="default"
               class="ml-2"
               :aria-label="common.langMenuTooltip"
             >
-              <img :src="langIcon" alt="" width="28" />
+              <img :src="langIcon" alt="lang" width="28" height="24" style="border-radius: 50%" />
             </v-btn>
           </template>
         </v-tooltip>
@@ -87,12 +87,21 @@
 
     <v-menu>
       <template #activator="{ props }">
-        <v-btn
+        <!-- <ButtonTooltip
+          v-bind="props"
+          icon="$bibleVersion"
+          size="medium"
+          class="text-white ml-3 mr-5"
+          :aria-label="header.translationMenu"
+          :text="header.translationMenu"
+        /> -->
+        <v-icon
           v-bind="props"
           icon="mdi-book-cross"
-          size="small"
-          class="mr-2"
+          size="large"
+          class="mr-5 ml-3 text-white"
           :aria-label="header.translationMenu"
+          :tooltip="header.translationMenu"
         />
       </template>
 
@@ -121,6 +130,7 @@ import { storeToRefs } from 'pinia'
 import langFallbackIcon from '@/assets/lang.svg'
 import logo from '@/assets/logo.png'
 import User from '@/components/user/User.vue'
+// import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import { langMenuItems, translationMenuItems } from '@/configs'
 import { useAppStore } from '@/stores/app'
 import { useContentStore } from '@/stores/content'
@@ -128,7 +138,7 @@ import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 
 const signIn = defineModel<boolean>('signIn', { default: false })
-const signUp = defineModel<boolean>('signUp', { default: false })
+// const signUp = defineModel<boolean>('signUp', { default: false })
 
 const app = useAppStore()
 const content = useContentStore()

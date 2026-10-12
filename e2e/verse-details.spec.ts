@@ -88,7 +88,7 @@ test.describe('signed in: verse details, notes and keywords', () => {
     await dialog(page).getByRole('button', { name: 'Додати', exact: true }).click()
 
     await page.locator('.v-bottom-navigation').getByRole('button', { name: 'Ключові слова' }).click()
-    await page.locator('.v-expansion-panel-title', { hasText: '#покоління' }).click()
+    await page.locator('.v-expansion-panel-title', { hasText: 'покоління' }).click()
     await expect(page.locator('.v-expansion-panel-text .link-to-verse')).toHaveText('(Від Матвія 1:2)')
   })
 })

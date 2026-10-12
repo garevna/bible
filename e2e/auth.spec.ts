@@ -5,8 +5,10 @@ import { dialog, expect, openBible, test, withStores } from './fixtures'
 test.describe('sign in and sign up dialog', () => {
   test.beforeEach(async ({ page }) => openBible(page))
 
-  test('header buttons open the matching tab', async ({ page }) => {
-    await page.getByRole('button', { name: 'Реєстрація' }).click()
+  test('the sign in button opens the dialog, registration is its tab', async ({ page }) => {
+    // registration is a tab of the sign in dialog
+    await page.getByRole('button', { name: 'Вхід' }).click()
+    await dialog(page).getByRole('tab', { name: 'Реєстрація' }).click()
     await expect(dialog(page).getByRole('tab', { name: 'Реєстрація' })).toHaveAttribute(
       'aria-selected',
       'true'
@@ -18,8 +20,11 @@ test.describe('sign in and sign up dialog', () => {
   })
 
   test('sign up validates the form and reports that the server is unreachable', async ({ page }) => {
-    await page.getByRole('button', { name: 'Реєстрація' }).click()
-    const form = dialog(page)
+    // registration is a tab of the sign in dialog
+    await page.getByRole('button', { name: 'Вхід' }).click()
+    await dialog(page).getByRole('tab', { name: 'Реєстрація' }).click()
+    // both tabs stay in the page, so the form is the active one
+    const form = dialog(page).locator('.v-window-item--active')
     const submit = form.getByRole('button', { name: 'Зареєструватися', exact: true })
 
     await form.getByPlaceholder('Email').fill('not-an-email')

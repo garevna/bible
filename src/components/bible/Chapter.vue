@@ -157,7 +157,7 @@ onBeforeUnmount(() => {
   border: solid 2px rgb(var(--v-theme-secondary));
   font-weight: bold;
   background: rgb(var(--v-theme-secondary) / 73%);
-  color: var(--app-on-secondary);
+  color: var(--app-secondary);
 }
 
 .line-text--emph {

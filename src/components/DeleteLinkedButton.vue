@@ -1,5 +1,12 @@
 <template>
-  <ButtonTooltip icon="$delete" color="delete" small class="delete-icon" :text="tooltip" @click="ask" />
+  <ButtonTooltip
+    icon="$delete-filled"
+    color="delete"
+    small
+    class="delete-icon"
+    :text="tooltip"
+    @click="ask"
+  />
 
   <AppDialog v-model="open" :title="format(common.deleteConfirm, { name })" icon="$delete" max-width="460">
     <v-alert v-if="count" type="warning" variant="tonal" density="compact">

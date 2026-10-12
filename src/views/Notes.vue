@@ -16,7 +16,7 @@
       <Note v-for="note of notes.notes" :key="note._id" :note="note" :show-controls="showControls" />
     </div>
 
-    <div class="notes-toolbar d-flex align-center elevation-4">
+    <div class="notes-toolbar d-flex ga-4 py-2 px-4 align-center elevation-4">
       <DatePickerDialog
         :from="notes.date"
         :to="notes.dateTo"

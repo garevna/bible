@@ -62,7 +62,7 @@ test.describe('creating keywords, topics and notes', () => {
     await page.getByRole('button', { name: 'Нове ключове слово' }).click()
     await dialog(page).locator('input').fill('блаженство')
     await dialog(page).getByRole('button', { name: 'Додати', exact: true }).click()
-    await expect(page.locator('.v-expansion-panel-title', { hasText: '#блаженство' })).toBeVisible()
+    await expect(page.locator('.v-expansion-panel-title', { hasText: 'блаженство' })).toBeVisible()
 
     // verses by reference: Matthew 5:3-4
     await page.getByRole('button', { name: 'Додати вірші' }).click()

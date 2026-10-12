@@ -35,7 +35,7 @@
         :key="keyword._id"
         :value="keyword._id"
         elevation="0"
-        class="keyword-panel"
+        class="keyword-panel mt-1"
       >
         <v-expansion-panel-title>
           <DeleteLinkedButton
@@ -45,8 +45,10 @@
             :tooltip="text.deleteKeyword"
             @confirm="remove(keyword)"
           />
-          <span class="ml-1">#{{ keyword._id }}</span>
-          <v-chip size="x-small" class="ml-2">{{ keyword.refs.length }}</v-chip>
+          <span class="ml-1">{{ keyword._id }}</span>
+          <v-chip size="x-small" class="ml-2">
+            {{ keyword.refs.length }}
+          </v-chip>
         </v-expansion-panel-title>
 
         <v-expansion-panel-text>
@@ -55,17 +57,17 @@
             <div
               v-for="verse in content.listOfVerses"
               :key="verse._id"
-              class="d-flex align-center keyword-verse"
+              class="d-flex align-start keyword-verse"
             >
-              <p class="flex-grow-1 my-0" v-html="verse.html" />
               <ButtonTooltip
                 icon="$remove"
                 color="delete"
                 small
-                class="delete-icon"
+                class="delete-icon mr-2 mt-1"
                 :text="text.removeFromListTooltip"
                 @click="keywords.removeKeywordFromVerse(keyword._id, verse._id).then(load)"
               />
+              <p class="flex-grow-1 my-0" v-html="verse.html" />
             </div>
             <AddVerses :label="notesText.addVerses" class="mt-2" @add="addVerses(keyword._id, $event)" />
           </template>
@@ -142,6 +144,13 @@ async function remove(keyword: Keyword) {
   margin-bottom: 4px;
   border-radius: var(--app-radius) !important;
 }
+/* .v-expansion-panel.keyword-panel::before {
+  content: '⛔';
+  position: absolute;
+  top: -16px;
+  right: -12px;
+  font-size: 20px;
+} */
 
 .keyword-verse + .keyword-verse {
   border-top: solid 1px var(--app-border-light);
