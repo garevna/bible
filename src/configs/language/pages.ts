@@ -1,4 +1,9 @@
 export const pages = {
+  admin: {
+    ua: 'Адміністрування',
+    ru: 'Администрирование',
+    en: 'Administration'
+  },
   bible: {
     ua: 'Біблія',
     ru: 'Библия',

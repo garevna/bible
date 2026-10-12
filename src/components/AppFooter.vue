@@ -22,7 +22,8 @@ const user = useUserStore()
 const { pages } = storeToRefs(useLanguageStore())
 
 /** 'topic' is opened from the topic list and has no item of its own */
-const menu = footerMenu.filter((item) => item.value === item.menu)
+// pages without an icon (a topic, the dashboard) are opened from other places
+const menu = footerMenu.filter((item) => item.icon && item.value === item.menu)
 
 const activeMenu = computed(() => footerMenu.find((item) => item.value === app.page)?.menu ?? 'bible')
 

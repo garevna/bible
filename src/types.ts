@@ -78,7 +78,7 @@ export interface User extends Profile {
   email?: string | null
 }
 
-export type Page = 'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search'
+export type Page = 'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search' | 'admin'
 
 export interface MenuItem {
   value: string

@@ -1,3 +1,4 @@
+import { admin } from './admin'
 import { common } from './common'
 import { header } from './header'
 import { keywords } from './keywords'
@@ -13,6 +14,7 @@ import { signUp } from './signUp'
 import { topics } from './topics'
 
 export const languages = {
+  admin,
   common,
   header,
   keywords,

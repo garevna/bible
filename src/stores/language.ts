@@ -24,6 +24,7 @@ export const useLanguageStore = defineStore('language', () => {
     computed(() => translate(languages[name] as Languages[K], lang.value))
 
   return {
+    admin: section('admin'),
     common: section('common'),
     header: section('header'),
     keywords: section('keywords'),

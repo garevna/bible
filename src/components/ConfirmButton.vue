@@ -6,6 +6,7 @@
           <v-btn
             v-bind="{ ...menu, ...tooltip }"
             :icon="icon"
+            :aria-label="text || undefined"
             size="small"
             variant="text"
             color="delete"

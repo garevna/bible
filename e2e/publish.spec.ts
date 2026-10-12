@@ -32,7 +32,7 @@ async function openTopic(page: Page) {
   // the Firebase user gives the token for the worker; the store asks the worker again
   await withStores(page, async (stores) => {
     stores.firebase.authUser = { getIdToken: async () => 'test-token' }
-    await stores.publish.loadRole()
+    await stores.worker.loadRole()
   })
 }
 

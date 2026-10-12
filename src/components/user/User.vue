@@ -9,6 +9,19 @@
       </template>
     </v-tooltip>
 
+    <!-- administrators: the dashboard of the roles -->
+    <v-tooltip v-if="worker.isAdmin" :text="admin.openDashboard">
+      <template #activator="{ props }">
+        <v-btn
+          v-bind="props"
+          icon="mdi-shield-account-outline"
+          size="small"
+          :aria-label="admin.openDashboard"
+          @click="app.setPage('admin')"
+        />
+      </template>
+    </v-tooltip>
+
     <v-tooltip :text="header.signOut">
       <template #activator="{ props }">
         <v-btn
@@ -27,11 +40,15 @@
 import { ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
+import { useWorkerStore } from '@/stores/worker'
 
+const app = useAppStore()
 const user = useUserStore()
-const { header } = storeToRefs(useLanguageStore())
+const worker = useWorkerStore()
+const { admin, header } = storeToRefs(useLanguageStore())
 
 /** the photo could not be loaded: show the initials instead */
 const broken = ref(false)

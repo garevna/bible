@@ -1,12 +1,25 @@
-import { roleOf, verifyIdToken, type AuthUser } from './auth'
+import { verifyIdToken, type AuthUser } from './auth'
 import { parsePost } from './post'
 import { formatTopic, sendMessages, TelegramError } from './telegram'
+import {
+  isRole,
+  listUsers,
+  removeUser,
+  RoleChangeError,
+  roleOf,
+  setRole,
+  touchUser,
+  type UsersStore
+} from './users'
 
 /**
  * Worker of the Bible app.
- *   GET  /me                 the role of the signed in user
- *   POST /telegram/preview   the messages a topic becomes (nothing is sent)
- *   POST /telegram/publish   sends the topic to the Telegram channel (publishers only)
+ *   GET    /me                 the role of the signed in user (and remembers the user)
+ *   POST   /telegram/preview   the messages a topic becomes (nothing is sent)
+ *   POST   /telegram/publish   sends the topic to the Telegram channel
+ *   GET    /admin/users        users who signed in, with their roles
+ *   PUT    /admin/users/:uid   gives a role: { role: 'reader' | 'publisher' | 'admin' }
+ *   DELETE /admin/users/:uid   takes a user off the list
  * Every request carries the Firebase ID token: Authorization: Bearer <token>.
  */
 export interface Env {
@@ -15,10 +28,11 @@ export interface Env {
   /** the channel (@name or -100… id); the bot is its administrator */
   TELEGRAM_CHAT_ID: string
   FIREBASE_PROJECT_ID: string
-  /** user ids and verified emails of the publishers, separated by commas */
-  PUBLISHERS: string
+  /** user ids and verified emails of the owners: administrators the dashboard cannot change */
+  OWNERS: string
   /** origins of the app, separated by commas */
   ALLOWED_ORIGINS: string
+  USERS: UsersStore
 }
 
 export interface Deps {
@@ -34,12 +48,19 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
   if (!allowed.includes(origin)) return {}
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'access-control-allow-headers': 'authorization, content-type',
     'access-control-max-age': '86400',
     vary: 'origin'
   }
 }
+
+const ROUTES = [
+  /^GET \/me$/,
+  /^POST \/telegram\/(preview|publish)$/,
+  /^GET \/admin\/users$/,
+  /^(PUT|DELETE) \/admin\/users\/[^/]+$/
+]
 
 export async function handle(request: Request, env: Env, deps: Deps = defaultDeps): Promise<Response> {
   const cors = corsHeaders(request, env)
@@ -50,37 +71,55 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
 
   const { pathname } = new URL(request.url)
   const route = `${request.method} ${pathname}`
-  if (!['GET /me', 'POST /telegram/preview', 'POST /telegram/publish'].includes(route)) {
-    return json({ error: 'not-found' }, 404)
-  }
+  if (!ROUTES.some((pattern) => pattern.test(route))) return json({ error: 'not-found' }, 404)
 
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1]
   if (!token) return json({ error: 'unauthorized' }, 401)
-  let user: AuthUser
+  let authUser: AuthUser
   try {
-    user = await deps.verify(token, env.FIREBASE_PROJECT_ID)
+    authUser = await deps.verify(token, env.FIREBASE_PROJECT_ID)
   } catch {
     return json({ error: 'unauthorized' }, 401)
   }
-  const role = roleOf(user, env.PUBLISHERS)
 
-  if (route === 'GET /me')
-    return json({ role, telegram: Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID) })
+  const me = await touchUser(env.USERS, authUser)
+  const role = roleOf(me, env.OWNERS)
+  const telegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
 
-  if (role !== 'publisher') return json({ error: 'forbidden' }, 403)
+  if (route === 'GET /me') return json({ role, telegram })
 
-  const post = parsePost(await request.json().catch(() => null))
-  if (!post) return json({ error: 'bad-request' }, 400)
-  const messages = formatTopic(post)
+  if (pathname.startsWith('/telegram/')) {
+    if (role === 'reader') return json({ error: 'forbidden' }, 403)
+    const post = parsePost(await request.json().catch(() => null))
+    if (!post) return json({ error: 'bad-request' }, 400)
+    const messages = formatTopic(post)
+    if (route === 'POST /telegram/preview') return json({ messages })
+    try {
+      return json({
+        sent: await sendMessages(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, messages, deps.fetcher)
+      })
+    } catch (error) {
+      const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
+      return json({ error: 'telegram', message }, 502)
+    }
+  }
 
-  if (route === 'POST /telegram/preview') return json({ messages })
+  // the dashboard
+  if (role !== 'admin') return json({ error: 'forbidden' }, 403)
+  if (route === 'GET /admin/users') return json({ users: await listUsers(env.USERS, env.OWNERS) })
 
+  const uid = decodeURIComponent(pathname.slice('/admin/users/'.length))
   try {
-    const sent = await sendMessages(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, messages, deps.fetcher)
-    return json({ sent })
+    if (request.method === 'DELETE') {
+      await removeUser(env.USERS, env.OWNERS, me, uid)
+      return json({ removed: uid })
+    }
+    const { role: newRole } = ((await request.json().catch(() => ({}))) ?? {}) as { role?: unknown }
+    if (!isRole(newRole)) return json({ error: 'bad-request' }, 400)
+    return json({ user: await setRole(env.USERS, env.OWNERS, me, uid, newRole) })
   } catch (error) {
-    const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
-    return json({ error: 'telegram', message }, 502)
+    if (!(error instanceof RoleChangeError)) throw error
+    return json({ error: error.code }, error.code === 'not-found' ? 404 : 409)
   }
 }
 

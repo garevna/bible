@@ -8,5 +8,11 @@ FIREBASE_PROJECT_ID = "bible-ukr"
 ALLOWED_ORIGINS = "https://garevna.github.io,http://localhost:5173,http://localhost:4179"
 # set in the Cloudflare dashboard (Workers > bible-worker > Settings > Variables) or in .dev.vars:
 #   TELEGRAM_CHAT_ID  the channel: @name or the -100… id
-#   PUBLISHERS        user ids and verified emails of the publishers, separated by commas
+#   OWNERS            user ids and verified emails of the owners (admins that the dashboard cannot change), separated by commas
 # secret: npx wrangler secret put TELEGRAM_BOT_TOKEN
+
+# users who signed in, with their roles (see src/users.ts)
+[[kv_namespaces]]
+binding = "USERS"
+id = "2c3fc90d1bc749bb9b3de8c26513ea17"
+preview_id = "8bb220c5ec034f05ae28521991f64527"

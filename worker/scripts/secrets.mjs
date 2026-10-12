@@ -1,13 +1,13 @@
 /**
  * Uploads the filled settings of worker/.dev.vars to the Cloudflare secrets of the worker:
- * TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, PUBLISHERS. The values are never printed.
+ * TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, OWNERS. The values are never printed.
  *   pnpm worker:secrets
  */
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const names = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'PUBLISHERS']
+const names = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'OWNERS']
 const workerDir = fileURLToPath(new URL('..', import.meta.url))
 const vars = readFileSync(new URL('../.dev.vars', import.meta.url), 'utf8')
 

@@ -8,7 +8,11 @@ let remoteKeys: JWTVerifyGetKey | undefined
 
 export interface AuthUser {
   uid: string
+  /** the email of the account, shown in the dashboard */
   email: string | null
+  /** the app does not verify emails: only a verified one (e.g. Google sign in) says who the user is */
+  emailVerified: boolean
+  name: string | null
 }
 
 /**
@@ -27,25 +31,25 @@ export async function verifyIdToken(
     algorithms: ['RS256']
   })
   if (!payload.sub) throw new Error('No user in the token')
-  // the app does not verify emails, so only a verified one (e.g. Google sign in) says who the user is
-  const email = typeof payload.email === 'string' && payload.email_verified === true ? payload.email : null
-  return { uid: payload.sub, email }
+  return {
+    uid: payload.sub,
+    email: typeof payload.email === 'string' ? payload.email : null,
+    emailVerified: payload.email_verified === true,
+    name: typeof payload.name === 'string' ? payload.name : null
+  }
 }
 
-export type Role = 'publisher' | 'reader'
-
 /**
- * For the demo the publishers are listed in the worker settings (PUBLISHERS): Firebase user ids
- * (Firebase console > Authentication) and verified emails, separated by commas.
+ * The owners are listed in the worker settings (OWNERS): Firebase user ids and verified emails,
+ * separated by commas. They are administrators that the dashboard cannot change.
  */
-export function roleOf(user: AuthUser, publishers: string): Role {
-  const list = publishers
+export function isOwner(user: Pick<AuthUser, 'uid' | 'email' | 'emailVerified'>, owners: string): boolean {
+  const list = owners
     .split(',')
     .map((entry) => entry.trim())
     .filter(Boolean)
-  const email = user.email?.toLowerCase()
   // user ids are case sensitive, emails are not
-  const known =
-    list.includes(user.uid) || (email !== undefined && list.some((entry) => entry.toLowerCase() === email))
-  return known ? 'publisher' : 'reader'
+  if (list.includes(user.uid)) return true
+  const email = user.emailVerified ? user.email?.toLowerCase() : undefined
+  return email !== undefined && list.some((entry) => entry.toLowerCase() === email)
 }

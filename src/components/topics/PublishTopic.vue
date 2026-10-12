@@ -39,13 +39,13 @@ import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
-import { PublishError, usePublishStore } from '@/stores/publish'
+import { useWorkerStore, WorkerError } from '@/stores/worker'
 import { useTopicsStore } from '@/stores/topics'
 import { format } from '@/utils/format'
 import { topicPost } from '@/utils/topicPost'
 
 /** The current topic as it is on the page, previewed and then posted to the Telegram channel */
-const publish = usePublishStore()
+const worker = useWorkerStore()
 const topics = useTopicsStore()
 const { common, publish: text } = storeToRefs(useLanguageStore())
 
@@ -63,7 +63,7 @@ const previews = computed(() =>
 const post = computed(() => topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData))
 
 const reason = (cause: unknown) =>
-  cause instanceof PublishError && cause.message !== 'unreachable' ? cause.message : text.value.unreachable
+  cause instanceof WorkerError && cause.message !== 'unreachable' ? cause.message : text.value.unreachable
 
 async function run(action: () => Promise<void>) {
   busy.value = true
@@ -86,13 +86,13 @@ function openDialog() {
     return
   }
   run(async () => {
-    messages.value = await publish.preview(post.value)
+    messages.value = await worker.preview(post.value)
   })
 }
 
 const publishPost = () =>
   run(async () => {
-    sent.value = await publish.publishToTelegram(post.value)
+    sent.value = await worker.publishToTelegram(post.value)
   })
 </script>
 
