@@ -98,7 +98,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     if (route === 'POST /telegram/preview') return json({ messages, caption })
     try {
       const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId } = env
-      if (post.image && caption) await sendPhoto(token, chatId, post.image, caption, deps.fetcher)
+      if (post.image && caption !== null) await sendPhoto(token, chatId, post.image, caption, deps.fetcher)
       const sent = await sendMessages(token, chatId, messages, deps.fetcher)
       return json({ sent: sent + (post.image ? 1 : 0) })
     } catch (error) {

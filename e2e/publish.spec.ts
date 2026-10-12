@@ -121,3 +121,42 @@ test('a picture is added to the head of the topic, kept, and published as a phot
   await page.getByRole('button', { name: 'Прибрати картинку' }).click()
   await expect(page.getByRole('button', { name: 'Додати картинку' })).toBeVisible()
 })
+
+test('a note is published from the Notes page: its text and verses, no title', async ({ page }) => {
+  const posts = await fakeWorker(page, 'publisher')
+  await openBible(page)
+  await signInLocally(page)
+  await withStores(page, async (stores) => {
+    await stores.notes.startNewNote({ lineRef: '1.000.000.000' })
+    stores.notes.updateCurrentNoteText('Родовід Ісуса')
+    await stores.notes.saveCurrentNote()
+    stores.firebase.authUser = { getIdToken: async () => 'test-token' }
+    await stores.app.setPage('notes')
+    await stores.worker.loadRole()
+  })
+
+  const note = page.locator('.notes-list .note', { hasText: 'Родовід Ісуса' })
+  await note.getByRole('button', { name: 'Опублікувати в Telegram' }).click()
+  const publish = dialog(page)
+  await expect(publish.locator('.telegram-message')).toBeVisible()
+  await publish.getByRole('button', { name: 'Опублікувати', exact: true }).click()
+  await expect(publish).toContainText('Опубліковано в каналі (1)')
+
+  expect(posts).toEqual([
+    {
+      title: '',
+      items: [
+        {
+          kind: 'note',
+          text: 'Родовід Ісуса',
+          verses: [
+            {
+              text: 'Книга родоводу Ісуса Христа, Сина Давидового, Сина Авраамового:',
+              ref: 'Огієнко, Від Матвія 1:1'
+            }
+          ]
+        }
+      ]
+    }
+  ])
+})

@@ -9,14 +9,14 @@ const verseBlock = ({ text, ref }: VersePost) =>
   `<blockquote>${escape(text.trim())}\n<i>${escape(ref)}</i></blockquote>`
 
 /** The title as Telegram shows it; with a picture it is the caption of the photo */
-export const titleBlock = (post: TopicPost) => `<b>${escape(post.title)}</b>`
+export const titleBlock = (post: TopicPost) => (post.title ? `<b>${escape(post.title)}</b>` : '')
 
 /**
  * One block per title, note and verse; the message HTML of Telegram (parse_mode HTML).
  * A topic with a picture has its title under the photo, so the messages go without it.
  */
 export function topicBlocks(post: TopicPost): string[] {
-  const blocks = post.image ? [] : [titleBlock(post)]
+  const blocks = post.image || !post.title ? [] : [titleBlock(post)]
   for (const item of post.items) {
     if (item.kind === 'verse') blocks.push(verseBlock(item))
     else {

@@ -10,6 +10,7 @@ export type TopicPostItem =
   ({ kind: 'verse' } & VersePost) | { kind: 'note'; text: string; verses: VersePost[] }
 
 export interface TopicPost {
+  /** may be empty: a note has no title */
   title: string
   items: TopicPostItem[]
   /** the picture of the topic: a JPEG, PNG or WebP data URL */
@@ -49,7 +50,8 @@ function isItem(value: unknown): value is TopicPostItem {
 /** The request body, or null when it is not a topic post */
 export function parsePost(body: unknown): TopicPost | null {
   const post = body as TopicPost
-  if (!post || !isText(post.title, 500) || !post.title.trim()) return null
+  if (!post || !isText(post.title, 500)) return null
+  if (!post.title.trim() && !post.items?.length) return null
   if (!Array.isArray(post.items) || post.items.length > MAX_ITEMS || !post.items.every(isItem)) return null
   if (post.image !== undefined && !isImage(post.image)) return null
   return { title: post.title.trim(), items: post.items, ...(post.image ? { image: post.image } : {}) }

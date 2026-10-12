@@ -1,5 +1,12 @@
 <template>
-  <ButtonTooltip icon="$publish" :text="text.toTelegram" color="secondary" large @click="openDialog" />
+  <ButtonTooltip
+    icon="$publish"
+    :text="text.toTelegram"
+    color="secondary"
+    :large="!small"
+    :small="small"
+    @click="openDialog"
+  />
 
   <AppDialog v-model="open" :title="text.toTelegram" icon="$publish" max-width="640">
     <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-4" />
@@ -14,7 +21,7 @@
       <p v-if="messages.length > 1" class="hint">{{ format(text.messages, { count: messages.length }) }}</p>
       <!-- Telegram HTML: the worker escapes the texts, the tags are b, i and blockquote -->
       <!-- a picture goes first, as a photo with the title -->
-      <div v-if="post.image" class="telegram-message telegram-photo">
+      <div v-if="post?.image" class="telegram-message telegram-photo">
         <img :src="post.image" alt="" />
         <div v-if="caption" class="telegram-caption" v-html="caption" />
       </div>
@@ -37,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
@@ -45,13 +52,16 @@ import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useWorkerStore, WorkerError } from '@/stores/worker'
-import { useTopicsStore } from '@/stores/topics'
 import { format } from '@/utils/format'
-import { topicPost } from '@/utils/topicPost'
+import type { TopicPost } from '@/utils/topicPost'
 
-/** The current topic as it is on the page, previewed and then posted to the Telegram channel */
+/**
+ * A post of the Telegram channel (a topic, a note), previewed and then posted.
+ * build: makes the post when the dialog opens, from what is on the page right now.
+ */
+const props = defineProps<{ build: () => TopicPost | Promise<TopicPost>; small?: boolean }>()
+
 const worker = useWorkerStore()
-const topics = useTopicsStore()
 const { common, publish: text } = storeToRefs(useLanguageStore())
 
 const open = ref(false)
@@ -66,9 +76,7 @@ const previews = computed(() =>
   messages.value.map((message) => message.replace(/\n*(<\/?blockquote>)\n*/g, '$1'))
 )
 
-const post = computed(() =>
-  topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData, topics.currentTopic?.image)
-)
+const post = shallowRef<TopicPost | null>(null)
 
 const reason = (cause: unknown) =>
   cause instanceof WorkerError && cause.message !== 'unreachable' ? cause.message : text.value.unreachable
@@ -89,18 +97,21 @@ function openDialog() {
   open.value = true
   messages.value = []
   sent.value = 0
-  if (!post.value.items.length) {
-    error.value = text.value.emptyTopic
-    return
-  }
+  post.value = null
   run(async () => {
-    ;({ messages: messages.value, caption: caption.value } = await worker.preview(post.value))
+    const built = await props.build()
+    if (!built.items.length) {
+      error.value = text.value.emptyTopic
+      return
+    }
+    post.value = built
+    ;({ messages: messages.value, caption: caption.value } = await worker.preview(built))
   })
 }
 
 const publishPost = () =>
   run(async () => {
-    sent.value = await worker.publishToTelegram(post.value)
+    if (post.value) sent.value = await worker.publishToTelegram(post.value)
   })
 </script>
 

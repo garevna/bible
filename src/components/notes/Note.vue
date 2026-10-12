@@ -5,6 +5,7 @@
       <v-chip size="small" variant="tonal">{{ date }}</v-chip>
       <v-spacer />
       <template v-if="showControls">
+        <PublishPost v-if="worker.canPublish" :build="noteAsPost" small />
         <DialogToUpdateNote :note="note" small @saved="emit('changed')" />
         <ConfirmButton icon="$deleteNote" :text="notes.deleteNote" @confirm="remove" />
       </template>
@@ -42,19 +43,26 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import PublishPost from '@/components/PublishPost.vue'
 import DialogToUpdateNote from '@/components/notes/DialogToUpdateNote.vue'
-import { noteDate } from '@/db'
+import { getVersesByRefs, noteDate } from '@/db'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
+import { useWorkerStore } from '@/stores/worker'
 import type { Note } from '@/types'
+import { notePost } from '@/utils/topicPost'
 import { versesWithLinks } from '@/utils/verse'
 
 const props = withDefaults(defineProps<{ note: Note; showControls?: boolean }>(), { showControls: true })
 
 const notesStore = useNotesStore()
+const worker = useWorkerStore()
 const { notes } = storeToRefs(useLanguageStore())
 
 const date = computed(() => noteDate(props.note))
+
+/** the note for the Telegram channel: its text and verses */
+const noteAsPost = async () => notePost(props.note.text, await getVersesByRefs(props.note.refs))
 
 const expanded = ref(false)
 const verses = ref<Awaited<ReturnType<typeof versesWithLinks>>>([])

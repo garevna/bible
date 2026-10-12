@@ -31,3 +31,9 @@ export const topicPost = (title: string, items: TopicItem[], image?: string): To
       : { kind: 'verse', ...versePost(item) }
   )
 })
+
+/** A note for the Telegram channel: its text and its verses, without a title */
+export const notePost = (text: string, verses: VerseRef[]): TopicPost => ({
+  title: '',
+  items: [{ kind: 'note', text, verses: verses.map(versePost) }]
+})

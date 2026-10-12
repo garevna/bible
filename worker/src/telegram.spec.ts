@@ -40,6 +40,14 @@ describe('formatting for Telegram', () => {
     expect(formatTopic(post)).toHaveLength(1)
   })
 
+  it('a note has no title: its text and verses only', () => {
+    const note = { title: '', items: [post.items[0]!] }
+    expect(parsePost(note)).not.toBeNull()
+    expect(formatTopic(note)).toEqual([
+      'Хвала &amp; подяка\n\n<blockquote>Великий Господь\n<i>Псалми 47:2</i></blockquote>'
+    ])
+  })
+
   it('splits between blocks when a message would be too long', () => {
     const messages = toMessages(['a'.repeat(30), 'b'.repeat(30), 'c'.repeat(30)], 70)
     expect(messages).toEqual(['a'.repeat(30) + '\n\n' + 'b'.repeat(30), 'c'.repeat(30)])

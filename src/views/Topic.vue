@@ -4,7 +4,7 @@
       <v-btn icon="$return" variant="text" color="primary" @click="topics.returnToTopicList()" />
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
       <!-- editing mode, publishers only: the topic as a post of the Telegram channel -->
-      <PublishTopic v-if="showControls && topics.currentTopic && worker.canPublish" />
+      <PublishPost v-if="showControls && topics.currentTopic && worker.canPublish" :build="topicAsPost" />
       <ControlsView v-model="showControls" storage-key="topicMode" />
 
       <!-- editing mode, phones: the ways to add in a dropdown menu on the right -->
@@ -116,10 +116,10 @@ import { storeToRefs } from 'pinia'
 import { useDisplay } from 'vuetify'
 
 import ControlsView from '@/components/ControlsView.vue'
+import PublishPost from '@/components/PublishPost.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
 import AddVerses from '@/components/selectors/AddVerses.vue'
 import AddExistingNotes from '@/components/topics/AddExistingNotes.vue'
-import PublishTopic from '@/components/topics/PublishTopic.vue'
 import TopicImage from '@/components/topics/TopicImage.vue'
 import NestedDraggable from '@/components/topics/NestedDraggable.vue'
 import { useContentStore } from '@/stores/content'
@@ -129,12 +129,17 @@ import { useWorkerStore } from '@/stores/worker'
 import { useTopicsStore, type TopicItem, type TopicNoteItem } from '@/stores/topics'
 import type { Note } from '@/types'
 import { removeById } from '@/utils/array'
+import { topicPost } from '@/utils/topicPost'
 import { versesWithLinks } from '@/utils/verse'
 
 const topics = useTopicsStore()
 const content = useContentStore()
 const notes = useNotesStore()
 const worker = useWorkerStore()
+
+/** the topic as it is on the page now, for the Telegram channel */
+const topicAsPost = () =>
+  topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData, topics.currentTopic?.image)
 const { common, nestedDraggable } = storeToRefs(useLanguageStore())
 
 const showControls = ref(true)
