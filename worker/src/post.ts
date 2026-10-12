@@ -4,6 +4,8 @@ export interface VersePost {
   text: string
   /** e.g. "Від Матвія 1:1" */
   ref: string
+  /** the ref of the verse in the app (e.g. 'synodal:1.003.002.015'): a sent note can be saved with its verses */
+  id?: string
 }
 
 export type TopicPostItem =
@@ -31,7 +33,12 @@ const isText = (value: unknown, max = MAX_TEXT): value is string =>
 
 const isVerse = (value: unknown): value is VersePost => {
   const verse = value as VersePost
-  return Boolean(verse) && isText(verse.text) && isText(verse.ref, 200)
+  return (
+    Boolean(verse) &&
+    isText(verse.text) &&
+    isText(verse.ref, 200) &&
+    (verse.id === undefined || isText(verse.id, 60))
+  )
 }
 
 function isItem(value: unknown): value is TopicPostItem {

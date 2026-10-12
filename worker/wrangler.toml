@@ -16,3 +16,14 @@ ALLOWED_ORIGINS = "https://garevna.github.io,http://localhost:5173,http://localh
 binding = "USERS"
 id = "2c3fc90d1bc749bb9b3de8c26513ea17"
 preview_id = "8bb220c5ec034f05ae28521991f64527"
+
+# messages between ministers, kept for a day (see src/messages.ts)
+[[d1_databases]]
+binding = "DB"
+database_name = "bible-messages"
+database_id = "ec8db852-55f0-4d6c-a4ae-4bcfe7a674a7"
+migrations_dir = "migrations"
+
+# once a day the expired messages are deleted
+[triggers]
+crons = ["0 3 * * *"]

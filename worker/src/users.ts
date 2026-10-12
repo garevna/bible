@@ -13,6 +13,8 @@ export interface UserRecord {
   emailVerified: boolean
   name: string | null
   role: Role
+  /** the ministries the user serves in (e.g. 'Музичне служіння'), given by an administrator */
+  ministries?: string[]
   /** ms */
   lastSeen: number
   /** who gave the role and when */
@@ -105,22 +107,47 @@ export async function removeUser(store: UsersStore, owners: string, admin: UserR
   await store.delete(key(uid))
 }
 
-/** Gives a role; owners and the administrator's own role cannot be changed (nobody locks themselves out) */
-export async function setRole(
+/**
+ * Gives a role and/or ministries. Owners are not changed; an administrator may put themselves
+ * into ministries, but not change their own role (nobody locks themselves out).
+ */
+export async function updateUser(
   store: UsersStore,
   owners: string,
   admin: UserRecord,
   uid: string,
-  role: Role,
+  change: { role?: Role; ministries?: string[] },
   now = Date.now()
 ): Promise<UserView> {
-  const record = await changeable(store, owners, admin, uid)
+  const record =
+    uid === admin.uid && change.role === undefined ? admin : await changeable(store, owners, admin, uid)
   const updated: UserRecord = {
     ...record,
-    role,
+    ...(change.role ? { role: change.role } : {}),
+    ...(change.ministries ? { ministries: change.ministries } : {}),
     updatedBy: admin.name ?? admin.email ?? admin.uid,
     updatedAt: now
   }
   await save(store, updated)
   return view(updated, owners)
 }
+
+/* ---------- ministries ---------- */
+
+const MINISTRIES_KEY = 'settings:ministries'
+export const DEFAULT_MINISTRIES = ['Лідер домашньої групи', 'Музичне служіння']
+
+/** The ministries of the church (the administrators keep the list) */
+export const getMinistries = async (store: UsersStore) =>
+  (await store.get<string[]>(MINISTRIES_KEY, 'json')) ?? DEFAULT_MINISTRIES
+
+/** A list of short distinct names, or null when it is not one */
+export function parseMinistries(value: unknown): string[] | null {
+  if (!Array.isArray(value) || value.length > 30) return null
+  const names = value.map((item) => (typeof item === 'string' ? item.trim() : ''))
+  if (names.some((name) => !name || name.length > 60)) return null
+  return [...new Set(names)]
+}
+
+export const setMinistries = (store: UsersStore, ministries: string[]) =>
+  store.put(MINISTRIES_KEY, JSON.stringify(ministries))

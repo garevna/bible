@@ -1,25 +1,37 @@
 import { verifyIdToken, type AuthUser } from './auth'
+import { d1Store, HOURLY_LIMIT, MESSAGE_LIFE, parseDraft, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
 import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import {
+  getMinistries,
   isRole,
   listUsers,
+  parseMinistries,
   removeUser,
   RoleChangeError,
   roleOf,
-  setRole,
+  setMinistries,
   touchUser,
+  updateUser,
+  type Role,
+  type UserRecord,
   type UsersStore
 } from './users'
 
 /**
  * Worker of the Bible app.
- *   GET    /me                 the role of the signed in user (and remembers the user)
- *   POST   /telegram/preview   the messages a topic becomes, and the caption of its picture (nothing is sent)
- *   POST   /telegram/publish   sends the topic to the Telegram channel
- *   GET    /admin/users        users who signed in, with their roles
- *   PUT    /admin/users/:uid   gives a role: { role: 'reader' | 'publisher' | 'admin' }
- *   DELETE /admin/users/:uid   takes a user off the list
+ *   GET    /me                   the role of the signed in user (and remembers the user)
+ *   POST   /telegram/preview     the messages a post becomes, and the caption of its picture (nothing is sent)
+ *   POST   /telegram/publish     sends the post to the Telegram channel
+ *   GET    /admin/users          users who signed in, with their roles and ministries
+ *   PUT    /admin/users/:uid     { role?: 'reader' | 'publisher' | 'admin', ministries?: string[] }
+ *   DELETE /admin/users/:uid     takes a user off the list
+ *   GET    /ministries           the ministries of the church
+ *   PUT    /admin/ministries     { ministries: string[] }
+ *   GET    /messages             the messages of the last day, to and from the user
+ *   GET    /messages/recipients  whom the user may write to
+ *   POST   /messages             { to?, ministries?, text, attachment?, replyTo? }
+ *   POST   /messages/:id/read    marks a message read
  * Every request carries the Firebase ID token: Authorization: Bearer <token>.
  */
 export interface Env {
@@ -33,11 +45,15 @@ export interface Env {
   /** origins of the app, separated by commas */
   ALLOWED_ORIGINS: string
   USERS: UsersStore
+  DB: D1Database
 }
 
 export interface Deps {
   verify: (token: string, projectId: string) => Promise<AuthUser>
   fetcher: typeof fetch
+  /** the messages; D1 when not given */
+  messages?: MessagesStore
+  now?: () => number
 }
 
 const defaultDeps: Deps = { verify: (token, projectId) => verifyIdToken(token, projectId), fetcher: fetch }
@@ -59,8 +75,20 @@ const ROUTES = [
   /^GET \/me$/,
   /^POST \/telegram\/(preview|publish)$/,
   /^GET \/admin\/users$/,
-  /^(PUT|DELETE) \/admin\/users\/[^/]+$/
+  /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
+  /^GET \/ministries$/,
+  /^PUT \/admin\/ministries$/,
+  /^GET \/messages(\/recipients)?$/,
+  /^POST \/messages$/,
+  /^POST \/messages\/[^/]+\/read$/
 ]
+
+/** publishers and administrators write to people and ministries */
+const canSend = (role: Role) => role !== 'reader'
+/** they and the members of ministries get messages */
+const canReceive = (record: UserRecord, role: Role) => role !== 'reader' || Boolean(record.ministries?.length)
+
+const nameOf = (record: UserRecord) => record.name ?? record.email ?? record.uid
 
 export async function handle(request: Request, env: Env, deps: Deps = defaultDeps): Promise<Response> {
   const cors = corsHeaders(request, env)
@@ -85,12 +113,21 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   const me = await touchUser(env.USERS, authUser)
   const role = roleOf(me, env.OWNERS)
   const telegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
+  const body = async () => (await request.json().catch(() => null)) as unknown
 
-  if (route === 'GET /me') return json({ role, telegram })
+  if (route === 'GET /me') {
+    return json({
+      role,
+      telegram,
+      ministries: me.ministries ?? [],
+      canSend: canSend(role),
+      canReceive: canReceive(me, role)
+    })
+  }
 
   if (pathname.startsWith('/telegram/')) {
     if (role === 'reader') return json({ error: 'forbidden' }, 403)
-    const post = parsePost(await request.json().catch(() => null))
+    const post = parsePost(await body())
     if (!post) return json({ error: 'bad-request' }, 400)
     const messages = formatTopic(post)
     // with a picture the title is its caption
@@ -107,9 +144,23 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     }
   }
 
+  if (pathname.startsWith('/messages') || route === 'GET /ministries') {
+    if (!canReceive(me, role)) return json({ error: 'forbidden' }, 403)
+    if (route === 'GET /ministries') return json({ ministries: await getMinistries(env.USERS) })
+    return handleMessages(request, env, deps, me, role, json, body)
+  }
+
   // the dashboard
   if (role !== 'admin') return json({ error: 'forbidden' }, 403)
-  if (route === 'GET /admin/users') return json({ users: await listUsers(env.USERS, env.OWNERS) })
+  if (route === 'GET /admin/users') {
+    return json({ users: await listUsers(env.USERS, env.OWNERS), ministries: await getMinistries(env.USERS) })
+  }
+  if (route === 'PUT /admin/ministries') {
+    const ministries = parseMinistries(((await body()) as { ministries?: unknown } | null)?.ministries)
+    if (!ministries) return json({ error: 'bad-request' }, 400)
+    await setMinistries(env.USERS, ministries)
+    return json({ ministries })
+  }
 
   const uid = decodeURIComponent(pathname.slice('/admin/users/'.length))
   try {
@@ -117,15 +168,113 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       await removeUser(env.USERS, env.OWNERS, me, uid)
       return json({ removed: uid })
     }
-    const { role: newRole } = ((await request.json().catch(() => ({}))) ?? {}) as { role?: unknown }
-    if (!isRole(newRole)) return json({ error: 'bad-request' }, 400)
-    return json({ user: await setRole(env.USERS, env.OWNERS, me, uid, newRole) })
+    const change = ((await body()) ?? {}) as { role?: unknown; ministries?: unknown }
+    const ministries = change.ministries === undefined ? undefined : parseMinistries(change.ministries)
+    if ((change.role !== undefined && !isRole(change.role)) || ministries === null) {
+      return json({ error: 'bad-request' }, 400)
+    }
+    if (change.role === undefined && ministries === undefined) return json({ error: 'bad-request' }, 400)
+    const user = await updateUser(env.USERS, env.OWNERS, me, uid, {
+      ...(isRole(change.role) ? { role: change.role } : {}),
+      ...(ministries ? { ministries } : {})
+    })
+    return json({ user })
   } catch (error) {
     if (!(error instanceof RoleChangeError)) throw error
     return json({ error: error.code }, error.code === 'not-found' ? 404 : 409)
   }
 }
 
+async function handleMessages(
+  request: Request,
+  env: Env,
+  deps: Deps,
+  me: UserRecord,
+  role: Role,
+  json: (body: unknown, status?: number) => Response,
+  body: () => Promise<unknown>
+): Promise<Response> {
+  const store = deps.messages ?? d1Store(env.DB)
+  const now = deps.now?.() ?? Date.now()
+  const { pathname } = new URL(request.url)
+
+  if (request.method === 'GET' && pathname === '/messages') {
+    const messages = await store.forUser(me.uid, now)
+    const unread = messages.filter((m) => m.toUid === me.uid && !m.readAt).length
+    return json({ messages, unread })
+  }
+
+  const read = pathname.match(/^\/messages\/([^/]+)\/read$/)
+  if (read) {
+    await store.markRead(decodeURIComponent(read[1]!), me.uid, now)
+    return json({ read: true })
+  }
+
+  // the people who get messages: publishers, administrators and the members of ministries
+  const users = await listUsers(env.USERS, env.OWNERS)
+  const receivers = users.filter((user) => user.uid !== me.uid && canReceive(user, user.role))
+
+  if (pathname === '/messages/recipients') {
+    if (!canSend(role)) return json({ people: [], ministries: [] })
+    return json({
+      people: receivers.map(({ uid, name, email, role: userRole, ministries }) => ({
+        uid,
+        name: name ?? email ?? uid,
+        role: userRole,
+        ministries: ministries ?? []
+      })),
+      ministries: await getMinistries(env.USERS)
+    })
+  }
+
+  // POST /messages
+  const draft = parseDraft(await body())
+  if (!draft) return json({ error: 'bad-request' }, 400)
+
+  let recipients: { uid: string; name: string }[]
+  if (canSend(role) && !draft.replyTo) {
+    const chosen = new Set(draft.to)
+    const unknown = draft.to.filter((uid) => !receivers.some((user) => user.uid === uid))
+    if (unknown.length) return json({ error: 'unknown-recipient' }, 400)
+    receivers
+      .filter((user) => user.ministries?.some((ministry) => draft.ministries.includes(ministry)))
+      .forEach((user) => chosen.add(user.uid))
+    recipients = receivers
+      .filter((user) => chosen.has(user.uid))
+      .map((user) => ({ uid: user.uid, name: nameOf(user) }))
+  } else {
+    // an answer goes to the one who wrote, and only to a message the user got
+    const original = draft.replyTo ? await store.get(draft.replyTo) : null
+    if (!original || original.toUid !== me.uid || original.expiresAt <= now)
+      return json({ error: 'forbidden' }, 403)
+    recipients = [{ uid: original.fromUid, name: original.fromName }]
+  }
+  if (!recipients.length) return json({ error: 'no-recipients' }, 400)
+
+  if ((await store.sentSince(me.uid, now - 60 * 60 * 1000)) + recipients.length > HOURLY_LIMIT) {
+    return json({ error: 'too-many' }, 429)
+  }
+
+  await store.deleteExpired(now)
+  const messages: Message[] = recipients.map(({ uid, name }) => ({
+    id: crypto.randomUUID(),
+    fromUid: me.uid,
+    fromName: nameOf(me),
+    toUid: uid,
+    toName: name,
+    text: draft.text,
+    attachment: draft.attachment,
+    replyTo: draft.replyTo,
+    createdAt: now,
+    expiresAt: now + MESSAGE_LIFE,
+    readAt: null
+  }))
+  await store.insert(messages)
+  return json({ sent: messages.length })
+}
+
 export default {
-  fetch: (request: Request, env: Env) => handle(request, env)
+  fetch: (request: Request, env: Env) => handle(request, env),
+  // once a day: the expired messages go
+  scheduled: async (_event: ScheduledController, env: Env) => d1Store(env.DB).deleteExpired(Date.now())
 } satisfies ExportedHandler<Env>
