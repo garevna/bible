@@ -65,6 +65,46 @@ pnpm dev
 в справжній Firestore нічого не потрапляє. Користувач «входить» лише в пам'яті сторінки
 (`signInLocally` у `e2e/fixtures.ts`).
 
+## Публікація в Telegram
+
+Пастор чи адміністратор може опублікувати тему в Telegram-каналі: у режимі редагування теми
+є кнопка «Опублікувати в Telegram», яка спершу показує, як виглядатиме пост.
+
+Токен бота не можна тримати в коді сайту, тому публікує маленький сервер —
+Cloudflare Worker у `worker/` (безкоштовний тариф). Він перевіряє Firebase-токен користувача,
+дивиться, чи той є серед `PUBLISHERS`, і надсилає пост від імені бота.
+
+Хто може публікувати (`PUBLISHERS`): Firebase user id (Firebase console > Authentication) або email
+Google-акаунта, через кому. Email із реєстрації за паролем не підходить: застосунок не перевіряє
+пошту, тому такий email міг би вказати будь-хто.
+
+### Канал і бот
+
+1. Бот створюється в @BotFather, його токен — секрет (не надсилайте його в чати і не комітьте).
+2. Бот додається в канал адміністратором із правом публікувати повідомлення.
+3. `TELEGRAM_CHAT_ID` — `@назва` публічного каналу або id приватного (`-100…`).
+   Id можна дізнатися так: опублікувати будь-що в каналі й виконати `pnpm worker:chat-id`
+   (скрипт бере токен з `worker/.dev.vars`).
+
+Для перевірок — окремі тестовий бот і тестовий канал, щоб нічого не потрапило в справжній канал.
+
+### Локально
+
+1. `worker/.dev.vars` (не комітиться, зразок — `worker/.dev.vars.example`):
+   `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `PUBLISHERS`.
+2. `pnpm worker:dev` — сервер на `http://localhost:8787`.
+3. У `.env.local`: `VITE_WORKER_URL=http://localhost:8787`, потім `pnpm dev`.
+
+### На Cloudflare
+
+1. Акаунт на cloudflare.com (безкоштовний), потім `pnpm --filter bible-worker exec wrangler login`.
+2. `pnpm --filter bible-worker exec wrangler secret put TELEGRAM_BOT_TOKEN` — токен вводиться
+   у терміналі й зберігається лише в Cloudflare.
+3. `TELEGRAM_CHAT_ID` і `PUBLISHERS` — у Cloudflare: Workers > bible-worker > Settings > Variables.
+4. `pnpm worker:deploy` — адреса буде на кшталт `https://bible-worker.<акаунт>.workers.dev`.
+5. Ця адреса — змінна репозиторію `VITE_WORKER_URL` (GitHub > Settings > Secrets and variables >
+   Actions > Variables), щоб кнопка з'явилася на сайті після наступного деплою.
+
 ## Структура
 
 ```text
@@ -76,6 +116,7 @@ src/
   views/        сторінки (перемикаються через app.page, без роутера)
   utils/        чисті функції (рефи віршів, інтервали виділень)
 public/         bible-*.json — тексти перекладів
+worker/         Cloudflare Worker: публікація в Telegram
 ```
 
 ## Тексти інтерфейсу (переклади)

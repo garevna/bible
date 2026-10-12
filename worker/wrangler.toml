@@ -1,0 +1,12 @@
+# Cloudflare Worker of the Bible app (see README, "Публікація в Telegram")
+name = "bible-worker"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "bible-ukr"
+ALLOWED_ORIGINS = "https://garevna.github.io,http://localhost:5173,http://localhost:4179"
+# set in the Cloudflare dashboard (Workers > bible-worker > Settings > Variables) or in .dev.vars:
+#   TELEGRAM_CHAT_ID  the channel: @name or the -100… id
+#   PUBLISHERS        user ids and verified emails of the publishers, separated by commas
+# secret: npx wrangler secret put TELEGRAM_BOT_TOKEN

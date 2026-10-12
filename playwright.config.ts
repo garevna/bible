@@ -30,7 +30,8 @@ export default defineConfig({
   webServer: {
     command: `pnpm exec vite build && pnpm exec vite preview --port ${port} --strictPort`,
     url: `http://localhost:${port}/`,
-    env: { BASE_PATH: '/' },
+    // the worker is faked in the tests (e2e/publish.spec.ts)
+    env: { BASE_PATH: '/', VITE_WORKER_URL: `http://localhost:${port}/worker-test` },
     reuseExistingServer: !process.env.CI,
     timeout: 180_000
   }

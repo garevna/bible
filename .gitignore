@@ -35,3 +35,7 @@ blob-report
 *-firebase-adminsdk-*.json
 .firebase
 firebase-debug.log
+
+# Cloudflare Worker: local secrets and wrangler state
+.dev.vars
+.wrangler

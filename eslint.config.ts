@@ -12,7 +12,8 @@ export default defineConfigWithVueTs(
       'playwright-report/**',
       '.old-nuxt/**',
       '.backup-nuxt/**',
-      'public/**'
+      'public/**',
+      '**/.wrangler/**'
     ]
   },
   pluginVue.configs['flat/recommended'],

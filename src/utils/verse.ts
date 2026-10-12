@@ -16,3 +16,7 @@ export async function versesWithLinks(refs: string[]) {
   const verses = await getVersesByRefs(refs)
   return verses.map((verse) => ({ ...verse, html: getVerseHTML(verse) }))
 }
+
+/** "Від Матвія 1:1" */
+export const verseReference = ({ bookName, chapterNum, line }: VerseRef) =>
+  `${bookName ?? ''} ${chapterNum}:${line + 1}`.trim()

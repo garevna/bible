@@ -1,0 +1,4 @@
+# copy to .dev.vars for `pnpm worker:dev` (the file is not committed)
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_CHAT_ID=@your_test_channel
+PUBLISHERS=

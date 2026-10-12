@@ -3,6 +3,10 @@
     <div class="d-flex align-center">
       <v-btn icon="$return" variant="text" color="primary" @click="topics.returnToTopicList()" />
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
+      <!-- editing mode, publishers only: the topic as a post of the Telegram channel -->
+      <PublishTopic
+        v-if="showControls && topics.currentTopic && publish.role === 'publisher' && publish.telegram"
+      />
       <ControlsView v-model="showControls" storage-key="topicMode" />
 
       <!-- editing mode, phones: the ways to add in a dropdown menu on the right -->
@@ -115,10 +119,12 @@ import ControlsView from '@/components/ControlsView.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
 import AddVerses from '@/components/selectors/AddVerses.vue'
 import AddExistingNotes from '@/components/topics/AddExistingNotes.vue'
+import PublishTopic from '@/components/topics/PublishTopic.vue'
 import NestedDraggable from '@/components/topics/NestedDraggable.vue'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useNotesStore } from '@/stores/notes'
+import { usePublishStore } from '@/stores/publish'
 import { useTopicsStore, type TopicItem, type TopicNoteItem } from '@/stores/topics'
 import type { Note } from '@/types'
 import { removeById } from '@/utils/array'
@@ -127,6 +133,7 @@ import { versesWithLinks } from '@/utils/verse'
 const topics = useTopicsStore()
 const content = useContentStore()
 const notes = useNotesStore()
+const publish = usePublishStore()
 const { common, nestedDraggable } = storeToRefs(useLanguageStore())
 
 const showControls = ref(true)

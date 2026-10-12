@@ -51,6 +51,8 @@ const iconAliases = {
   reset: 'mdi-close',
   return: 'mdi-page-previous',
   save: 'mdi-content-save-outline',
+  /** publish to the Telegram channel */
+  publish: 'mdi-send-variant-outline',
   search: 'mdi-magnify',
   send: 'mdi-send-variant',
   /** switches to the editing mode */

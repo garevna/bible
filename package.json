@@ -10,13 +10,16 @@
     "dev": "vite",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
-    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.node.json",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p worker/tsconfig.json",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "worker:dev": "pnpm --filter bible-worker dev",
+    "worker:deploy": "pnpm --filter bible-worker deploy",
+    "worker:chat-id": "node worker/scripts/chat-id.mjs"
   },
   "lint-staged": {
     "*.{ts,vue,js}": "eslint --fix",
