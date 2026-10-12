@@ -1,5 +1,10 @@
-/** Books after which the list of books has a divider: the Law, history, poetry, prophets; Gospels and Acts, epistles */
+/**
+ * Books after which the list of books has a divider: the Law, history, poetry, prophets;
+ * Gospels and Acts, epistles. Book titles differ from translation to translation (so do the order
+ * and the number of books), so each translation has its own titles here.
+ */
 export const beforeDivider = [
+  // Переклад І. Огієнка (послання апостолів — перед посланнями Павла)
   'Повторення Закону',
   'Естер',
   'Пісня над піснями',
@@ -7,6 +12,7 @@ export const beforeDivider = [
   'Дії Апостолів',
   'Юда',
   'До Євреїв',
+
   // Синодальный перевод (протестантская редакция)
   'Второзаконие',
   'Есфирь',
@@ -14,5 +20,23 @@ export const beforeDivider = [
   'Даниил',
   'Деяния',
   'К Евреям',
-  'Иуды'
+  'Иуды',
+
+  // Переклад П. Куліша та І. Пулюя (з неканонічними книгами Старого Заповіту)
+  'Второзаконня',
+  'ІІ Книга Макавеїв',
+  'Ісус Син Сираха',
+  'Книга Пророка Даниїла',
+  'Діяння Апостолів',
+  'Послання Апостола Павла до Євреїв',
+  'Послання Апостола Юди',
+
+  // KJV, ASV, WEB
+  'Deuteronomy',
+  'Esther',
+  'Song',
+  'Daniel',
+  'Acts',
+  'Hebrews',
+  'Jude'
 ]

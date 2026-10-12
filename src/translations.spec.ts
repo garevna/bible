@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 
 import { describe, expect, it } from 'vitest'
 
-import { translationMenuItems } from '@/configs'
+import { beforeDivider, translationMenuItems } from '@/configs'
 
 type BibleJSON = { title: string; books: { title: string; chapters: string[][] }[] }[]
 
@@ -21,4 +21,16 @@ describe('translations', () => {
     )
     expect(numbered.slice(0, 5)).toEqual([])
   })
+
+  // the list of books is cut into groups: the Law, history, poetry, prophets; Gospels and Acts, two groups of epistles
+  it.each(translationMenuItems.map((item) => item.json))(
+    '%s has the dividers of the list of books',
+    (json) => {
+      const bible: BibleJSON = JSON.parse(readFileSync(`public/${json}`, 'utf8'))
+      const dividers = bible.map(
+        ({ books }) => books.filter(({ title }) => beforeDivider.includes(title)).length
+      )
+      expect(dividers).toEqual([4, 3])
+    }
+  )
 })
