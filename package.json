@@ -19,7 +19,8 @@
     "prepare": "husky",
     "worker:dev": "pnpm --filter bible-worker dev",
     "worker:deploy": "pnpm --filter bible-worker deploy",
-    "worker:chat-id": "node worker/scripts/chat-id.mjs"
+    "worker:chat-id": "node worker/scripts/chat-id.mjs",
+    "worker:secrets": "node worker/scripts/secrets.mjs"
   },
   "lint-staged": {
     "*.{ts,vue,js}": "eslint --fix",

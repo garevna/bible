@@ -97,13 +97,14 @@ Google-акаунта, через кому. Email із реєстрації за
 
 ### На Cloudflare
 
-1. Акаунт на cloudflare.com (безкоштовний), потім `pnpm --filter bible-worker exec wrangler login`.
-2. `pnpm --filter bible-worker exec wrangler secret put TELEGRAM_BOT_TOKEN` — токен вводиться
-   у терміналі й зберігається лише в Cloudflare.
-3. `TELEGRAM_CHAT_ID` і `PUBLISHERS` — у Cloudflare: Workers > bible-worker > Settings > Variables.
-4. `pnpm worker:deploy` — адреса буде на кшталт `https://bible-worker.<акаунт>.workers.dev`.
-5. Ця адреса — змінна репозиторію `VITE_WORKER_URL` (GitHub > Settings > Secrets and variables >
-   Actions > Variables), щоб кнопка з'явилася на сайті після наступного деплою.
+Сервер уже розгорнуто: (акаунт Cloudflare, вхід через GitHub).
+
+1.  — один раз, відкриється браузер.
+2.  — заповнені , і з
+    потрапляють у секрети Cloudflare (значення ніде не друкуються).
+3.  — після змін у .
+4.  Адреса сервера — змінна репозиторію (GitHub > Settings > Secrets and variables >
+    Actions > Variables); з нею кнопка публікації є на сайті після деплою.
 
 ## Структура
 
