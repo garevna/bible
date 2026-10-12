@@ -30,7 +30,9 @@ describe('translations', () => {
       const dividers = bible.map(
         ({ books }) => books.filter(({ title }) => beforeDivider.includes(title)).length
       )
-      expect(dividers).toEqual([4, 3])
+      // a partial Bible (e.g. the New Testament and the Psalms) has no groups in its Old Testament
+      const fullOldTestament = (bible[0]?.books.length ?? 0) >= 39
+      expect(dividers).toEqual([fullOldTestament ? 4 : 0, 3])
     }
   )
 })

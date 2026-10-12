@@ -79,7 +79,7 @@ test('a verse is picked in another translation; the translation of the menu stay
   // the note shows the Russian text with the name of the translation, not as a link
   const verses = editor.locator('.field-set', { hasText: 'Вірші з Біблії' })
   await expect(verses).toContainText('Ибо так возлюбил Бог мир')
-  await expect(verses.locator('.verse-reference')).toHaveText('(От Иоанна 3:16, Синод.)')
+  await expect(verses.locator('.verse-reference')).toHaveText('(СП, От Иоанна 3:16)')
   expect(await withStores(page, (stores) => [...stores.notes.currentNote.refs])).toContain(
     'synodal:1.003.002.015'
   )

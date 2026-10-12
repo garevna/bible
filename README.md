@@ -178,8 +178,19 @@ saveButton: {
   суспільне надбання; джерело — `rus-synodal.zefania.xml` з
   [open-bibles](https://github.com/seven1m/open-bibles). Псалми — за єврейською нумерацією,
   синодальний номер — у дужках на початку вірша.
-- Права на `bible-ohienko.json` і `bible-homenko.json` треба уточнити в правовласників до широкого
-  показу застосунку.
+- `bible-kulish.json` — переклад П. Куліша та І. Пулюя (1905), 66 книг, суспільне надбання; джерело —
+  [eBible.org, ukr1871](https://ebible.org/details.php?id=ukr1871) (VPL + назви книг з USFM). У налаштуваннях
+  його значення лишилося `homenko`: воно збережене в профілях користувачів.
+- `bible-npu.json` — Бібліка® Відкрита Новий Переклад Українською™ (Новий Завіт і Псалми),
+  © 2022 Biblica, Inc., ліцензія [CC BY-SA 4.0](http://creativecommons.org/licenses/by-sa/4.0/); джерело —
+  [eBible.org, ukronpu](https://ebible.org/details.php?id=ukronpu). Текст не змінено (лише формат);
+  повідомлення правовласника показується в меню перекладів. Оригінал безкоштовно доступний на
+  www.biblica.com і open.bible.
+- `bible-kjv.json`, `bible-asv.json`, `bible-web.json` — суспільне надбання.
+- `bible-ohienko.json` — під авторським правом: потрібен дозвіл правовласника (меню показує попередження).
+
+Права кожного перекладу описані в `src/configs/translationMenuItems.ts` (`rights`, `notice`).
+Скорочення (`short`) стоїть першим у посиланні на вірш: «(СП, Бытие 1:3)».
 
 Після зміни текстів підніміть `CONTENT_VERSION` у `src/stores/content.ts`: браузери користувачів
 завантажать тексти заново.

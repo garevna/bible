@@ -1,8 +1,10 @@
 import type { Localized } from '@/types'
 
 /**
- * short: shown next to the reference of a verse taken from another translation than the chosen one;
- * rights: set when the text may not be used freely: what is wrong and what to do (the menu shows a warning)
+ * short: the abbreviation of the translation, first in the reference of a verse: "(СП, Бытие 1:3)";
+ * rights: set when the text may not be used freely: what is wrong and what to do (the menu shows a warning);
+ * notice: what the license of a free text asks to show (the menu shows it in the tooltip).
+ * Where the texts come from: README, "Тексти Біблії".
  */
 export const translationMenuItems: {
   value: string
@@ -10,6 +12,7 @@ export const translationMenuItems: {
   short: string
   json: string
   rights?: Localized
+  notice?: Localized
 }[] = [
   {
     value: 'ohienko',
@@ -27,14 +30,31 @@ export const translationMenuItems: {
     }
   },
   {
+    // the old name of the value stays: it is kept in the profiles of the users who chose it
     value: 'homenko',
     text: {
-      ua: 'Українська Біблія в перекладі П.Куліша та І.Пулюя',
-      ru: 'Украинская Библия в переводе П.Кулиша та И.Пулюя',
-      en: 'Ukrainian Bible translated by P. Kulish and I. Pulyuya'
+      ua: 'Біблія в перекладі П. Куліша та І. Пулюя (1905)',
+      ru: 'Библия в переводе П. Кулиша и И. Пулюя (1905)',
+      en: 'Ukrainian Bible translated by P. Kulish and I. Puluj (1905)'
     },
     short: 'Куліш',
-    json: 'bible-homenko.json'
+    json: 'bible-kulish.json'
+  },
+  {
+    value: 'npu',
+    text: {
+      ua: 'Новий Переклад Українською (Новий Завіт і Псалми)',
+      ru: 'Новый перевод на украинский (Новый Завет и Псалмы)',
+      en: 'New Ukrainian Translation (New Testament and Psalms)'
+    },
+    short: 'НПУ',
+    json: 'bible-npu.json',
+    // CC BY-SA 4.0: the notice of the rights holder goes with the text
+    notice: {
+      ua: 'Новий Завіт і Книга Псалмів, Бібліка® Відкрита Новий Переклад Українською™ © 2022 Biblica, Inc. Ліцензія CC BY-SA 4.0. Оригінал безкоштовно доступний на www.biblica.com і open.bible.',
+      ru: 'Новый Завет и Книга Псалмов, Бібліка® Відкрита Новий Переклад Українською™ © 2022 Biblica, Inc. Лицензия CC BY-SA 4.0. Оригинал бесплатно доступен на www.biblica.com и open.bible.',
+      en: 'New Testament and Psalms, Biblica® Open New Ukrainian Translation™ © 2022 Biblica, Inc. License CC BY-SA 4.0. The original work is available for free at www.biblica.com and open.bible.'
+    }
   },
   {
     value: 'synodal',
@@ -43,7 +63,7 @@ export const translationMenuItems: {
       ru: 'Синодальный перевод (ru)',
       en: 'Synodal translation (ru)'
     },
-    short: 'Синод.',
+    short: 'СП',
     json: 'bible-synodal.json'
   },
   {

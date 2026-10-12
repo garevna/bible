@@ -115,7 +115,9 @@
           <!-- free to use, or a warning: permission is needed -->
           <template #prepend>
             <v-tooltip
-              :text="item.rights ? item.rights[user.lang] : header.translationFree"
+              :text="
+                item.rights ? item.rights[user.lang] : (item.notice?.[user.lang] ?? header.translationFree)
+              "
               location="start"
               max-width="360"
             >

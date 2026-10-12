@@ -53,7 +53,7 @@ test('a publisher previews the topic and publishes it to Telegram', async ({ pag
         {
           kind: 'verse',
           text: 'Книга родоводу Ісуса Христа, Сина Давидового, Сина Авраамового:',
-          ref: 'Від Матвія 1:1'
+          ref: 'Огієнко, Від Матвія 1:1'
         }
       ]
     }

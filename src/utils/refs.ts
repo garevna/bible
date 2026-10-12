@@ -34,7 +34,8 @@ export function splitRef(ref: string): { translation: string | null; lineRef: st
 }
 
 /** The translation in IndexedDB, i.e. the one chosen in the menu */
-export const loadedTranslation = () => localStorage.getItem('content-translation')
+export const loadedTranslation = () =>
+  typeof localStorage === 'undefined' ? null : localStorage.getItem('content-translation')
 
 /** The ref points to this verse of the loaded translation: plainly, or with the name of that translation */
 export const refersTo = (ref: string, lineRef: string, translation = loadedTranslation()) =>
