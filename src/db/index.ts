@@ -1,7 +1,9 @@
 import type { Book, Keyword, Note, Topic, Verse, VerseRef } from '@/types'
 
+import { loadedTranslation, refersTo, splitRef } from '@/utils/refs'
 import { normalize, queryWords } from '@/utils/search'
 
+import { loadBible, verseOf } from './bibles'
 import { dbKeys, dbName, storeNames, type StoreName } from './config'
 
 export * from './config'
@@ -156,12 +158,12 @@ async function filterRecords<T>(storeName: StoreName, predicate: (record: T) => 
 }
 
 export const searchLineKeywords = async (lineRef: string) =>
-  (await filterRecords<Keyword>('keywords', (keyword) => keyword.refs.includes(lineRef))).map(
-    (keyword) => keyword._id
-  )
+  (
+    await filterRecords<Keyword>('keywords', (keyword) => keyword.refs.some((ref) => refersTo(ref, lineRef)))
+  ).map((keyword) => keyword._id)
 
 export const searchLineTopics = (lineRef: string) =>
-  filterRecords<Topic>('topics', (topic) => topic.refs.includes(lineRef))
+  filterRecords<Topic>('topics', (topic) => topic.refs.some((ref) => refersTo(ref, lineRef)))
 
 export interface NotesFilter {
   lineRef?: string | null
@@ -187,7 +189,7 @@ export function searchNotes({ lineRef, keyword, topic, date, text, from, to }: N
   return filterRecords<Note>('notes', (note) => {
     const day = noteDate(note)
     return (
-      (!lineRef || note.refs.includes(lineRef)) &&
+      (!lineRef || note.refs.some((ref) => refersTo(ref, lineRef))) &&
       (!keyword || note.keywords.includes(keyword)) &&
       (!topic || note.topics.includes(topic)) &&
       (!date || day === date) &&
@@ -198,9 +200,9 @@ export function searchNotes({ lineRef, keyword, topic, date, text, from, to }: N
   })
 }
 
-/** Verses with the title of their book and the 1-based chapter number */
-export async function getVersesByRefs(refs: string[]): Promise<VerseRef[]> {
-  const verses = await getRecordsByKeys<Verse>('content', refs)
+/** Verses of the loaded translation (IndexedDB) with the title of their book and the 1-based chapter number */
+async function loadedVerses(lineRefs: string[]): Promise<VerseRef[]> {
+  const verses = await getRecordsByKeys<Verse>('content', lineRefs)
   const bookRefs = Array.from(new Set(verses.map((verse) => verse.book)))
   const books = await getRecordsByKeys<Book>('books', bookRefs)
 
@@ -209,6 +211,35 @@ export async function getVersesByRefs(refs: string[]): Promise<VerseRef[]> {
     bookName: books.find((book) => book._id === verse.book)?.title,
     chapterNum: Number(verse.chapter.slice(6)) + 1
   }))
+}
+
+/**
+ * Verses of the refs, in their order; each keeps its ref as `_id`. Plain refs and the refs
+ * of the loaded translation come from IndexedDB, the others from the files of their translations.
+ */
+export async function getVersesByRefs(refs: string[]): Promise<VerseRef[]> {
+  const loaded = loadedTranslation()
+  const parts = refs.map((ref) => ({ ref, ...splitRef(ref) }))
+  const local = parts.filter(({ translation }) => !translation || translation === loaded)
+
+  const byRef = new Map<string, VerseRef>()
+  const fromDB = await loadedVerses(local.map(({ lineRef }) => lineRef))
+  for (const { ref, translation, lineRef } of local) {
+    const verse = fromDB.find((item) => item._id === lineRef)
+    verse && byRef.set(ref, { ...verse, _id: ref, ...(translation ? { translation } : {}) })
+  }
+
+  const others = parts.filter(({ translation }) => translation && translation !== loaded)
+  for (const translation of new Set(others.map((part) => part.translation!))) {
+    const bible = await loadBible(translation).catch(() => null)
+    if (!bible) continue
+    for (const part of others.filter((item) => item.translation === translation)) {
+      const verse = verseOf(bible, part.lineRef, translation)
+      verse && byRef.set(part.ref, { ...verse, _id: part.ref })
+    }
+  }
+
+  return refs.flatMap((ref) => byRef.get(ref) ?? [])
 }
 
 /** True when the database is usable and the Bible text has already been saved into it */

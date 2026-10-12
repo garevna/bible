@@ -42,6 +42,48 @@ test('verses are added to a note by text search and by reference', async ({ page
 
   await expect
     .poll(refs)
-    .toEqual(expect.arrayContaining(['1.000.000.000', '1.000.004.002', '1.000.004.003', '1.000.004.004']))
+    // the verse of the Bible page stays plain; the picked ones keep their translation
+    .toEqual(
+      expect.arrayContaining([
+        '1.000.000.000',
+        'ohienko:1.000.004.002',
+        'ohienko:1.000.004.003',
+        'ohienko:1.000.004.004'
+      ])
+    )
   await expect(editor.locator('.field-set', { hasText: 'Вірші з Біблії' }).locator('p')).toHaveCount(6)
+})
+
+test('a verse is picked in another translation; the translation of the menu stays', async ({ page }) => {
+  await openBible(page)
+  await signInLocally(page)
+
+  await page
+    .locator('.line-actions')
+    .first()
+    .getByRole('button', { name: 'Написати замітку до вірша' })
+    .click()
+  const editor = dialog(page)
+  await editor.getByRole('button', { name: 'Додати вірші' }).click()
+  const picker = dialog(page)
+
+  // the picker's own switch
+  await picker.locator('.field-translation').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Синодальний переклад' }).click()
+  await picker.getByPlaceholder('Слова з тексту Біблії').fill('так возлюбил Бог мир')
+  const result = picker.locator('.v-window-item--active .d-flex', { hasText: 'От Иоанна 3:16' })
+  await expect(result).toBeVisible()
+  await result.locator('input[type=checkbox]').check()
+  await picker.getByRole('button', { name: 'Додати (1)' }).click()
+
+  // the note shows the Russian text with the name of the translation, not as a link
+  const verses = editor.locator('.field-set', { hasText: 'Вірші з Біблії' })
+  await expect(verses).toContainText('Ибо так возлюбил Бог мир')
+  await expect(verses.locator('.verse-reference')).toHaveText('(От Иоанна 3:16, Синод.)')
+  expect(await withStores(page, (stores) => [...stores.notes.currentNote.refs])).toContain(
+    'synodal:1.003.002.015'
+  )
+
+  // the Bible page still reads in Ukrainian
+  expect(await withStores(page, (stores) => stores.user.translation)).toBe('ohienko')
 })

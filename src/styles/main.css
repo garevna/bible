@@ -11,6 +11,12 @@ p {
   margin-bottom: 8px;
 }
 
+/* the reference of a verse from another translation than the chosen one: not a link */
+.verse-reference {
+  font-weight: bold;
+  color: rgb(var(--v-theme-secondary) / 70%);
+}
+
 .link-to-verse {
   position: relative;
   display: inline-block;

@@ -13,6 +13,19 @@
 
   <AppDialog v-model="open" :title="text.addVerses" icon="$addVerse" max-width="760">
     <template #subheader>
+      <!-- the translation to pick from; the one in the menu stays as it is -->
+      <div class="d-flex align-center flex-wrap ga-2 px-6 pt-3">
+        <v-select
+          v-model="source"
+          :items="translationItems"
+          :label="text.pickerTranslation"
+          :loading="loadingBible"
+          density="compact"
+          hide-details
+          class="field-translation"
+        />
+        <small class="text-medium-emphasis">{{ text.pickerTranslationHint }}</small>
+      </div>
       <v-tabs v-model="tab" hide-slider density="comfortable" selected-class="app-tab--active" class="px-6">
         <v-tab value="search" class="app-tab" prepend-icon="$search">{{ text.bySearch }}</v-tab>
         <v-tab value="reference" class="app-tab" prepend-icon="$book">{{ text.byReference }}</v-tab>
@@ -119,12 +132,15 @@ import AddButton from '@/components/AddButton.vue'
 import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
+import { translationMenuItems } from '@/configs'
 import { getRecordsByIndex } from '@/db'
+import { chapterVersesOf, loadBible, searchBible, type BibleJSON } from '@/db/bibles'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useSearchStore } from '@/stores/search'
+import { useUserStore } from '@/stores/user'
 import type { Verse } from '@/types'
-import { getChapterRef } from '@/utils/refs'
+import { getChapterRef, loadedTranslation, qualifiedRef } from '@/utils/refs'
 import { markWords, queryWords } from '@/utils/search'
 
 /** Picks Bible verses, found by text or chosen by reference, and emits their ids */
@@ -134,6 +150,7 @@ const emit = defineEmits<{ add: [verseIds: string[]] }>()
 
 const content = useContentStore()
 const search = useSearchStore()
+const user = useUserStore()
 const { notes: text, search: searchText, common } = storeToRefs(useLanguageStore())
 
 const open = ref(false)
@@ -142,26 +159,57 @@ const tab = ref<'search' | 'reference'>('search')
 const range = (count: number) => Array.from({ length: count }, (_, index) => index + 1)
 
 /** 'Від Матвія 1:2' */
-function reference({ covenant, book, chapter, line }: Verse) {
-  const title = content.books?.[covenant]?.[Number(book.slice(2))]?.title ?? ''
+function reference({ covenant, book, chapter, line, bookName }: Verse & { bookName?: string }) {
+  const title = bookName ?? content.books?.[covenant]?.[Number(book.slice(2))]?.title ?? ''
   return `${title} ${Number(chapter.slice(6)) + 1}:${line + 1}`
 }
+
+/* ---------- translation ---------- */
+
+/** the translation of this picker; another one than in the menu is read from its file */
+const source = ref(user.translation)
+const bible = shallowRef<BibleJSON | null>(null)
+const loadingBible = ref(false)
+const foreign = computed(() => source.value !== loadedTranslation() && Boolean(bible.value))
+
+const translationItems = computed(() =>
+  translationMenuItems.map((item) => ({ value: item.value, title: item.text[user.lang] }))
+)
+
+watch(source, async (value) => {
+  bible.value = null
+  if (value !== loadedTranslation()) {
+    loadingBible.value = true
+    bible.value = await loadBible(value).catch(() => null)
+    loadingBible.value = false
+  }
+  // the same place, as far as this translation has it
+  const books = bookTitles.value
+  if (bookNum.value >= books.length) selectBook(0)
+  else if (chapter.value > chapterCount.value) chapter.value = 1
+  ticked.value = []
+  runSearch(words.value)
+  loadChapter()
+})
 
 /* ---------- search ---------- */
 
 const query = ref('')
 const words = computed(() => queryWords(query.value ?? ''))
-const found = shallowRef<Verse[]>([])
+const found = shallowRef<(Verse & { bookName?: string })[]>([])
 const shown = ref(50)
 const ticked = ref<string[]>([])
+
+async function runSearch(value: string[]) {
+  shown.value = 50
+  if (!foreign.value) found.value = await search.findVerses(value)
+  else found.value = search.searchable(value) ? searchBible(bible.value!, value, source.value) : []
+}
 
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(words, (value) => {
   clearTimeout(timer)
-  timer = setTimeout(async () => {
-    shown.value = 50
-    found.value = await search.findVerses(value)
-  }, 300)
+  timer = setTimeout(() => runSearch(value), 300)
 })
 
 /* ---------- reference ---------- */
@@ -173,15 +221,25 @@ const fromVerse = ref(1)
 const toVerse = ref<number | null>(null)
 const chapterVerses = shallowRef<Verse[]>([])
 
-const covenantItems = computed(() =>
-  (content.covenantNames.length === 2 ? content.covenantNames : common.value.covenantNames).map(
-    (title: string, value: number) => ({ title, value })
-  )
+const covenantItems = computed(() => {
+  const names = foreign.value
+    ? bible.value!.map((item) => item.title)
+    : content.covenantNames.length === 2
+      ? content.covenantNames
+      : common.value.covenantNames
+  return names.map((title: string, value: number) => ({ title, value }))
+})
+const bookTitles = computed(() =>
+  foreign.value
+    ? (bible.value![covenant.value]?.books ?? []).map((book) => book.title)
+    : (content.books?.[covenant.value] ?? []).map((book) => book.title)
 )
-const bookItems = computed(() =>
-  (content.books?.[covenant.value] ?? []).map((book, value) => ({ title: book.title, value }))
+const bookItems = computed(() => bookTitles.value.map((title, value) => ({ title, value })))
+const chapterCount = computed(() =>
+  foreign.value
+    ? (bible.value![covenant.value]?.books[bookNum.value]?.chapters.length ?? 0)
+    : (content.books?.[covenant.value]?.[bookNum.value]?.chapters ?? 0)
 )
-const chapterCount = computed(() => content.books?.[covenant.value]?.[bookNum.value]?.chapters ?? 0)
 
 const rangeVerses = computed(() =>
   chapterVerses.value.filter(
@@ -194,25 +252,34 @@ function selectBook(num: number) {
   chapter.value = 1
 }
 
-watch(
-  [covenant, bookNum, chapter],
-  async () => {
-    fromVerse.value = 1
-    toVerse.value = null
-    const lines = await getRecordsByIndex<Verse>(
-      'content',
-      'chapter',
-      getChapterRef(covenant.value, bookNum.value, chapter.value - 1)
+async function loadChapter() {
+  fromVerse.value = 1
+  toVerse.value = null
+  if (foreign.value) {
+    chapterVerses.value = chapterVersesOf(
+      bible.value!,
+      covenant.value,
+      bookNum.value,
+      chapter.value - 1,
+      source.value
     )
-    chapterVerses.value = lines.sort((a, b) => a.line - b.line)
-  },
-  { immediate: true }
-)
+    return
+  }
+  const lines = await getRecordsByIndex<Verse>(
+    'content',
+    'chapter',
+    getChapterRef(covenant.value, bookNum.value, chapter.value - 1)
+  )
+  chapterVerses.value = lines.sort((a, b) => a.line - b.line)
+}
+
+watch([covenant, bookNum, chapter], loadChapter, { immediate: true })
 
 /** starts from the place being read */
 watch(open, (value) => {
   if (!value) return
   ticked.value = []
+  source.value = user.translation
   covenant.value = content.covenantIndex
   bookNum.value = content.bookIndex ?? 0
   chapter.value = content.chapterIndex + 1
@@ -224,8 +291,12 @@ const selection = computed(() =>
   tab.value === 'search' ? ticked.value : rangeVerses.value.map((verse) => verse._id)
 )
 
+/** each verse keeps the translation it was picked in */
 function add() {
-  emit('add', [...selection.value])
+  emit(
+    'add',
+    selection.value.map((id) => qualifiedRef(source.value, id))
+  )
   open.value = false
 }
 
@@ -245,6 +316,10 @@ defineExpose({ show: () => (open.value = true) })
 .field {
   flex: 1 1 110px;
   max-width: 160px;
+}
+
+.field-translation {
+  flex: 0 1 300px;
 }
 
 .field-covenant {

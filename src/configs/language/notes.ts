@@ -59,6 +59,16 @@ export const notes = {
     ru: 'Убрать стих из заметки',
     en: 'Remove the verse from the note'
   },
+  pickerTranslation: {
+    ua: 'Переклад',
+    ru: 'Перевод',
+    en: 'Translation'
+  },
+  pickerTranslationHint: {
+    ua: 'Лише для вибору віршів тут; переклад у меню не зміниться',
+    ru: 'Только для выбора стихов здесь; перевод в меню не изменится',
+    en: 'For picking verses here only; the translation in the menu stays'
+  },
   bySearch: {
     ua: 'Пошук за текстом',
     ru: 'Поиск по тексту',

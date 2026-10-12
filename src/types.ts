@@ -34,6 +34,8 @@ export interface Verse {
 export interface VerseRef extends Verse {
   bookName?: string
   chapterNum: number
+  /** set when the verse was picked in a translation of its own (see qualifiedRef) */
+  translation?: string
 }
 
 export interface HighlightRecord {

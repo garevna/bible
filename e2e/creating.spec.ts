@@ -81,8 +81,9 @@ test.describe('creating keywords, topics and notes', () => {
 
     await expect(page.locator('.keyword-verse')).toHaveCount(2)
     expect((await readRecord(page, 'keywords', 'блаженство')).refs).toEqual([
-      '1.000.004.002',
-      '1.000.004.003'
+      // picked in the verse picker: with the translation they were picked in
+      'ohienko:1.000.004.002',
+      'ohienko:1.000.004.003'
     ])
 
     // a note with the keyword

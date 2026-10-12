@@ -18,7 +18,7 @@ import {
 import type { Book, HighlightRecord, Keyword, Note, Topic, Verse, VerseRef } from '@/types'
 import { idFrom, pushUnique, removeById } from '@/utils/array'
 import { clearHighlights, getHTML, updateIntervals } from '@/utils/highlights'
-import { chapterOf, getBookRef, getChapterRef, getLineRef, parseLineRef } from '@/utils/refs'
+import { chapterOf, getBookRef, getChapterRef, getLineRef, parseLineRef, splitRef } from '@/utils/refs'
 import { getVerseHTML } from '@/utils/verse'
 
 import { useAppStore } from './app'
@@ -163,7 +163,9 @@ export const useContentStore = defineStore('content', () => {
   }
 
   /** Opens the Bible on the given verse ('1.004.002.010') */
-  async function gotoVerse(id: string) {
+  async function gotoVerse(ref: string) {
+    // a link may carry the name of the translation (see qualifiedRef)
+    const id = splitRef(ref).lineRef
     const [covenant, bookNum, chapter, line] = parseLineRef(id)
     if ([covenant, bookNum, chapter, line].some((value) => Number.isNaN(value))) return
 
