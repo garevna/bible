@@ -112,6 +112,24 @@
           :active="item.value === user.translation"
           @click="content.switchTranslation(item.value)"
         >
+          <!-- free to use, or a warning: permission is needed -->
+          <template #prepend>
+            <v-tooltip
+              :text="item.rights ? item.rights[user.lang] : header.translationFree"
+              location="start"
+              max-width="360"
+            >
+              <template #activator="{ props: tooltip }">
+                <v-icon
+                  v-bind="tooltip"
+                  :icon="item.rights ? 'mdi-file-document-alert-outline' : 'mdi-file-document-check-outline'"
+                  :color="item.rights ? 'warning' : 'primary'"
+                  :class="item.rights ? 'translation-rights--warning' : 'translation-rights--free'"
+                  class="mr-3"
+                />
+              </template>
+            </v-tooltip>
+          </template>
           <v-list-item-title>{{ item.text[user.lang] }}</v-list-item-title>
         </v-list-item>
       </v-list>

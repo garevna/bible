@@ -44,6 +44,11 @@ export const header = {
     ru: 'Выход',
     en: 'Sign Out'
   },
+  translationFree: {
+    ua: 'Вільний доступ: переклад у суспільному надбанні',
+    ru: 'Свободный доступ: перевод в общественном достоянии',
+    en: 'Free to use: the translation is in the public domain'
+  },
   uploadPhoto: {
     ua: 'Завантажити фото',
     ru: 'Загрузить фото',
