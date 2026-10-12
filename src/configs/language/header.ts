@@ -43,5 +43,20 @@ export const header = {
     ua: 'Вихід',
     ru: 'Выход',
     en: 'Sign Out'
+  },
+  uploadPhoto: {
+    ua: 'Завантажити фото',
+    ru: 'Загрузить фото',
+    en: 'Upload a photo'
+  },
+  removePhoto: {
+    ua: 'Прибрати фото',
+    ru: 'Убрать фото',
+    en: 'Remove the photo'
+  },
+  photoFailed: {
+    ua: 'Не вдалося відкрити цю картинку',
+    ru: 'Не удалось открыть эту картинку',
+    en: 'This picture could not be opened'
   }
 }

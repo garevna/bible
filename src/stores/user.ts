@@ -14,6 +14,13 @@ import { useFirebaseStore } from './firebase'
 /** profile of the signed in user, so that the app starts offline too */
 const PROFILE_KEY = 'profile'
 
+/** the user took the photo away: the Google one is not shown either */
+const NO_PHOTO = 'none'
+
+/** the photo of the profile, or the one of the Google account when the profile has none */
+const photoOf = (profilePhoto: string | undefined, authUser: AuthUser) =>
+  profilePhoto && profilePhoto !== defaultAvatar ? profilePhoto : authUser.photoURL || ''
+
 export type AuthResult =
   | 'ok'
   | 'wrong-credentials'
@@ -58,8 +65,12 @@ export const useUserStore = defineStore('user', () => {
   const email = ref<string | null>(null)
 
   const signed = computed(() => Boolean(uid.value))
-  /** photo of the user, or '' when there is none (the old default picture counts as none) */
-  const avatar = computed(() => (userPhoto.value && userPhoto.value !== defaultAvatar ? userPhoto.value : ''))
+  /** photo of the user, or '' when there is none (the old default picture and NO_PHOTO count as none) */
+  const avatar = computed(() =>
+    userPhoto.value && userPhoto.value !== defaultAvatar && userPhoto.value !== NO_PHOTO
+      ? userPhoto.value
+      : ''
+  )
   /** 'ІФ' from 'Ірина Филиппова', 'R' from 'reader@example.com' */
   const initials = computed(() =>
     (userName.value || email.value || '?')
@@ -74,7 +85,7 @@ export const useUserStore = defineStore('user', () => {
 
   const profile = (): Profile => ({
     userName: userName.value ?? '',
-    avatar: avatar.value,
+    avatar: userPhoto.value === NO_PHOTO ? NO_PHOTO : avatar.value,
     city: city.value ?? '',
     country: country.value ?? '',
     lang: lang.value,
@@ -134,7 +145,12 @@ export const useUserStore = defineStore('user', () => {
         firebase.saveProfile(authUser.uid, userProfile)
       }
 
-      setUser({ ...userProfile, uid: authUser.uid, email: authUser.email })
+      setUser({
+        ...userProfile,
+        avatar: photoOf(userProfile.avatar, authUser),
+        uid: authUser.uid,
+        email: authUser.email
+      })
       updateLocalStorage()
 
       isNew || (await firebase.read())
@@ -158,6 +174,7 @@ export const useUserStore = defineStore('user', () => {
       lang: lang.value,
       translation: translation.value,
       ...userProfile,
+      avatar: photoOf(userProfile.avatar, authUser),
       uid: authUser.uid,
       email: authUser.email
     })
@@ -218,9 +235,10 @@ export const useUserStore = defineStore('user', () => {
     await updateProfile({ translation: value })
   }
 
+  /** a data URL of the photo, or '' to take it away */
   async function updateUserAvatar(value: string) {
-    userPhoto.value = value
-    await updateProfile({ avatar: value })
+    userPhoto.value = value || NO_PHOTO
+    await updateProfile({ avatar: userPhoto.value })
   }
 
   async function updateUserCity(value: string) {
