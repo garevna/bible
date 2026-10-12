@@ -200,10 +200,21 @@ const found = shallowRef<(Verse & { bookName?: string })[]>([])
 const shown = ref(50)
 const ticked = ref<string[]>([])
 
+/** another translation is still loading: the search and the chapter wait, its load runs them */
+const waiting = () => source.value !== loadedTranslation() && !bible.value
+
+let searchRun = 0
 async function runSearch(value: string[]) {
+  if (waiting()) return
+  // a slower search started earlier (e.g. in the translation of the menu) must not overwrite this one
+  const run = ++searchRun
   shown.value = 50
-  if (!foreign.value) found.value = await search.findVerses(value)
-  else found.value = search.searchable(value) ? searchBible(bible.value!, value, source.value) : []
+  const result = foreign.value
+    ? search.searchable(value)
+      ? searchBible(bible.value!, value, source.value)
+      : []
+    : await search.findVerses(value)
+  if (run === searchRun) found.value = result
 }
 
 let timer: ReturnType<typeof setTimeout> | undefined
@@ -252,7 +263,10 @@ function selectBook(num: number) {
   chapter.value = 1
 }
 
+let chapterRun = 0
 async function loadChapter() {
+  if (waiting()) return
+  const run = ++chapterRun
   fromVerse.value = 1
   toVerse.value = null
   if (foreign.value) {
@@ -270,7 +284,7 @@ async function loadChapter() {
     'chapter',
     getChapterRef(covenant.value, bookNum.value, chapter.value - 1)
   )
-  chapterVerses.value = lines.sort((a, b) => a.line - b.line)
+  if (run === chapterRun) chapterVerses.value = lines.sort((a, b) => a.line - b.line)
 }
 
 watch([covenant, bookNum, chapter], loadChapter, { immediate: true })

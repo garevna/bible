@@ -28,6 +28,7 @@ export const useLanguageStore = defineStore('language', () => {
     common: section('common'),
     header: section('header'),
     keywords: section('keywords'),
+    messages: section('messages'),
     nestedDraggable: section('nestedDraggable'),
     notes: section('notes'),
     pages: section('pages'),

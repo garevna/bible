@@ -69,6 +69,21 @@ export const admin = {
     ru: 'пользователь потеряет роль; если войдёт снова — будет читателем',
     en: 'the user loses the role; signed in again, they are a reader'
   },
+  ministries: {
+    ua: 'Служіння',
+    ru: 'Служения',
+    en: 'Ministries'
+  },
+  ministriesHint: {
+    ua: 'Учасникам служіння публікатори й адміністратори можуть надсилати повідомлення; учасники лише відповідають на них.',
+    ru: 'Участникам служения публикаторы и администраторы могут отправлять сообщения; участники только отвечают на них.',
+    en: 'Publishers and administrators may write to the members of a ministry; the members only answer.'
+  },
+  newMinistry: {
+    ua: 'Нове служіння, Enter',
+    ru: 'Новое служение, Enter',
+    en: 'A new ministry, Enter'
+  },
   reload: {
     ua: 'Оновити список',
     ru: 'Обновить список',

@@ -53,7 +53,8 @@ test('a publisher previews the topic and publishes it to Telegram', async ({ pag
         {
           kind: 'verse',
           text: 'Книга родоводу Ісуса Христа, Сина Давидового, Сина Авраамового:',
-          ref: 'Огієнко, Від Матвія 1:1'
+          ref: 'Огієнко, Від Матвія 1:1',
+          id: '1.000.000.000'
         }
       ]
     }
@@ -152,7 +153,8 @@ test('a note is published from the Notes page: its text and verses, no title', a
           verses: [
             {
               text: 'Книга родоводу Ісуса Христа, Сина Давидового, Сина Авраамового:',
-              ref: 'Огієнко, Від Матвія 1:1'
+              ref: 'Огієнко, Від Матвія 1:1',
+              id: '1.000.000.000'
             }
           ]
         }

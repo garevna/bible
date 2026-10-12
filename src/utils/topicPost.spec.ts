@@ -34,8 +34,12 @@ describe('topicPost', () => {
     expect(topicPost('Родовід Ісуса', items)).toEqual({
       title: 'Родовід Ісуса',
       items: [
-        { kind: 'note', text: 'Родовід', verses: [{ text: 'Книга родоводу', ref: 'Від Матвія 1:1' }] },
-        { kind: 'verse', text: 'Авраам породив Ісака', ref: 'Від Матвія 1:2' }
+        {
+          kind: 'note',
+          text: 'Родовід',
+          verses: [{ text: 'Книга родоводу', ref: 'Від Матвія 1:1', id: '1.000.000.000' }]
+        },
+        { kind: 'verse', text: 'Авраам породив Ісака', ref: 'Від Матвія 1:2', id: '1.000.000.001' }
       ]
     })
   })

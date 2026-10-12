@@ -1,4 +1,9 @@
 export const pages = {
+  messages: {
+    ua: 'Повідомлення',
+    ru: 'Сообщения',
+    en: 'Messages'
+  },
   admin: {
     ua: 'Адміністрування',
     ru: 'Администрирование',

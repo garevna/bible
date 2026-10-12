@@ -6,6 +6,7 @@
       <v-spacer />
       <template v-if="showControls">
         <PublishPost v-if="worker.canPublish" :build="noteAsPost" small />
+        <SendMessage v-if="worker.canSend" :attach="noteAsAttachment" small />
         <DialogToUpdateNote :note="note" small @saved="emit('changed')" />
         <ConfirmButton icon="$deleteNote" :text="notes.deleteNote" @confirm="remove" />
       </template>
@@ -44,6 +45,7 @@ import { storeToRefs } from 'pinia'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import PublishPost from '@/components/PublishPost.vue'
+import SendMessage from '@/components/messages/SendMessage.vue'
 import DialogToUpdateNote from '@/components/notes/DialogToUpdateNote.vue'
 import { getVersesByRefs, noteDate } from '@/db'
 import { useLanguageStore } from '@/stores/language'
@@ -63,6 +65,7 @@ const date = computed(() => noteDate(props.note))
 
 /** the note for the Telegram channel: its text and verses */
 const noteAsPost = async () => notePost(props.note.text, await getVersesByRefs(props.note.refs))
+const noteAsAttachment = async () => ({ kind: 'note' as const, post: await noteAsPost() })
 
 const expanded = ref(false)
 const verses = ref<Awaited<ReturnType<typeof versesWithLinks>>>([])

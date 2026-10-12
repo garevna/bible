@@ -5,6 +5,7 @@
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
       <!-- editing mode, publishers only: the topic as a post of the Telegram channel -->
       <PublishPost v-if="showControls && topics.currentTopic && worker.canPublish" :build="topicAsPost" />
+      <SendMessage v-if="showControls && topics.currentTopic && worker.canSend" :attach="topicAsAttachment" />
       <ControlsView v-model="showControls" storage-key="topicMode" />
 
       <!-- editing mode, phones: the ways to add in a dropdown menu on the right -->
@@ -117,6 +118,7 @@ import { useDisplay } from 'vuetify'
 
 import ControlsView from '@/components/ControlsView.vue'
 import PublishPost from '@/components/PublishPost.vue'
+import SendMessage from '@/components/messages/SendMessage.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
 import AddVerses from '@/components/selectors/AddVerses.vue'
 import AddExistingNotes from '@/components/topics/AddExistingNotes.vue'
@@ -140,6 +142,12 @@ const worker = useWorkerStore()
 /** the topic as it is on the page now, for the Telegram channel */
 const topicAsPost = () =>
   topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData, topics.currentTopic?.image)
+
+/** the topic for a message to ministers: without its picture */
+const topicAsAttachment = () => ({
+  kind: 'topic' as const,
+  post: topicPost(topics.currentTopic?.title ?? '', topics.currentTopicData)
+})
 const { common, nestedDraggable } = storeToRefs(useLanguageStore())
 
 const showControls = ref(true)

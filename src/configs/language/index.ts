@@ -2,6 +2,7 @@ import { admin } from './admin'
 import { common } from './common'
 import { header } from './header'
 import { keywords } from './keywords'
+import { messages } from './messages'
 import { nestedDraggable } from './nestedDraggable'
 import { notes } from './notes'
 import { pages } from './pages'
@@ -18,6 +19,7 @@ export const languages = {
   common,
   header,
   keywords,
+  messages,
   nestedDraggable,
   notes,
   pages,

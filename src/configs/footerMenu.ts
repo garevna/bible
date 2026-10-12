@@ -16,5 +16,7 @@ export const footerMenu: FooterMenuItem[] = [
   { icon: '$search', value: 'search', component: 'Search', menu: 'search' },
   { icon: '', value: 'topic', component: 'Topic', menu: 'topics' },
   // opened from the header, administrators only
-  { icon: '', value: 'admin', component: 'Admin', menu: 'admin' }
+  { icon: '', value: 'admin', component: 'Admin', menu: 'admin' },
+  // opened from the header, ministers only
+  { icon: '', value: 'messages', component: 'Messages', menu: 'messages' }
 ]

@@ -31,7 +31,7 @@ async function fakeWorker(page: Page, role: 'admin' | 'reader') {
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
     if (path === '/me') return route.fulfill({ json: { role, telegram: true } })
     if (role !== 'admin') return route.fulfill({ status: 403, json: { error: 'forbidden' } })
-    if (path === '/admin/users') return route.fulfill({ json: { users } })
+    if (path === '/admin/users') return route.fulfill({ json: { users, ministries: ['Музичне служіння'] } })
     const uid = decodeURIComponent(path.replace('/admin/users/', ''))
     const user = users.find((item) => item.uid === uid)!
     if (request.method() === 'DELETE') {
@@ -63,11 +63,11 @@ test('an administrator gives a role and takes a temporary admin off the list', a
   await expect(rows).toHaveCount(2)
 
   // the administrator's own role cannot be changed
-  await expect(rows.filter({ hasText: 'це ви' }).locator('.v-select')).toHaveClass(/v-input--disabled/)
+  await expect(rows.filter({ hasText: 'це ви' }).locator('.role-select')).toHaveClass(/v-input--disabled/)
 
   const pastor = rows.filter({ hasText: 'pastor@example.com' })
   await expect(pastor).toContainText('email не підтверджено')
-  await pastor.locator('.v-select').click()
+  await pastor.locator('.role-select').click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Адміністратор' }).click()
   await expect(pastor).toContainText('роль дав(ла) E2E')
 

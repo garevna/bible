@@ -43,6 +43,23 @@
 
     <v-snackbar v-model="failed" color="error" timeout="4000">{{ header.photoFailed }}</v-snackbar>
 
+    <!-- ministers: the messages, with the number of unread ones -->
+    <v-tooltip v-if="worker.canReceive" :text="messagesText.title">
+      <template #activator="{ props }">
+        <v-btn
+          v-bind="props"
+          icon
+          size="small"
+          :aria-label="messagesText.title"
+          @click="app.setPage('messages')"
+        >
+          <v-badge :model-value="worker.unread > 0" :content="worker.unread" color="warning" floating>
+            <v-icon icon="mdi-email-outline" />
+          </v-badge>
+        </v-btn>
+      </template>
+    </v-tooltip>
+
     <!-- administrators: the dashboard of the roles -->
     <v-tooltip v-if="worker.isAdmin" :text="admin.openDashboard">
       <template #activator="{ props }">
@@ -83,7 +100,7 @@ import { pickImage, resizeImage } from '@/utils/image'
 const app = useAppStore()
 const user = useUserStore()
 const worker = useWorkerStore()
-const { admin, header } = storeToRefs(useLanguageStore())
+const { admin, header, messages: messagesText } = storeToRefs(useLanguageStore())
 
 /** the photo could not be loaded: show the initials instead */
 const broken = ref(false)

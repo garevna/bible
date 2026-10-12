@@ -10,6 +10,31 @@
       <p class="hint">{{ text.hint }}</p>
       <p class="hint">{{ text.remove }}: {{ text.removeHint }}.</p>
 
+      <!-- the ministries of the church: the members of a ministry get the messages sent to it -->
+      <FieldSet :title="text.ministries">
+        <p class="hint mb-2">{{ text.ministriesHint }}</p>
+        <div class="d-flex flex-wrap align-center ga-2">
+          <v-chip
+            v-for="ministry of ministryList"
+            :key="ministry"
+            closable
+            variant="tonal"
+            color="secondary"
+            @click:close="saveMinistries(ministryList.filter((item) => item !== ministry))"
+          >
+            {{ ministry }}
+          </v-chip>
+          <v-text-field
+            v-model="newMinistry"
+            :placeholder="text.newMinistry"
+            density="compact"
+            hide-details
+            class="new-ministry"
+            @keydown.enter="addMinistry"
+          />
+        </div>
+      </FieldSet>
+
       <v-text-field
         v-model="query"
         :placeholder="text.search"
@@ -66,6 +91,20 @@
           @update:model-value="changeRole(item, $event)"
         />
 
+        <v-select
+          :model-value="(item.ministries ?? []).filter((ministry) => ministryList.includes(ministry))"
+          :items="ministryList"
+          :label="text.ministries"
+          :disabled="item.owner || saving === item.uid"
+          multiple
+          chips
+          closable-chips
+          density="compact"
+          hide-details
+          class="ministries-select"
+          @update:model-value="changeMinistries(item, $event)"
+        />
+
         <ConfirmButton
           v-if="!locked(item)"
           icon="mdi-account-remove-outline"
@@ -84,6 +123,7 @@ import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import FieldSet from '@/components/FieldSet.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { ROLES, useWorkerStore, WorkerError, type Role, type UserView } from '@/stores/worker'
@@ -129,18 +169,40 @@ async function load() {
   if (!worker.isAdmin) return
   busy.value = true
   await run(async () => {
-    users.value = await worker.listUsers()
+    const answer = await worker.listUsers()
+    users.value = answer.users
+    ministryList.value = answer.ministries
   })
   busy.value = false
 }
 
-async function changeRole(item: UserView, role: Role) {
+async function change(item: UserView, update: { role?: Role; ministries?: string[] }) {
   saving.value = item.uid
   await run(async () => {
-    const updated = await worker.setUserRole(item.uid, role)
+    const updated = await worker.updateUser(item.uid, update)
     users.value = users.value.map((entry) => (entry.uid === updated.uid ? updated : entry))
   })
   saving.value = null
+}
+
+const changeRole = (item: UserView, role: Role) => change(item, { role })
+const changeMinistries = (item: UserView, ministries: string[]) => change(item, { ministries })
+
+/* ---------- ministries ---------- */
+
+const ministryList = ref<string[]>([])
+const newMinistry = ref('')
+
+const saveMinistries = (list: string[]) =>
+  run(async () => {
+    ministryList.value = await worker.setMinistries(list)
+  })
+
+async function addMinistry() {
+  const name = (newMinistry.value ?? '').trim()
+  if (!name || ministryList.value.includes(name)) return
+  await saveMinistries([...ministryList.value, name])
+  newMinistry.value = ''
 }
 
 const remove = (item: UserView) =>
@@ -200,6 +262,15 @@ watch(() => worker.isAdmin, load)
 
 .role-select {
   flex: 0 0 200px;
+}
+
+.ministries-select {
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+
+.new-ministry {
+  flex: 0 1 240px;
 }
 
 .remove-placeholder {

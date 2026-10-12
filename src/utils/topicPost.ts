@@ -7,6 +7,8 @@ import { verseReference } from './verse'
 export interface VersePost {
   text: string
   ref: string
+  /** the ref of the verse in the app, so a sent note or topic can be saved with its verses */
+  id?: string
 }
 
 export type TopicPostItem =
@@ -19,7 +21,12 @@ export interface TopicPost {
   image?: string
 }
 
-const versePost = (verse: VerseRef): VersePost => ({ text: verse.verse, ref: verseReference(verse) })
+/** id: the ref of the verse in the app, so a sent note or topic can be saved with its verses */
+const versePost = (verse: VerseRef): VersePost => ({
+  text: verse.verse,
+  ref: verseReference(verse),
+  id: verse._id
+})
 
 /** The topic in the order of the page: notes with their verses, and the verses of the topic */
 export const topicPost = (title: string, items: TopicItem[], image?: string): TopicPost => ({

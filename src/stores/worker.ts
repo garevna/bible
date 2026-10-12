@@ -20,12 +20,46 @@ export interface UserView {
   emailVerified: boolean
   name: string | null
   role: Role
+  /** the ministries the user serves in, e.g. 'Музичне служіння' */
+  ministries?: string[]
   /** an administrator the dashboard cannot change (the worker settings, OWNERS) */
   owner: boolean
   lastSeen: number
   updatedBy?: string
   updatedAt?: number
 }
+
+/** A note or a topic sent in a message (its verses carry their refs, so it can be saved) */
+export interface Attachment {
+  kind: 'note' | 'topic'
+  post: TopicPost
+}
+
+/** A message between ministers (see worker/src/messages.ts); it lives for a day */
+export interface Message {
+  id: string
+  fromUid: string
+  fromName: string
+  toUid: string
+  toName: string
+  text: string
+  attachment: Attachment | null
+  replyTo: string | null
+  createdAt: number
+  expiresAt: number
+  readAt: number | null
+}
+
+/** Whom a publisher or an administrator may write to */
+export interface Recipient {
+  uid: string
+  name: string
+  role: Role
+  ministries: string[]
+}
+
+/** how often the number of unread messages is asked for while the app is open */
+const UNREAD_EVERY = 60_000
 
 /** the worker answered with an error: its code, e.g. 'owner', 'self', 'forbidden', or 'unreachable' */
 export class WorkerError extends Error {}
@@ -38,6 +72,12 @@ export const useWorkerStore = defineStore('worker', () => {
   const role = ref<Role>('reader')
   /** the worker has a bot and a channel */
   const telegram = ref(false)
+  /** the ministries of the user */
+  const ministries = ref<string[]>([])
+  /** publishers and administrators write to people and ministries */
+  const canSend = ref(false)
+  /** they and the members of ministries get messages */
+  const canReceive = ref(false)
 
   const canPublish = computed(() => telegram.value && role.value !== 'reader')
   const isAdmin = computed(() => role.value === 'admin')
@@ -71,17 +111,68 @@ export const useWorkerStore = defineStore('worker', () => {
   async function loadRole() {
     role.value = 'reader'
     telegram.value = false
+    ministries.value = []
+    canSend.value = canReceive.value = false
     if (!workerUrl || !user.signed) return
     try {
-      const me = await call<{ role: Role; telegram: boolean }>('GET', '/me')
+      const me = await call<{
+        role: Role
+        telegram: boolean
+        ministries?: string[]
+        canSend?: boolean
+        canReceive?: boolean
+      }>('GET', '/me')
       role.value = me.role
       telegram.value = me.telegram
+      ministries.value = me.ministries ?? []
+      canSend.value = Boolean(me.canSend)
+      canReceive.value = Boolean(me.canReceive)
     } catch (error) {
       console.warn('The role is not known\n', error)
     }
   }
 
   watch(() => user.uid, loadRole, { immediate: true })
+
+  /* ---------- messages ---------- */
+
+  const messages = ref<Message[]>([])
+  const unread = ref(0)
+
+  async function loadMessages() {
+    if (!canReceive.value) return
+    const answer = await call<{ messages: Message[]; unread: number }>('GET', '/messages')
+    messages.value = answer.messages
+    unread.value = answer.unread
+  }
+
+  async function markRead(message: Message) {
+    if (message.readAt || message.toUid !== user.uid) return
+    message.readAt = Date.now()
+    unread.value = Math.max(0, unread.value - 1)
+    await call('POST', `/messages/${encodeURIComponent(message.id)}/read`)
+  }
+
+  const recipients = () => call<{ people: Recipient[]; ministries: string[] }>('GET', '/messages/recipients')
+
+  const sendMessage = async (draft: {
+    to?: string[]
+    ministries?: string[]
+    text: string
+    attachment?: Attachment | null
+    replyTo?: string | null
+  }) => (await call<{ sent: number }>('POST', '/messages', draft)).sent
+
+  // the number of unread messages is kept fresh while the app is open and visible
+  let timer: ReturnType<typeof setInterval> | undefined
+  const quietly = () => loadMessages().catch(() => undefined)
+  watch(canReceive, (value) => {
+    clearInterval(timer)
+    if (!value) return
+    quietly()
+    timer = setInterval(() => document.visibilityState === 'visible' && quietly(), UNREAD_EVERY)
+  })
+  document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && quietly())
 
   /** the messages of the post, and the caption of its picture */
   const preview = (post: TopicPost) =>
@@ -90,23 +181,40 @@ export const useWorkerStore = defineStore('worker', () => {
   const publishToTelegram = async (post: TopicPost) =>
     (await call<{ sent: number }>('POST', '/telegram/publish', post)).sent
 
-  const listUsers = async () => (await call<{ users: UserView[] }>('GET', '/admin/users')).users
+  /** the users and the ministries of the church */
+  const listUsers = () => call<{ users: UserView[]; ministries: string[] }>('GET', '/admin/users')
 
-  const setUserRole = async (uid: string, newRole: Role) =>
-    (await call<{ user: UserView }>('PUT', `/admin/users/${encodeURIComponent(uid)}`, { role: newRole })).user
+  const updateUser = async (uid: string, change: { role?: Role; ministries?: string[] }) =>
+    (await call<{ user: UserView }>('PUT', `/admin/users/${encodeURIComponent(uid)}`, change)).user
+
+  const setUserRole = (uid: string, newRole: Role) => updateUser(uid, { role: newRole })
 
   const removeUser = (uid: string) => call('DELETE', `/admin/users/${encodeURIComponent(uid)}`)
+
+  const setMinistries = async (list: string[]) =>
+    (await call<{ ministries: string[] }>('PUT', '/admin/ministries', { ministries: list })).ministries
 
   return {
     role,
     telegram,
     canPublish,
     isAdmin,
+    ministries,
+    canSend,
+    canReceive,
+    messages,
+    unread,
     loadRole,
     preview,
     publishToTelegram,
     listUsers,
+    updateUser,
     setUserRole,
-    removeUser
+    removeUser,
+    setMinistries,
+    loadMessages,
+    markRead,
+    recipients,
+    sendMessage
   }
 })
