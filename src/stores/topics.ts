@@ -12,6 +12,7 @@ import {
 } from '@/db'
 import type { Note, Topic, VerseRef } from '@/types'
 import { clone, idFrom, isEqual, removeById } from '@/utils/array'
+import { typedOf } from '@/utils/noteTypes'
 import { getVerseHTML } from '@/utils/verse'
 
 import { useAppStore } from './app'
@@ -68,7 +69,7 @@ export const useTopicsStore = defineStore('topics', () => {
 
   async function putTopic(topic: Topic) {
     const { _id = Date.now().toString(), title, refs = [], order = [], image } = topic
-    const record: Topic = clone({ _id, title, refs, order, ...(image ? { image } : {}) })
+    const record: Topic = clone({ _id, title, refs, order, ...(image ? { image } : {}), ...typedOf(topic) })
 
     await app.withProgress(async () => {
       await putRecord('topics', record)
@@ -215,8 +216,15 @@ export const useTopicsStore = defineStore('topics', () => {
     const noteItems = currentTopicData.value.filter((item): item is TopicNoteItem => item.type === 'note')
 
     await Promise.all(
-      noteItems.map(({ _id, keywords, topics, text, verses }) =>
-        notesStore.putNote({ _id, keywords, topics, text, refs: verses.map((verse) => verse._id) })
+      noteItems.map((item) =>
+        notesStore.putNote({
+          _id: item._id,
+          keywords: item.keywords,
+          topics: item.topics,
+          text: item.text,
+          refs: item.verses.map((verse) => verse._id),
+          ...typedOf(item)
+        })
       )
     )
 

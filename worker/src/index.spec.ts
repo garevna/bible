@@ -111,7 +111,7 @@ describe('worker', () => {
   it('the owner is an admin; a new user is a reader; an unverified email is not the owner', async () => {
     const { call } = setup()
     expect((await call('GET', '/me', 'owner')).body).toMatchObject({
-      role: 'admin',
+      role: 'owner',
       telegram: true,
       canSend: true
     })
@@ -230,6 +230,143 @@ describe('worker', () => {
   })
 })
 
+describe('roles kept by the administrators', () => {
+  const role = (id: string, change: Record<string, unknown> = {}) => ({
+    id,
+    name: id,
+    publish: false,
+    send: false,
+    sendToRoles: [],
+    sendToPeople: false,
+    messageDays: 1,
+    manage: [],
+    ...change
+  })
+
+  it('a role has the functions of an administrator it is given, no more', async () => {
+    const { call } = setup()
+    for (const user of ['owner', 'pastor', 'musician']) await call('GET', '/me', user)
+    const defaults = (await call('GET', '/admin/settings', 'owner')).body.roles as { id: string }[]
+    expect(defaults.map((item) => item.id)).toEqual(['reader', 'servant', 'publisher', 'admin'])
+
+    // a coordinator of people: gives roles, does not change the roles themselves
+    const roles = [role('reader'), role('servant'), role('coordinator', { manage: ['users'] })]
+    expect((await call('PUT', '/admin/roles', 'owner', { roles })).status).toBe(200)
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'coordinator' })
+
+    expect((await call('GET', '/me', 'pastor')).body).toMatchObject({
+      role: 'coordinator',
+      rights: { manage: ['users'] }
+    })
+    expect((await call('GET', '/admin/users', 'pastor')).status).toBe(200)
+    expect((await call('PUT', '/admin/users/musician-uid', 'pastor', { role: 'servant' })).status).toBe(200)
+    expect((await call('PUT', '/admin/roles', 'pastor', { roles })).status).toBe(403)
+    expect((await call('PUT', '/admin/directories/locations', 'pastor', { items: ['Церква'] })).status).toBe(
+      403
+    )
+    // no role that is not on the list
+    expect((await call('PUT', '/admin/users/musician-uid', 'pastor', { role: 'bishop' })).status).toBe(400)
+  })
+
+  it('whom a role writes to, and how long its messages are kept', async () => {
+    const { call, clock } = setup()
+    for (const user of ['owner', 'pastor', 'musician', 'leader']) await call('GET', '/me', user)
+    const roles = [
+      role('reader'),
+      role('servant'),
+      role('leader'),
+      role('pastor', { send: true, sendToRoles: ['leader'], messageDays: 3 })
+    ]
+    await call('PUT', '/admin/roles', 'owner', { roles })
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'pastor' })
+    await call('PUT', '/admin/users/musician-uid', 'owner', { role: 'servant' })
+    await call('PUT', '/admin/users/leader-uid', 'owner', { role: 'leader' })
+
+    const answer = (await call('GET', '/messages/recipients', 'pastor')).body
+    expect((answer.people as { uid: string }[]).map((person) => person.uid)).toEqual(['leader-uid'])
+    expect(answer.roles).toEqual([{ id: 'leader', name: 'leader' }])
+    expect((await call('POST', '/messages', 'pastor', { to: ['musician-uid'], text: 'Ні' })).status).toBe(400)
+
+    expect((await call('POST', '/messages', 'pastor', { roles: ['leader'], text: 'Лідерам' })).body).toEqual({
+      sent: 1
+    })
+    clock.now += 2 * 24 * 60 * 60 * 1000
+    expect((await call('GET', '/messages', 'leader')).body.messages).toHaveLength(1)
+    clock.now += 2 * 24 * 60 * 60 * 1000
+    expect((await call('GET', '/messages', 'leader')).body.messages).toHaveLength(0)
+
+    // a role without sending writes to nobody
+    expect((await call('POST', '/messages', 'musician', { to: ['leader-uid'], text: 'Привіт' })).status).toBe(
+      403
+    )
+  })
+
+  it('the reader has no rights; a removed role is a reader', async () => {
+    const { call } = setup()
+    for (const user of ['owner', 'pastor']) await call('GET', '/me', user)
+    const saved = await call('PUT', '/admin/roles', 'owner', {
+      roles: [role('reader', { publish: true, manage: ['roles'] }), role('helper', { publish: true })]
+    })
+    expect((saved.body.roles as { id: string; publish: boolean }[])[0]).toMatchObject({
+      id: 'reader',
+      publish: false
+    })
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'helper' })
+    expect((await call('GET', '/me', 'pastor')).body).toMatchObject({ rights: { publish: true } })
+
+    await call('PUT', '/admin/roles', 'owner', { roles: [role('reader')] })
+    expect((await call('GET', '/me', 'pastor')).body).toMatchObject({
+      role: 'helper',
+      rights: { publish: false },
+      canReceive: false
+    })
+    expect((await call('POST', '/telegram/preview', 'pastor', topic)).status).toBe(403)
+  })
+})
+
+describe('types of notes and topics', () => {
+  it('everyone who signed in reads them; administrators change them', async () => {
+    const { call } = setup()
+    await call('GET', '/me', 'owner')
+    const { body } = await call('GET', '/types', 'reader')
+    expect((body.types as { id: string }[]).map((type) => type.id)).toEqual([
+      'news',
+      'announcement',
+      'sermon',
+      'prayer',
+      'internal'
+    ])
+
+    const types = [
+      {
+        id: 'sermon',
+        name: ' Проповідь ',
+        color: '#6A1B9A',
+        publish: 'author',
+        send: true,
+        days: null,
+        deleteAfterPublish: false,
+        authorSetsTerm: false
+      }
+    ]
+    expect((await call('PUT', '/admin/types', 'reader', { types })).status).toBe(403)
+    expect((await call('PUT', '/admin/types', 'owner', { types })).body).toEqual({
+      types: [{ ...types[0], name: 'Проповідь' }]
+    })
+    expect(((await call('GET', '/types', 'reader')).body.types as unknown[]).length).toBe(1)
+
+    // no types, two with one id, a wrong color or term are refused
+    for (const bad of [
+      [],
+      [types[0], types[0]],
+      [{ ...types[0], color: 'red' }],
+      [{ ...types[0], days: 0 }]
+    ]) {
+      expect((await call('PUT', '/admin/types', 'owner', { types: bad })).status).toBe(400)
+    }
+  })
+})
+
 describe('messages between ministers', () => {
   /** the owner makes the pastor a publisher and puts two people into ministries */
   async function church() {
@@ -260,19 +397,19 @@ describe('messages between ministers', () => {
   it('ministries: a list kept by the administrators, given to users', async () => {
     const { call } = await church()
     expect((await call('GET', '/me', 'musician')).body).toMatchObject({
-      role: 'reader',
+      role: 'servant',
       ministries: ['Музичне служіння'],
       canSend: false,
       canReceive: true
     })
     expect((await call('GET', '/me', 'reader')).body).toMatchObject({ canSend: false, canReceive: false })
 
-    expect((await call('PUT', '/admin/ministries', 'pastor', { ministries: ['x'] })).status).toBe(403)
+    expect((await call('PUT', '/admin/directories/ministries', 'pastor', { items: ['x'] })).status).toBe(403)
     expect(
-      (await call('PUT', '/admin/ministries', 'owner', { ministries: [' Хор ', 'Хор', 'Діти'] })).body
-    ).toEqual({ ministries: ['Хор', 'Діти'] })
+      (await call('PUT', '/admin/directories/ministries', 'owner', { items: [' Хор ', 'Хор', 'Діти'] })).body
+    ).toEqual({ items: ['Хор', 'Діти'] })
     expect((await call('GET', '/ministries', 'musician')).body).toEqual({ ministries: ['Хор', 'Діти'] })
-    expect((await call('PUT', '/admin/ministries', 'owner', { ministries: [''] })).status).toBe(400)
+    expect((await call('PUT', '/admin/directories/ministries', 'owner', { items: [''] })).status).toBe(400)
   })
 
   it('the pastor writes to a ministry; the note goes without its picture; read marks', async () => {

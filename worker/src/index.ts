@@ -1,40 +1,57 @@
 import { verifyIdToken, type AuthUser } from './auth'
-import { d1Store, HOURLY_LIMIT, MESSAGE_LIFE, parseDraft, type Message, type MessagesStore } from './messages'
+import { d1Store, HOURLY_LIMIT, parseDraft, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
-import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import {
+  getRoles,
+  OWNER_ROLE,
+  parseRoles,
+  READER,
+  roleDefOf,
+  setRoles,
+  type Manage,
+  type RoleDef
+} from './roles'
+import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
+import { getTypes, parseTypes, setTypes } from './types'
+import {
+  DIRECTORIES,
+  getDirectory,
   getMinistries,
   isPhone,
-  isRole,
   listUsers,
   parseMinistries,
   removeUser,
   RoleChangeError,
   roleOf,
-  setMinistries,
+  setDirectory,
   setOwnPhone,
   touchUser,
   updateUser,
-  type Role,
+  type Directory,
   type UserRecord,
   type UsersStore
 } from './users'
 
 /**
  * Worker of the Bible app.
- *   GET    /me                   the role of the signed in user (and remembers the user)
- *   PUT    /me                   { phone: '+380…' | null }: the user's own mobile number
- *   POST   /telegram/preview     the messages a post becomes, and the caption of its picture (nothing is sent)
- *   POST   /telegram/publish     sends the post to the Telegram channel
- *   GET    /admin/users          users who signed in, with their roles and ministries
- *   PUT    /admin/users/:uid     { role?: 'reader' | 'publisher' | 'admin', ministries?: string[] }
- *   DELETE /admin/users/:uid     takes a user off the list
- *   GET    /ministries           the ministries of the church
- *   PUT    /admin/ministries     { ministries: string[] }
- *   GET    /messages             the messages of the last day, to and from the user
- *   GET    /messages/recipients  whom the user may write to
- *   POST   /messages             { to?, ministries?, text, attachment?, replyTo? }
- *   POST   /messages/:id/read    marks a message read
+ *   GET    /me                      the role and the rights of the signed in user (and remembers the user)
+ *   PUT    /me                      { phone: '+380…' | null }: the user's own mobile number
+ *   POST   /telegram/preview        the messages a post becomes, and the caption of its picture (nothing is sent)
+ *   POST   /telegram/publish        sends the post to the Telegram channel
+ *   GET    /types                   the types of notes and topics
+ *   GET    /ministries              the ministries of the church
+ *   GET    /messages                the messages to and from the user that have not expired
+ *   GET    /messages/recipients     whom the user may write to
+ *   POST   /messages                { to?, ministries?, roles?, text, attachment?, replyTo? }
+ *   POST   /messages/:id/read       marks a message read
+ * The dashboard, each part for the roles that have its function (the owners have all):
+ *   GET    /admin/settings          the roles, types, ministries and locations
+ *   PUT    /admin/roles             { roles }                                        roles
+ *   GET    /admin/users             the users who signed in                          users
+ *   PUT    /admin/users/:uid        { role?, ministries?, phone? }                   users
+ *   DELETE /admin/users/:uid        takes a user off the list                        users
+ *   PUT    /admin/directories/:name { items }: 'ministries' or 'locations'           directories
+ *   PUT    /admin/types             { types }                                        types
  * Every request carries the Firebase ID token: Authorization: Bearer <token>.
  */
 export interface Env {
@@ -43,7 +60,7 @@ export interface Env {
   /** the channel (@name or -100… id); the bot is its administrator */
   TELEGRAM_CHAT_ID: string
   FIREBASE_PROJECT_ID: string
-  /** user ids and verified emails of the owners: administrators the dashboard cannot change */
+  /** user ids and verified emails of the owners: every right, the dashboard cannot change them */
   OWNERS: string
   /** origins of the app, separated by commas */
   ALLOWED_ORIGINS: string
@@ -77,21 +94,27 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
 const ROUTES = [
   /^(GET|PUT) \/me$/,
   /^POST \/telegram\/(preview|publish)$/,
-  /^GET \/admin\/users$/,
-  /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
-  /^GET \/ministries$/,
-  /^PUT \/admin\/ministries$/,
+  /^GET \/(types|ministries)$/,
   /^GET \/messages(\/recipients)?$/,
   /^POST \/messages$/,
-  /^POST \/messages\/[^/]+\/read$/
+  /^POST \/messages\/[^/]+\/read$/,
+  /^GET \/admin\/(settings|users)$/,
+  /^PUT \/admin\/(roles|types)$/,
+  /^PUT \/admin\/directories\/(ministries|locations)$/,
+  /^(PUT|DELETE) \/admin\/users\/[^/]+$/
 ]
 
-/** publishers and administrators write to people and ministries */
-const canSend = (role: Role) => role !== 'reader'
-/** they and the members of ministries get messages */
-const canReceive = (record: UserRecord, role: Role) => role !== 'reader' || Boolean(record.ministries?.length)
+const DAY = 24 * 60 * 60 * 1000
 
 const nameOf = (record: UserRecord) => record.name ?? record.email ?? record.uid
+
+/** what the people of a role may do; the owners may do everything */
+const rightsOf = (roles: RoleDef[], roleId: string) =>
+  roleId === 'owner' ? OWNER_ROLE : roleDefOf(roles, roleId)
+
+/** everyone but the readers serves: they get messages and see the ministries (a removed role is a reader) */
+const serves = (roles: RoleDef[], roleId: string) =>
+  roleId === 'owner' || (roleId !== READER && roles.some((role) => role.id === roleId))
 
 export async function handle(request: Request, env: Env, deps: Deps = defaultDeps): Promise<Response> {
   const cors = corsHeaders(request, env)
@@ -114,20 +137,31 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   }
 
   const me = await touchUser(env.USERS, authUser)
-  const role = roleOf(me, env.OWNERS)
+  const roles = await getRoles(env.USERS)
+  const roleId = roleOf(me, env.OWNERS)
+  const rights = rightsOf(roles, roleId)
+  const can = (function_: Manage) => rights.manage.includes(function_)
   const telegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
   const body = async () => (await request.json().catch(() => null)) as unknown
 
   if (route === 'GET /me') {
     return json({
-      role,
+      role: roleId,
+      roleName: rights.name,
       telegram,
       ministries: me.ministries ?? [],
-      canSend: canSend(role),
-      canReceive: canReceive(me, role),
+      rights: {
+        publish: rights.publish,
+        send: rights.send,
+        sendToPeople: rights.sendToPeople,
+        sendToRoles: rights.sendToRoles,
+        manage: rights.manage
+      },
+      canSend: rights.send,
+      canReceive: serves(roles, roleId),
       phone: me.phone ?? null,
       // ministers are asked for their mobile number until they give it
-      needsPhone: canReceive(me, role) && !me.phone
+      needsPhone: serves(roles, roleId) && !me.phone
     })
   }
 
@@ -138,8 +172,11 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     return json({ phone: updated.phone ?? null })
   }
 
+  // the types of notes and topics: everyone who signed in reads them
+  if (route === 'GET /types') return json({ types: await getTypes(env.USERS) })
+
   if (pathname.startsWith('/telegram/')) {
-    if (role === 'reader') return json({ error: 'forbidden' }, 403)
+    if (!rights.publish) return json({ error: 'forbidden' }, 403)
     const post = parsePost(await body())
     if (!post) return json({ error: 'bad-request' }, 400)
     const messages = formatTopic(post)
@@ -158,21 +195,55 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   }
 
   if (pathname.startsWith('/messages') || route === 'GET /ministries') {
-    if (!canReceive(me, role)) return json({ error: 'forbidden' }, 403)
+    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
     if (route === 'GET /ministries') return json({ ministries: await getMinistries(env.USERS) })
-    return handleMessages(request, env, deps, me, role, json, body)
+    return handleMessages(request, env, deps, me, roles, rights, json, body)
   }
 
   // the dashboard
-  if (role !== 'admin') return json({ error: 'forbidden' }, 403)
-  if (route === 'GET /admin/users') {
-    return json({ users: await listUsers(env.USERS, env.OWNERS), ministries: await getMinistries(env.USERS) })
+  if (route === 'GET /admin/settings') {
+    if (!rights.manage.length) return json({ error: 'forbidden' }, 403)
+    return json({
+      roles,
+      types: await getTypes(env.USERS),
+      ministries: await getDirectory(env.USERS, 'ministries'),
+      locations: await getDirectory(env.USERS, 'locations')
+    })
   }
-  if (route === 'PUT /admin/ministries') {
-    const ministries = parseMinistries(((await body()) as { ministries?: unknown } | null)?.ministries)
-    if (!ministries) return json({ error: 'bad-request' }, 400)
-    await setMinistries(env.USERS, ministries)
-    return json({ ministries })
+
+  if (route === 'PUT /admin/roles') {
+    if (!can('roles')) return json({ error: 'forbidden' }, 403)
+    const parsed = parseRoles(((await body()) as { roles?: unknown } | null)?.roles)
+    if (!parsed) return json({ error: 'bad-request' }, 400)
+    await setRoles(env.USERS, parsed)
+    return json({ roles: parsed })
+  }
+
+  if (route === 'PUT /admin/types') {
+    if (!can('types')) return json({ error: 'forbidden' }, 403)
+    const types = parseTypes(((await body()) as { types?: unknown } | null)?.types)
+    if (!types) return json({ error: 'bad-request' }, 400)
+    await setTypes(env.USERS, types)
+    return json({ types })
+  }
+
+  const directory = pathname.match(/^\/admin\/directories\/(\w+)$/)?.[1] as Directory | undefined
+  if (directory && DIRECTORIES.includes(directory)) {
+    if (!can('directories')) return json({ error: 'forbidden' }, 403)
+    const items = parseMinistries(((await body()) as { items?: unknown } | null)?.items)
+    if (!items) return json({ error: 'bad-request' }, 400)
+    await setDirectory(env.USERS, directory, items)
+    return json({ items })
+  }
+
+  // the users
+  if (!can('users')) return json({ error: 'forbidden' }, 403)
+  if (route === 'GET /admin/users') {
+    return json({
+      users: await listUsers(env.USERS, env.OWNERS),
+      roles,
+      ministries: await getMinistries(env.USERS)
+    })
   }
 
   const uid = decodeURIComponent(pathname.slice('/admin/users/'.length))
@@ -182,16 +253,18 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       return json({ removed: uid })
     }
     const change = ((await body()) ?? {}) as { role?: unknown; ministries?: unknown; phone?: unknown }
+    const role =
+      typeof change.role === 'string' && roles.some((item) => item.id === change.role) ? change.role : null
     const ministries = change.ministries === undefined ? undefined : parseMinistries(change.ministries)
     const badPhone = change.phone !== undefined && change.phone !== null && !isPhone(change.phone)
-    if ((change.role !== undefined && !isRole(change.role)) || ministries === null || badPhone) {
+    if ((change.role !== undefined && !role) || ministries === null || badPhone) {
       return json({ error: 'bad-request' }, 400)
     }
     if (change.role === undefined && ministries === undefined && change.phone === undefined) {
       return json({ error: 'bad-request' }, 400)
     }
     const user = await updateUser(env.USERS, env.OWNERS, me, uid, {
-      ...(isRole(change.role) ? { role: change.role } : {}),
+      ...(role ? { role } : {}),
       ...(ministries ? { ministries } : {}),
       ...(change.phone !== undefined ? { phone: change.phone as string | null } : {})
     })
@@ -207,7 +280,8 @@ async function handleMessages(
   env: Env,
   deps: Deps,
   me: UserRecord,
-  role: Role,
+  roles: RoleDef[],
+  rights: RoleDef,
   json: (body: unknown, status?: number) => Response,
   body: () => Promise<unknown>
 ): Promise<Response> {
@@ -227,21 +301,27 @@ async function handleMessages(
     return json({ read: true })
   }
 
-  // the people who get messages: publishers, administrators and the members of ministries
+  // whom the role of the user may write to: anyone who serves, or the people of its roles
   const users = await listUsers(env.USERS, env.OWNERS)
-  const receivers = users.filter((user) => user.uid !== me.uid && canReceive(user, user.role))
+  const reachable = (user: (typeof users)[number]) =>
+    user.uid !== me.uid &&
+    serves(roles, user.role) &&
+    (rights.sendToPeople || rights.sendToRoles.includes(user.role))
+  const receivers = rights.send ? users.filter(reachable) : []
 
   if (pathname === '/messages/recipients') {
-    if (!canSend(role)) return json({ people: [], ministries: [] })
     return json({
-      people: receivers.map(({ uid, name, email, role: userRole, ministries, phone }) => ({
+      people: receivers.map(({ uid, name, email, role, ministries, phone }) => ({
         uid,
         name: name ?? email ?? uid,
-        role: userRole,
+        role,
         ministries: ministries ?? [],
         phone: phone ?? null
       })),
-      ministries: await getMinistries(env.USERS)
+      ministries: rights.send ? await getMinistries(env.USERS) : [],
+      roles: roles
+        .filter((role) => rights.sendToRoles.includes(role.id))
+        .map(({ id, name }) => ({ id, name }))
     })
   }
 
@@ -250,12 +330,16 @@ async function handleMessages(
   if (!draft) return json({ error: 'bad-request' }, 400)
 
   let recipients: { uid: string; name: string }[]
-  if (canSend(role) && !draft.replyTo) {
+  if (rights.send && !draft.replyTo) {
     const chosen = new Set(draft.to)
     const unknown = draft.to.filter((uid) => !receivers.some((user) => user.uid === uid))
     if (unknown.length) return json({ error: 'unknown-recipient' }, 400)
     receivers
-      .filter((user) => user.ministries?.some((ministry) => draft.ministries.includes(ministry)))
+      .filter(
+        (user) =>
+          user.ministries?.some((ministry) => draft.ministries.includes(ministry)) ||
+          (draft.roles.includes(user.role) && rights.sendToRoles.includes(user.role))
+      )
       .forEach((user) => chosen.add(user.uid))
     recipients = receivers
       .filter((user) => chosen.has(user.uid))
@@ -274,6 +358,8 @@ async function handleMessages(
   }
 
   await store.deleteExpired(now)
+  // the role of the one who writes says how long the messages are kept
+  const expiresAt = now + rights.messageDays * DAY
   const messages: Message[] = recipients.map(({ uid, name }) => ({
     id: crypto.randomUUID(),
     fromUid: me.uid,
@@ -284,7 +370,7 @@ async function handleMessages(
     attachment: draft.attachment,
     replyTo: draft.replyTo,
     createdAt: now,
-    expiresAt: now + MESSAGE_LIFE,
+    expiresAt,
     readAt: null
   }))
   await store.insert(messages)

@@ -1,51 +1,8 @@
 <template>
-  <div class="page mx-auto" style="max-width: 960px">
+  <div class="page mx-auto admin-panel" style="max-width: 1100px">
     <p v-if="!worker.isAdmin" class="text-medium-emphasis">{{ text.noAccess }}</p>
 
     <template v-else>
-      <div class="d-flex align-center ga-2 mb-2">
-        <h2 class="admin-title flex-grow-1">{{ text.title }}</h2>
-        <ButtonTooltip icon="mdi-refresh" :text="text.reload" color="secondary" @click="load" />
-      </div>
-      <p class="hint">{{ text.hint }}</p>
-      <p class="hint">{{ text.remove }}: {{ text.removeHint }}.</p>
-
-      <!-- the ministries of the church: the members of a ministry get the messages sent to it -->
-      <FieldSet :title="text.ministries">
-        <p class="hint mb-2">{{ text.ministriesHint }}</p>
-        <div class="d-flex flex-wrap align-center ga-2">
-          <v-chip
-            v-for="ministry of ministryList"
-            :key="ministry"
-            closable
-            variant="tonal"
-            color="secondary"
-            @click:close="saveMinistries(ministryList.filter((item) => item !== ministry))"
-          >
-            {{ ministry }}
-          </v-chip>
-          <v-text-field
-            v-model="newMinistry"
-            :placeholder="text.newMinistry"
-            density="compact"
-            hide-details
-            class="new-ministry"
-            @keydown.enter="addMinistry"
-          />
-        </div>
-      </FieldSet>
-
-      <v-text-field
-        v-model="query"
-        :placeholder="text.search"
-        prepend-inner-icon="$search"
-        density="compact"
-        clearable
-        hide-details
-        class="mb-4"
-      />
-
-      <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
       <v-alert
         v-if="error"
         type="error"
@@ -58,248 +15,187 @@
         {{ error }}
       </v-alert>
 
-      <p v-if="!busy && !shown.length" class="text-medium-emphasis">{{ text.noUsers }}</p>
+      <div class="admin-layout">
+        <!-- the sections the role of the user may open; on a phone they are a list above -->
+        <v-select
+          v-if="compact"
+          v-model="section"
+          :items="sections"
+          item-title="title"
+          item-value="value"
+          density="compact"
+          hide-details
+          class="mb-4"
+        />
+        <v-list
+          v-else
+          v-model:selected="selected"
+          nav
+          density="compact"
+          bg-color="homefone"
+          class="admin-nav"
+          mandatory
+        >
+          <v-list-item
+            v-for="item of sections"
+            :key="item.value"
+            :value="item.value"
+            :prepend-icon="item.icon"
+            :title="item.title"
+            color="secondary"
+          />
+        </v-list>
 
-      <div v-for="item of shown" :key="item.uid" class="user-row">
-        <div class="flex-grow-1 user-info">
-          <div class="user-name">
-            {{ item.name || item.email || item.uid }}
-            <v-chip v-if="item.owner" size="x-small" color="secondary" variant="tonal" class="ml-1">{{
-              text.owner
-            }}</v-chip>
-            <v-chip v-else-if="item.uid === user.uid" size="x-small" variant="tonal" class="ml-1">{{
-              text.you
-            }}</v-chip>
-          </div>
-          <div class="user-details">
-            <span v-if="item.email && item.name">{{ item.email }}</span>
-            <span v-if="item.email && !item.emailVerified" class="unverified">{{ text.unverified }}</span>
-            <a v-if="item.phone" :href="'tel:' + item.phone" class="phone">{{ item.phone }}</a>
-            <span>{{ format(text.lastSeen, { name: day(item.lastSeen) }) }}</span>
-            <span v-if="item.updatedBy">{{ format(text.changedBy, { name: item.updatedBy }) }}</span>
-          </div>
+        <div class="admin-section">
+          <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
+          <template v-if="settings">
+            <AdminRoles v-if="section === 'roles'" v-model="settings.roles" @error="fail" />
+            <AdminUsers
+              v-else-if="section === 'users'"
+              :roles="settings.roles"
+              :ministries="settings.ministries"
+              @error="fail"
+            />
+            <AdminDirectory
+              v-else-if="section === 'ministries'"
+              v-model="settings.ministries"
+              name="ministries"
+              :title="text.sectionMinistries"
+              @error="fail"
+            />
+            <AdminDirectory
+              v-else-if="section === 'locations'"
+              v-model="settings.locations"
+              name="locations"
+              :title="text.sectionLocations"
+              @error="fail"
+            />
+          </template>
         </div>
-
-        <v-select
-          :model-value="item.role"
-          :items="roleItems"
-          :disabled="locked(item) || saving === item.uid"
-          :loading="saving === item.uid"
-          :aria-label="item.name || item.email || item.uid"
-          density="compact"
-          hide-details
-          class="role-select"
-          @update:model-value="changeRole(item, $event)"
-        />
-
-        <v-select
-          :model-value="(item.ministries ?? []).filter((ministry) => ministryList.includes(ministry))"
-          :items="ministryList"
-          :label="text.ministries"
-          :disabled="item.owner || saving === item.uid"
-          multiple
-          chips
-          closable-chips
-          density="compact"
-          hide-details
-          class="ministries-select"
-          @update:model-value="changeMinistries(item, $event)"
-        />
-
-        <ButtonTooltip
-          icon="mdi-cellphone-cog"
-          :text="header.myPhone"
-          color="secondary"
-          small
-          :disabled="item.owner"
-          @click="phoneOf = item"
-        />
-
-        <ConfirmButton
-          v-if="!locked(item)"
-          icon="mdi-account-remove-outline"
-          :text="text.remove"
-          @confirm="remove(item)"
-        />
-        <span v-else class="remove-placeholder" />
       </div>
     </template>
-
-    <PhoneDialog
-      :model-value="Boolean(phoneOf)"
-      :number="phoneOf?.phone ?? null"
-      :title="phoneOf ? phoneOf.name || phoneOf.email || phoneOf.uid : ''"
-      :submit="(phone: string) => change(phoneOf!, { phone })"
-      @update:model-value="(value: boolean) => value || (phoneOf = null)"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useDisplay } from 'vuetify'
 
-import ButtonTooltip from '@/components/ButtonTooltip.vue'
-import ConfirmButton from '@/components/ConfirmButton.vue'
-import FieldSet from '@/components/FieldSet.vue'
-import PhoneDialog from '@/components/PhoneDialog.vue'
+import AdminDirectory from '@/components/admin/AdminDirectory.vue'
+import AdminRoles from '@/components/admin/AdminRoles.vue'
+import AdminUsers from '@/components/admin/AdminUsers.vue'
 import { useLanguageStore } from '@/stores/language'
-import { useUserStore } from '@/stores/user'
-import { ROLES, useWorkerStore, WorkerError, type Role, type UserView } from '@/stores/worker'
+import { useWorkerStore, WorkerError, type Manage, type RoleDef } from '@/stores/worker'
 import { format } from '@/utils/format'
+import type { NoteType } from '@/utils/noteTypes'
 
-/** The dashboard of the roles: who signed in to the app and what they may do */
+/** The dashboard: the sections on the left, each for the roles that have its function */
 const worker = useWorkerStore()
-const user = useUserStore()
-const { admin: text, header, publish } = storeToRefs(useLanguageStore())
+const { admin: text, publish } = storeToRefs(useLanguageStore())
+const { smAndDown: compact } = useDisplay()
 
-const users = shallowRef<UserView[]>([])
-const query = ref('')
+type Section = 'roles' | 'users' | 'ministries' | 'locations'
+
+const all: { value: Section; icon: string; manage: Manage; label: keyof typeof text.value }[] = [
+  { value: 'roles', icon: 'mdi-shield-key-outline', manage: 'roles', label: 'sectionRoles' },
+  { value: 'users', icon: 'mdi-account-group-outline', manage: 'users', label: 'sectionUsers' },
+  { value: 'ministries', icon: 'mdi-hand-heart-outline', manage: 'directories', label: 'sectionMinistries' },
+  { value: 'locations', icon: 'mdi-map-marker-outline', manage: 'directories', label: 'sectionLocations' }
+]
+
+const sections = computed(() =>
+  all
+    .filter((item) => worker.manages(item.manage))
+    .map((item) => ({ ...item, title: text.value[item.label] }))
+)
+
+const section = ref<Section | null>(null)
+const selected = computed({
+  get: () => (section.value ? [section.value] : []),
+  set: (value: Section[]) => value[0] && (section.value = value[0])
+})
+// the first section the role may open
+watch(
+  sections,
+  (list) => {
+    if (!list.some((item) => item.value === section.value)) section.value = list[0]?.value ?? null
+  },
+  { immediate: true }
+)
+
+const settings = ref<{
+  roles: RoleDef[]
+  types: NoteType[]
+  ministries: string[]
+  locations: string[]
+} | null>(null)
 const busy = ref(false)
-const saving = ref<string | null>(null)
 const error = ref('')
 
-const roleItems = computed(() => ROLES.map((role) => ({ value: role, title: text.value[role] })))
-
-const shown = computed(() => {
-  const words = (query.value ?? '').trim().toLowerCase()
-  if (!words) return users.value
-  return users.value.filter((item) => `${item.name ?? ''} ${item.email ?? ''}`.toLowerCase().includes(words))
-})
-
-/** the owners and the administrator's own role are not changed here */
-const locked = (item: UserView) => item.owner || item.uid === user.uid
-
-const day = (ms: number) => new Date(ms).toLocaleDateString()
-
-const reason = (cause: unknown) =>
-  cause instanceof WorkerError && cause.message !== 'unreachable' ? cause.message : publish.value.unreachable
-
-async function run(action: () => Promise<void>) {
-  error.value = ''
-  try {
-    await action()
-  } catch (cause) {
-    error.value = format(text.value.failed, { name: reason(cause) })
-  }
+function fail(cause: unknown) {
+  const reason =
+    cause instanceof WorkerError && cause.message !== 'unreachable'
+      ? cause.message
+      : publish.value.unreachable
+  error.value = format(text.value.failed, { name: reason })
 }
 
 async function load() {
   if (!worker.isAdmin) return
   busy.value = true
-  await run(async () => {
-    const answer = await worker.listUsers()
-    users.value = answer.users
-    ministryList.value = answer.ministries
-  })
-  busy.value = false
+  try {
+    settings.value = await worker.getSettings()
+  } catch (cause) {
+    fail(cause)
+  } finally {
+    busy.value = false
+  }
 }
-
-async function change(item: UserView, update: { role?: Role; ministries?: string[]; phone?: string | null }) {
-  saving.value = item.uid
-  await run(async () => {
-    const updated = await worker.updateUser(item.uid, update)
-    users.value = users.value.map((entry) => (entry.uid === updated.uid ? updated : entry))
-  })
-  saving.value = null
-}
-
-const changeRole = (item: UserView, role: Role) => change(item, { role })
-const changeMinistries = (item: UserView, ministries: string[]) => change(item, { ministries })
-
-/* ---------- ministries ---------- */
-
-const ministryList = ref<string[]>([])
-/** the user whose mobile number is being entered */
-const phoneOf = shallowRef<UserView | null>(null)
-const newMinistry = ref('')
-
-const saveMinistries = (list: string[]) =>
-  run(async () => {
-    ministryList.value = await worker.setMinistries(list)
-  })
-
-async function addMinistry() {
-  const name = (newMinistry.value ?? '').trim()
-  if (!name || ministryList.value.includes(name)) return
-  await saveMinistries([...ministryList.value, name])
-  newMinistry.value = ''
-}
-
-const remove = (item: UserView) =>
-  run(async () => {
-    await worker.removeUser(item.uid)
-    users.value = users.value.filter((entry) => entry.uid !== item.uid)
-  })
 
 onMounted(load)
-// the role comes from the worker after the page may already be open
+// the rights come from the worker after the page may already be open
 watch(() => worker.isAdmin, load)
 </script>
 
 <style scoped>
-.admin-title {
-  font-size: 18px;
-  color: rgb(var(--v-theme-primary));
+.admin-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
 }
 
-.hint {
+.admin-nav {
+  flex: 0 0 240px;
+  position: sticky;
+  top: 120px;
+  border: solid 1px var(--app-border);
+  border-radius: var(--app-radius);
+}
+
+.admin-section {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+@media (max-width: 959px) {
+  .admin-layout {
+    display: block;
+  }
+}
+</style>
+
+<style>
+/* shared by the sections of the dashboard */
+.admin-panel .admin-title {
+  font-size: 18px;
+  color: rgb(var(--v-theme-primary));
+  margin-bottom: 4px;
+}
+
+.admin-panel .hint {
   color: var(--app-text-muted);
   font-size: 14px;
   margin-bottom: 16px;
-}
-
-.user-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  padding: 10px 0;
-}
-
-.user-row + .user-row {
-  border-top: solid 1px var(--app-border-light);
-}
-
-.user-info {
-  min-width: 200px;
-}
-
-.user-name {
-  font-weight: 600;
-}
-
-.user-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
-  color: var(--app-text-muted);
-  font-size: 13px;
-}
-
-.phone {
-  color: rgb(var(--v-theme-secondary));
-  text-decoration: none;
-}
-
-.unverified {
-  color: rgb(var(--v-theme-warning));
-}
-
-.role-select {
-  flex: 0 0 200px;
-}
-
-.ministries-select {
-  flex: 1 1 240px;
-  max-width: 360px;
-}
-
-.new-ministry {
-  flex: 0 1 240px;
-}
-
-.remove-placeholder {
-  width: 40px;
 }
 </style>

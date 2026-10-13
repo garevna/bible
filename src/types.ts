@@ -49,7 +49,19 @@ export interface Keyword {
   refs: string[]
 }
 
-export interface Topic {
+/** The type of a note or a topic and how long it is kept (the types: src/utils/noteTypes.ts) */
+export interface Typed {
+  /** the id of its type, e.g. 'sermon'; none: the default type */
+  typeId?: string
+  /** ms; it is deleted after that (none: it is kept until its author deletes it) */
+  expiresAt?: number
+  /** it is deleted once it is posted to the channel */
+  deleteAfterPublish?: boolean
+  /** a copy saved from a message: whom it came from (they are its author) */
+  from?: string
+}
+
+export interface Topic extends Typed {
   _id: string
   title: string
   refs: string[]
@@ -58,7 +70,7 @@ export interface Topic {
   image?: string
 }
 
-export interface Note {
+export interface Note extends Typed {
   _id: string
   refs: string[]
   topics: string[]

@@ -24,6 +24,11 @@ export const messages = {
     ru: 'Кому',
     en: 'To'
   },
+  roles: {
+    ua: 'Усім з ролі',
+    ru: 'Всем с ролью',
+    en: 'Everyone with the role'
+  },
   ministries: {
     ua: 'Усім учасникам служіння',
     ru: 'Всем участникам служения',

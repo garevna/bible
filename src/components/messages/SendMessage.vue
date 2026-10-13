@@ -52,6 +52,20 @@
           <v-list-item v-bind="item" :subtitle="[...raw.ministries, raw.phone].filter(Boolean).join(' · ')" />
         </template>
       </v-autocomplete>
+      <!-- all the people of roles the role of the user may write to -->
+      <v-select
+        v-if="roleItems.length"
+        v-model="roles"
+        :items="roleItems"
+        item-title="name"
+        item-value="id"
+        :label="text.roles"
+        multiple
+        chips
+        closable-chips
+        density="compact"
+        class="mb-2"
+      />
       <!-- every ministry is listed; one without members cannot be chosen -->
       <v-select
         v-model="ministries"
@@ -135,6 +149,8 @@ const loaded = ref(false)
 
 const people = shallowRef<Recipient[]>([])
 const ministryItems = shallowRef<string[]>([])
+const roleItems = shallowRef<{ id: string; name: string }[]>([])
+const roles = ref<string[]>([])
 const to = ref<string[]>([])
 const ministries = ref<string[]>([])
 const message = ref('')
@@ -154,7 +170,7 @@ const ministryOptions = computed(() =>
 const ready = computed(
   () =>
     Boolean((message.value ?? '').trim() || attachment.value) &&
-    (Boolean(props.replyTo) || to.value.length > 0 || ministries.value.length > 0)
+    (Boolean(props.replyTo) || to.value.length > 0 || ministries.value.length > 0 || roles.value.length > 0)
 )
 
 const reason = (cause: unknown) => {
@@ -178,6 +194,7 @@ function openDialog() {
   open.value = true
   to.value = []
   ministries.value = []
+  roles.value = []
   message.value = ''
   attachment.value = null
   loaded.value = false
@@ -187,6 +204,7 @@ function openDialog() {
       const answer = await worker.recipients()
       people.value = answer.people
       ministryItems.value = answer.ministries
+      roleItems.value = answer.roles ?? []
     }
     loaded.value = true
   })
@@ -195,7 +213,9 @@ function openDialog() {
 const send = () =>
   run(async () => {
     sent.value = await worker.sendMessage({
-      ...(props.replyTo ? { replyTo: props.replyTo.id } : { to: to.value, ministries: ministries.value }),
+      ...(props.replyTo
+        ? { replyTo: props.replyTo.id }
+        : { to: to.value, ministries: ministries.value, roles: roles.value }),
       text: (message.value ?? '').trim(),
       attachment: attachment.value
     })

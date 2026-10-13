@@ -131,6 +131,7 @@ import { useWorkerStore } from '@/stores/worker'
 import { useTopicsStore, type TopicItem, type TopicNoteItem } from '@/stores/topics'
 import type { Note } from '@/types'
 import { removeById } from '@/utils/array'
+import { typedOf } from '@/utils/noteTypes'
 import { topicPost } from '@/utils/topicPost'
 import { versesWithLinks } from '@/utils/verse'
 
@@ -185,12 +186,14 @@ function choose(open: () => void) {
   open()
 }
 
-const noteRecord = ({ _id, text, keywords, topics, verses }: TopicNoteItem): Note => ({
-  _id,
-  text,
-  keywords,
-  topics,
-  refs: verses.map((verse) => verse._id)
+/** the note of an item, with its type and term */
+const noteRecord = (item: TopicNoteItem): Note => ({
+  _id: item._id,
+  text: item.text,
+  keywords: item.keywords,
+  topics: item.topics,
+  refs: item.verses.map((verse) => verse._id),
+  ...typedOf(item)
 })
 
 /** A verse leaves the topic when the topic is saved; a note loses the topic right away */

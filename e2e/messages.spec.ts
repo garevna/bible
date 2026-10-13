@@ -21,8 +21,15 @@ async function fakeWorker(
     if (path === '/me') {
       return route.fulfill({
         json: {
-          role: who === 'publisher' ? 'publisher' : 'reader',
+          role: who === 'publisher' ? 'publisher' : 'servant',
           telegram: false,
+          rights: {
+            publish: false,
+            send: who === 'publisher',
+            sendToPeople: who === 'publisher',
+            sendToRoles: [],
+            manage: []
+          },
           ministries: who === 'member' ? ['Музичне служіння'] : [],
           canSend: who === 'publisher',
           canReceive: true,
@@ -31,6 +38,7 @@ async function fakeWorker(
         }
       })
     }
+    if (path === '/types') return route.fulfill({ json: { types: [] } })
     if (path === '/messages/recipients') {
       return route.fulfill({
         json: {
@@ -89,6 +97,7 @@ test('the pastor sends a note to a ministry from the Notes page', async ({ page 
     {
       to: [],
       ministries: ['Музичне служіння'],
+      roles: [],
       text: 'Підготуйте, будь ласка',
       attachment: {
         kind: 'note',

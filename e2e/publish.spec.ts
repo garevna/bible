@@ -9,7 +9,17 @@ async function fakeWorker(page: Page, role: 'publisher' | 'reader') {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
     expect(request.headers().authorization).toBe('Bearer test-token')
-    if (path === '/me') return route.fulfill({ json: { role, telegram: true } })
+    if (path === '/types') return route.fulfill({ json: { types: [] } })
+    if (path === '/me') {
+      const rights = {
+        publish: role === 'publisher',
+        send: false,
+        sendToPeople: false,
+        sendToRoles: [],
+        manage: []
+      }
+      return route.fulfill({ json: { role, telegram: true, rights } })
+    }
     const post = request.postDataJSON()
     if (path === '/telegram/preview') return route.fulfill({ json: { messages: [`<b>${post.title}</b>`] } })
     posts.push(post)

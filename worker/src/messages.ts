@@ -46,6 +46,8 @@ export interface MessagesStore {
 export interface MessageDraft {
   to: string[]
   ministries: string[]
+  /** all the people of these roles */
+  roles: string[]
   text: string
   attachment: Attachment | null
   replyTo: string | null
@@ -61,10 +63,11 @@ const strings = (value: unknown, max: number) =>
 export function parseDraft(body: unknown): MessageDraft | null {
   const draft = (body ?? {}) as Record<string, unknown>
   const to = strings(draft.to ?? [], MAX_RECIPIENTS)
-  const ministries = strings(draft.ministries ?? [], 30)
+  const ministries = strings(draft.ministries ?? [], 50)
+  const roles = strings(draft.roles ?? [], 30)
   const text = typeof draft.text === 'string' ? draft.text.trim() : ''
   const replyTo = typeof draft.replyTo === 'string' ? draft.replyTo : null
-  if (!to || !ministries || text.length > MAX_TEXT) return null
+  if (!to || !ministries || !roles || text.length > MAX_TEXT) return null
 
   let attachment: Attachment | null = null
   if (draft.attachment !== undefined && draft.attachment !== null) {
@@ -76,7 +79,7 @@ export function parseDraft(body: unknown): MessageDraft | null {
     attachment = { kind, post: withoutImage }
   }
   if (!text && !attachment) return null
-  return { to, ministries, text, attachment, replyTo }
+  return { to, ministries, roles, text, attachment, replyTo }
 }
 
 /* ---------- D1 ---------- */

@@ -84,6 +84,151 @@ export const admin = {
     ru: 'Новое служение, Enter',
     en: 'A new ministry, Enter'
   },
+  sectionRoles: {
+    ua: 'Ролі і права',
+    ru: 'Роли и права',
+    en: 'Roles and rights'
+  },
+  sectionUsers: {
+    ua: 'Служителі',
+    ru: 'Служители',
+    en: 'Ministers'
+  },
+  sectionMinistries: {
+    ua: 'Служіння',
+    ru: 'Служения',
+    en: 'Ministries'
+  },
+  sectionLocations: {
+    ua: 'Локації',
+    ru: 'Локации',
+    en: 'Locations'
+  },
+  rolesHint: {
+    ua: 'Роль визначає, що можуть люди з нею. Читач — кожен, хто увійшов: прав не має, його не можна видалити.',
+    ru: 'Роль определяет, что могут люди с ней. Читатель — каждый, кто вошёл: прав не имеет, его нельзя удалить.',
+    en: 'A role says what its people may do. The reader is everyone who signed in: no rights, it cannot be removed.'
+  },
+  roleName: {
+    ua: 'Назва ролі',
+    ru: 'Название роли',
+    en: 'Name of the role'
+  },
+  rightPublish: {
+    ua: 'Публікує нотатки й теми в Telegram-каналі',
+    ru: 'Публикует заметки и темы в Telegram-канале',
+    en: 'Posts notes and topics to the Telegram channel'
+  },
+  rightSend: {
+    ua: 'Надсилає повідомлення колегам',
+    ru: 'Отправляет сообщения коллегам',
+    en: 'Writes messages to colleagues'
+  },
+  rightSendToRoles: {
+    ua: 'Кому може писати (ролі)',
+    ru: 'Кому может писать (роли)',
+    en: 'May write to (roles)'
+  },
+  rightSendToPeople: {
+    ua: 'І будь-якому служителю окремо, незалежно від ролі',
+    ru: 'И любому служителю отдельно, независимо от роли',
+    en: 'And to any minister alone, whatever their role'
+  },
+  rightMessageDays: {
+    ua: 'Скільки днів зберігаються надіслані повідомлення',
+    ru: 'Сколько дней хранятся отправленные сообщения',
+    en: 'Days the sent messages are kept'
+  },
+  rightManage: {
+    ua: 'Функції адміністратора',
+    ru: 'Функции администратора',
+    en: 'Functions of an administrator'
+  },
+  manageRoles: {
+    ua: 'Ролі і права',
+    ru: 'Роли и права',
+    en: 'Roles and rights'
+  },
+  manageUsers: {
+    ua: 'Служителі: ролі, служіння, телефони',
+    ru: 'Служители: роли, служения, телефоны',
+    en: 'Ministers: roles, ministries, phones'
+  },
+  manageDirectories: {
+    ua: 'Довідники служінь і локацій',
+    ru: 'Справочники служений и локаций',
+    en: 'Lists of ministries and locations'
+  },
+  manageTypes: {
+    ua: 'Типи повідомлень, нотаток і тем',
+    ru: 'Типы сообщений, заметок и тем',
+    en: 'Types of messages, notes and topics'
+  },
+  manageSchedule: {
+    ua: 'Розклад служінь',
+    ru: 'Расписание служений',
+    en: 'The schedule of ministries'
+  },
+  addRole: {
+    ua: 'Додати роль',
+    ru: 'Добавить роль',
+    en: 'Add a role'
+  },
+  newRole: {
+    ua: 'Нова роль',
+    ru: 'Новая роль',
+    en: 'New role'
+  },
+  removeRole: {
+    ua: 'Видалити роль',
+    ru: 'Удалить роль',
+    en: 'Remove the role'
+  },
+  removeRoleHint: {
+    ua: 'люди з цією роллю стануть читачами',
+    ru: 'люди с этой ролью станут читателями',
+    en: 'its people become readers'
+  },
+  readerFixed: {
+    ua: 'Читач не має прав: це кожен, хто увійшов у застосунок.',
+    ru: 'Читатель не имеет прав: это каждый, кто вошёл в приложение.',
+    en: 'The reader has no rights: it is everyone who signed in.'
+  },
+  saveRoles: {
+    ua: 'Зберегти ролі',
+    ru: 'Сохранить роли',
+    en: 'Save the roles'
+  },
+  unsaved: {
+    ua: 'Є незбережені зміни',
+    ru: 'Есть несохранённые изменения',
+    en: 'There are unsaved changes'
+  },
+  showReaders: {
+    ua: 'Показати читачів',
+    ru: 'Показать читателей',
+    en: 'Show the readers'
+  },
+  usersHint: {
+    ua: 'Служителі — усі, крім читачів. Щоб зробити читача служителем, увімкніть «Показати читачів» і дайте йому роль.',
+    ru: 'Служители — все, кроме читателей. Чтобы сделать читателя служителем, включите «Показать читателей» и дайте ему роль.',
+    en: 'Ministers are everyone but the readers. To make a reader a minister, show the readers and give them a role.'
+  },
+  directoryHint: {
+    ua: 'Довідник: додайте назву і натисніть Enter, видаліть — хрестиком.',
+    ru: 'Справочник: добавьте название и нажмите Enter, удалите — крестиком.',
+    en: 'A list: type a name and press Enter, remove with the cross.'
+  },
+  newItem: {
+    ua: 'Нова назва, Enter',
+    ru: 'Новое название, Enter',
+    en: 'A new name, Enter'
+  },
+  removeItem: {
+    ua: 'Видалити',
+    ru: 'Удалить',
+    en: 'Remove'
+  },
   reload: {
     ua: 'Оновити список',
     ru: 'Обновить список',

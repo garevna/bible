@@ -1,10 +1,7 @@
 import { isOwner, type AuthUser } from './auth'
 
-/** reader: the app; publisher: also posts to Telegram; admin: also gives the roles */
-export const ROLES = ['reader', 'publisher', 'admin'] as const
-export type Role = (typeof ROLES)[number]
-
-export const isRole = (value: unknown): value is Role => ROLES.includes(value as Role)
+/** the id of a role of the list kept by the administrators (see roles.ts); 'owner' for the owners */
+export type Role = string
 
 /** A user who signed in to the app at least once */
 export interface UserRecord {
@@ -65,9 +62,14 @@ export async function touchUser(store: UsersStore, user: AuthUser, now = Date.no
   return record
 }
 
-/** The owners are administrators whatever the record says */
-export const roleOf = (record: UserRecord, owners: string): Role =>
-  isOwner(record, owners) ? 'admin' : record.role
+/**
+ * The owners have every right whatever the record says. A reader with ministries (as the members of
+ * ministries were kept before the roles) is a servant.
+ */
+export function roleOf(record: UserRecord, owners: string): Role {
+  if (isOwner(record, owners)) return 'owner'
+  return record.role === 'reader' && record.ministries?.length ? 'servant' : record.role
+}
 
 export const view = (record: UserRecord, owners: string): UserView => ({
   ...record,
@@ -153,22 +155,38 @@ export async function setOwnPhone(
   return updated
 }
 
-/* ---------- ministries ---------- */
+/* ---------- directories: the ministries and the locations of the church ---------- */
 
-const MINISTRIES_KEY = 'settings:ministries'
-export const DEFAULT_MINISTRIES = ['Лідер домашньої групи', 'Музичне служіння']
+export const DIRECTORIES = ['ministries', 'locations'] as const
+export type Directory = (typeof DIRECTORIES)[number]
 
-/** The ministries of the church (the administrators keep the list) */
-export const getMinistries = async (store: UsersStore) =>
-  (await store.get<string[]>(MINISTRIES_KEY, 'json')) ?? DEFAULT_MINISTRIES
+const DEFAULT_DIRECTORIES: Record<Directory, string[]> = {
+  ministries: [
+    'Музичне служіння',
+    'Дитяче служіння',
+    'Молитовне служіння',
+    'Служіння порядку',
+    'Господарське служіння',
+    'Пасторське служіння',
+    'Служіння причастя',
+    'Лідер домашньої групи'
+  ],
+  locations: ['Церква', 'Онлайн']
+}
+
+/** A list kept by the administrators */
+export const getDirectory = async (store: UsersStore, name: Directory) =>
+  (await store.get<string[]>(`settings:${name}`, 'json')) ?? DEFAULT_DIRECTORIES[name]
+
+export const setDirectory = (store: UsersStore, name: Directory, items: string[]) =>
+  store.put(`settings:${name}`, JSON.stringify(items))
+
+export const getMinistries = (store: UsersStore) => getDirectory(store, 'ministries')
 
 /** A list of short distinct names, or null when it is not one */
 export function parseMinistries(value: unknown): string[] | null {
-  if (!Array.isArray(value) || value.length > 30) return null
+  if (!Array.isArray(value) || value.length > 50) return null
   const names = value.map((item) => (typeof item === 'string' ? item.trim() : ''))
   if (names.some((name) => !name || name.length > 60)) return null
   return [...new Set(names)]
 }
-
-export const setMinistries = (store: UsersStore, ministries: string[]) =>
-  store.put(MINISTRIES_KEY, JSON.stringify(ministries))
