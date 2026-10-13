@@ -13,6 +13,8 @@ export const test = base.extend({
       (url) => !['localhost', '127.0.0.1'].includes(url.hostname),
       (route) => route.abort()
     )
+    // ministers land on the calendar once a session: only calendar.spec.ts wants that (and clears it)
+    await page.addInitScript(() => sessionStorage.setItem('bible:calendar-landed', '1'))
     await use(page)
   }
 })

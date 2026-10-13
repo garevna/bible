@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { isOwner, verifyIdToken, type AuthUser } from './auth'
 import { handle, type Env } from './index'
 import { memoryStore as memoryMessages } from './messages'
+import { memorySchedule } from './schedule'
 import type { UserView, UsersStore } from './users'
 
 /** the answers of the worker in these tests */
@@ -49,6 +50,7 @@ const users: Record<string, AuthUser> = {
 
 function setup() {
   const messages = memoryMessages()
+  const schedule = memorySchedule()
   const clock = { now: Date.now() }
   const env: Env = {
     TELEGRAM_BOT_TOKEN: 'TOKEN',
@@ -77,7 +79,7 @@ function setup() {
         body: body ? JSON.stringify(body) : undefined
       }),
       env,
-      { verify, fetcher: fetcher as unknown as typeof fetch, messages, now: () => clock.now }
+      { verify, fetcher: fetcher as unknown as typeof fetch, messages, schedule, now: () => clock.now }
     )
     const answer = (await response.json().catch(() => null)) as Answer
     return { status: response.status, body: answer, headers: response.headers }
@@ -324,6 +326,221 @@ describe('roles kept by the administrators', () => {
   })
 })
 
+describe('the schedule of ministries', () => {
+  // Monday, 2026-10-12, 09:00 in Kyiv
+  const MONDAY = Date.parse('2026-10-12T06:00:00Z')
+
+  async function church() {
+    const context = setup()
+    const { call, clock } = context
+    clock.now = MONDAY
+    for (const user of ['owner', 'pastor', 'musician', 'leader', 'reader']) await call('GET', '/me', user)
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'publisher' })
+    await call('PUT', '/admin/users/musician-uid', 'owner', { ministries: ['Музичне служіння'] })
+    await call('PUT', '/admin/users/leader-uid', 'owner', { ministries: ['Молитовне служіння'] })
+    return context
+  }
+
+  const prayer = {
+    ministry: 'Молитовне служіння',
+    title: 'Ранкова молитва',
+    location: 'Онлайн',
+    weekdays: [1, 2, 3, 4, 5, 6],
+    time: '06:45',
+    responsibleUid: 'pastor-uid'
+  }
+
+  it('the morning prayer: planned by the schedule role, every day but Sunday', async () => {
+    const { call } = await church()
+    expect((await call('POST', '/schedule/events', 'pastor', prayer)).status).toBe(403)
+    const created = await call('POST', '/schedule/events', 'owner', prayer)
+    expect(created.body.event).toMatchObject({ responsibleName: 'pastor@example.com', mode: 'invite' })
+
+    const { body } = await call('GET', '/schedule?from=2026-10-12&to=2026-10-19', 'leader')
+    expect((body.days as { day: string }[]).map((item) => item.day)).toEqual([
+      '2026-10-12',
+      '2026-10-13',
+      '2026-10-14',
+      '2026-10-15',
+      '2026-10-16',
+      '2026-10-17',
+      '2026-10-19'
+    ])
+    // readers have no schedule
+    expect((await call('GET', '/schedule', 'reader')).status).toBe(403)
+  })
+
+  it('the backup agrees when invited; when the main one cannot, the backup leads', async () => {
+    const { call } = await church()
+    const eventId = ((await call('POST', '/schedule/events', 'owner', prayer)).body.event as { id: string })
+      .id
+    const day = '2026-10-13'
+
+    // the responsible person invites, with a backup
+    expect(
+      (
+        await call('POST', '/schedule/team', 'pastor', {
+          eventId,
+          day,
+          uid: 'musician-uid',
+          backupUid: 'leader-uid'
+        })
+      ).status
+    ).toBe(200)
+    expect(((await call('GET', '/messages', 'musician')).body.messages as unknown[])[0]).toMatchObject({
+      text: expect.stringContaining('Запрошення на служіння')
+    })
+
+    await call('POST', '/schedule/answer', 'leader', {
+      eventId,
+      day,
+      uid: 'musician-uid',
+      as: 'backup',
+      answer: 'confirm'
+    })
+    const declined = await call('POST', '/schedule/answer', 'musician', {
+      eventId,
+      day,
+      uid: 'musician-uid',
+      as: 'main',
+      answer: 'decline',
+      reason: 'захворів'
+    })
+    expect(declined.body).toEqual({ answered: true, replacedBy: 'leader-uid' })
+
+    const team = (await call('GET', `/schedule?from=${day}&to=${day}`, 'leader')).body.participants as {
+      uid: string
+      status: string
+    }[]
+    expect(team.map(({ uid, status }) => [uid, status]).sort()).toEqual([
+      ['leader-uid', 'confirmed'],
+      ['musician-uid', 'declined']
+    ])
+    const toPastor = (await call('GET', '/messages', 'pastor')).body.messages as { text: string }[]
+    expect(toPastor.map((message) => message.text)).toContainEqual(
+      expect.stringContaining('Причина: захворів')
+    )
+    // only the invited one answers for themselves
+    expect(
+      (
+        await call('POST', '/schedule/answer', 'pastor', {
+          eventId,
+          day,
+          uid: 'leader-uid',
+          as: 'main',
+          answer: 'decline'
+        })
+      ).status
+    ).toBe(403)
+  })
+
+  it('nobody left: an emergency to the responsible person and the planners', async () => {
+    const { call } = await church()
+    // the leader plans the schedule too
+    await call('PUT', '/admin/roles', 'owner', {
+      roles: [
+        {
+          id: 'reader',
+          name: 'Читач',
+          publish: false,
+          send: false,
+          sendToRoles: [],
+          sendToPeople: false,
+          messageDays: 1,
+          manage: []
+        },
+        {
+          id: 'publisher',
+          name: 'Публікатор',
+          publish: true,
+          send: true,
+          sendToRoles: [],
+          sendToPeople: true,
+          messageDays: 1,
+          manage: []
+        },
+        {
+          id: 'planner',
+          name: 'Координатор',
+          publish: false,
+          send: false,
+          sendToRoles: [],
+          sendToPeople: false,
+          messageDays: 1,
+          manage: ['schedule']
+        },
+        {
+          id: 'servant',
+          name: 'Служитель',
+          publish: false,
+          send: false,
+          sendToRoles: [],
+          sendToPeople: false,
+          messageDays: 1,
+          manage: []
+        }
+      ]
+    })
+    await call('PUT', '/admin/users/leader-uid', 'owner', { role: 'planner' })
+    await call('PUT', '/admin/users/musician-uid', 'owner', { role: 'servant' })
+    const eventId = (
+      (await call('POST', '/schedule/events', 'leader', { ...prayer, weekdays: null, day: '2026-10-14' }))
+        .body.event as { id: string }
+    ).id
+
+    await call('POST', '/schedule/team', 'leader', { eventId, day: '2026-10-14', uid: 'musician-uid' })
+    const answer = await call('POST', '/schedule/answer', 'musician', {
+      eventId,
+      day: '2026-10-14',
+      uid: 'musician-uid',
+      as: 'main',
+      answer: 'decline'
+    })
+    expect(answer.body).toEqual({ answered: true, emergency: true })
+    for (const user of ['pastor', 'leader']) {
+      const texts = ((await call('GET', '/messages', user)).body.messages as { text: string }[]).map(
+        (m) => m.text
+      )
+      expect(texts).toContainEqual(expect.stringContaining('ТЕРМІНОВО'))
+    }
+  })
+
+  it('an open event: the members of its ministry apply, the responsible person takes them', async () => {
+    const { call } = await church()
+    const eventId = (
+      (
+        await call('POST', '/schedule/events', 'owner', {
+          ministry: 'Музичне служіння',
+          title: 'Неділя',
+          day: '2026-10-18',
+          time: '10:00',
+          mode: 'open',
+          needed: 3,
+          responsibleUid: 'pastor-uid'
+        })
+      ).body.event as { id: string }
+    ).id
+    const day = '2026-10-18'
+
+    expect((await call('POST', '/schedule/apply', 'leader', { eventId, day })).status).toBe(403)
+    expect((await call('POST', '/schedule/apply', 'musician', { eventId, day })).status).toBe(200)
+    expect((await call('POST', '/schedule/apply', 'musician', { eventId, day })).status).toBe(409)
+    expect(
+      (await call('POST', '/schedule/approve', 'pastor', { eventId, day, uid: 'musician-uid' })).status
+    ).toBe(200)
+    const [participant] = (await call('GET', `/schedule?from=${day}&to=${day}`, 'musician')).body
+      .participants as {
+      status: string
+    }[]
+    expect(participant).toMatchObject({ status: 'confirmed' })
+
+    // no past days, no days the event does not have
+    expect((await call('POST', '/schedule/apply', 'musician', { eventId, day: '2026-10-19' })).status).toBe(
+      404
+    )
+  })
+})
+
 describe('types of notes and topics', () => {
   it('everyone who signed in reads them; administrators change them', async () => {
     const { call } = setup()
@@ -408,7 +625,7 @@ describe('messages between ministers', () => {
     expect(
       (await call('PUT', '/admin/directories/ministries', 'owner', { items: [' Хор ', 'Хор', 'Діти'] })).body
     ).toEqual({ items: ['Хор', 'Діти'] })
-    expect((await call('GET', '/ministries', 'musician')).body).toEqual({ ministries: ['Хор', 'Діти'] })
+    expect((await call('GET', '/ministries', 'musician')).body).toMatchObject({ ministries: ['Хор', 'Діти'] })
     expect((await call('PUT', '/admin/directories/ministries', 'owner', { items: [''] })).status).toBe(400)
   })
 

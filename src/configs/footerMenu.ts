@@ -18,5 +18,7 @@ export const footerMenu: FooterMenuItem[] = [
   // opened from the header, administrators only
   { icon: '', value: 'admin', component: 'Admin', menu: 'admin' },
   // opened from the header, ministers only
-  { icon: '', value: 'messages', component: 'Messages', menu: 'messages' }
+  { icon: '', value: 'messages', component: 'Messages', menu: 'messages' },
+  // ministers: the first page they see
+  { icon: '', value: 'calendar', component: 'Calendar', menu: 'calendar' }
 ]

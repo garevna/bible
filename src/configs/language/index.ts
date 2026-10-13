@@ -1,4 +1,5 @@
 import { admin } from './admin'
+import { calendar } from './calendar'
 import { common } from './common'
 import { header } from './header'
 import { keywords } from './keywords'
@@ -16,6 +17,7 @@ import { topics } from './topics'
 
 export const languages = {
   admin,
+  calendar,
   common,
   header,
   keywords,

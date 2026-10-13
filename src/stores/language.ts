@@ -25,6 +25,7 @@ export const useLanguageStore = defineStore('language', () => {
 
   return {
     admin: section('admin'),
+    calendar: section('calendar'),
     common: section('common'),
     header: section('header'),
     keywords: section('keywords'),

@@ -56,6 +56,19 @@
 
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
 
+    <!-- ministers: the schedule of ministries -->
+    <v-tooltip v-if="!compact && worker.canReceive" :text="calendarText.title">
+      <template #activator="{ props }">
+        <v-btn
+          v-bind="props"
+          icon="mdi-calendar-month-outline"
+          size="small"
+          :aria-label="calendarText.title"
+          @click="app.setPage('calendar')"
+        />
+      </template>
+    </v-tooltip>
+
     <!-- ministers: the messages, with the number of unread ones -->
     <v-tooltip v-if="!compact && worker.canReceive" :text="messagesText.title">
       <template #activator="{ props }">
@@ -117,7 +130,7 @@ defineProps<{ compact?: boolean }>()
 const app = useAppStore()
 const user = useUserStore()
 const worker = useWorkerStore()
-const { admin, header, messages: messagesText } = storeToRefs(useLanguageStore())
+const { admin, calendar: calendarText, header, messages: messagesText } = storeToRefs(useLanguageStore())
 
 /** the photo could not be loaded: show the initials instead */
 const broken = ref(false)

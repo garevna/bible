@@ -279,6 +279,8 @@ export const useWorkerStore = defineStore('worker', () => {
   }
 
   return {
+    /** a request to the worker with the token of the user (for other stores, e.g. the schedule) */
+    request: call,
     role,
     roleName,
     rights,

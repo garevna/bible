@@ -11,6 +11,8 @@ import {
   type Manage,
   type RoleDef
 } from './roles'
+import { d1Schedule, localDay, type ScheduleStore } from './schedule'
+import { handleSchedule } from './scheduleRoutes'
 import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import { getTypes, parseTypes, setTypes } from './types'
 import {
@@ -73,6 +75,8 @@ export interface Deps {
   fetcher: typeof fetch
   /** the messages; D1 when not given */
   messages?: MessagesStore
+  /** the schedule of ministries; D1 when not given */
+  schedule?: ScheduleStore
   now?: () => number
 }
 
@@ -101,7 +105,11 @@ const ROUTES = [
   /^GET \/admin\/(settings|users)$/,
   /^PUT \/admin\/(roles|types)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
-  /^(PUT|DELETE) \/admin\/users\/[^/]+$/
+  /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
+  /^GET \/schedule(\/people)?$/,
+  /^(POST|PUT|DELETE) \/schedule\/events(\/[^/]+)?$/,
+  /^(POST|DELETE) \/schedule\/team$/,
+  /^POST \/schedule\/(apply|approve|answer)$/
 ]
 
 const DAY = 24 * 60 * 60 * 1000
@@ -194,9 +202,35 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     }
   }
 
+  if (pathname.startsWith('/schedule')) {
+    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    const users = await listUsers(env.USERS, env.OWNERS)
+    return handleSchedule(
+      request,
+      {
+        me,
+        rights,
+        servants: users.filter((user) => serves(roles, user.role)),
+        planners: users
+          .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
+          .map((user) => user.uid),
+        schedule: deps.schedule ?? d1Schedule(env.DB),
+        messages: deps.messages ?? d1Store(env.DB),
+        now: deps.now?.() ?? Date.now()
+      },
+      json
+    )
+  }
+
   if (pathname.startsWith('/messages') || route === 'GET /ministries') {
     if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
-    if (route === 'GET /ministries') return json({ ministries: await getMinistries(env.USERS) })
+    if (route === 'GET /ministries') {
+      // the locations too: the schedule chooses from them
+      return json({
+        ministries: await getMinistries(env.USERS),
+        locations: await getDirectory(env.USERS, 'locations')
+      })
+    }
     return handleMessages(request, env, deps, me, roles, rights, json, body)
   }
 
@@ -379,6 +413,9 @@ async function handleMessages(
 
 export default {
   fetch: (request: Request, env: Env) => handle(request, env),
-  // once a day: the expired messages go
-  scheduled: async (_event: ScheduledController, env: Env) => d1Store(env.DB).deleteExpired(Date.now())
+  // once a day: the expired messages and the past events go
+  scheduled: async (_event: ScheduledController, env: Env) => {
+    await d1Store(env.DB).deleteExpired(Date.now())
+    await d1Schedule(env.DB).deletePast(localDay(Date.now()))
+  }
 } satisfies ExportedHandler<Env>

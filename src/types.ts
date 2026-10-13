@@ -94,7 +94,8 @@ export interface User extends Profile {
   email?: string | null
 }
 
-export type Page = 'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search' | 'admin' | 'messages'
+export type Page =
+  'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search' | 'admin' | 'messages' | 'calendar'
 
 export interface MenuItem {
   value: string

@@ -40,6 +40,12 @@
       <v-list density="compact" bg-color="homefone" min-width="270" class="header-menu">
         <v-list-item
           v-if="worker.canReceive"
+          prepend-icon="mdi-calendar-month-outline"
+          :title="calendarText.title"
+          @click="app.setPage('calendar')"
+        />
+        <v-list-item
+          v-if="worker.canReceive"
           prepend-icon="mdi-email-outline"
           :title="messagesText.title"
           @click="app.setPage('messages')"
@@ -198,7 +204,14 @@ const app = useAppStore()
 const content = useContentStore()
 const user = useUserStore()
 const worker = useWorkerStore()
-const { admin, common, header, messages: messagesText, pages } = storeToRefs(useLanguageStore())
+const {
+  admin,
+  calendar: calendarText,
+  common,
+  header,
+  messages: messagesText,
+  pages
+} = storeToRefs(useLanguageStore())
 
 /** a phone with a signed in user: one menu instead of a row of buttons */
 const { smAndDown } = useDisplay()

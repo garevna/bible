@@ -20,6 +20,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import { useVerseLinks } from '@/composables/useVerseLinks'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useWorkerStore } from '@/stores/worker'
 
 const AuthDialog = defineAsyncComponent(() => import('@/components/user/AuthDialog.vue'))
 
@@ -31,7 +32,8 @@ const views = {
   Topic: defineAsyncComponent(() => import('@/views/Topic.vue')),
   Search: defineAsyncComponent(() => import('@/views/Search.vue')),
   Admin: defineAsyncComponent(() => import('@/views/Admin.vue')),
-  Messages: defineAsyncComponent(() => import('@/views/Messages.vue'))
+  Messages: defineAsyncComponent(() => import('@/views/Messages.vue')),
+  Calendar: defineAsyncComponent(() => import('@/views/Calendar.vue'))
 }
 
 const app = useAppStore()
@@ -61,6 +63,22 @@ watch(
   (signed, wasSigned) => {
     if (signed) authOpen.value = false
     else if (wasSigned && app.page !== 'bible') app.setPage('bible')
+  }
+)
+
+/** a minister sees the schedule of ministries first, once a session (the rights come from the worker a bit later) */
+const worker = useWorkerStore()
+const LANDED = 'bible:calendar-landed'
+watch(
+  () => worker.canReceive,
+  (minister) => {
+    try {
+      if (!minister || sessionStorage.getItem(LANDED)) return
+      sessionStorage.setItem(LANDED, '1')
+    } catch {
+      return
+    }
+    if (app.page === 'bible') app.setPage('calendar')
   }
 )
 
