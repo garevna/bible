@@ -37,17 +37,19 @@
         </v-btn>
       </template>
 
-      <v-list density="compact" bg-color="homefone" min-width="270" class="header-menu">
+      <v-list density="compact" bg-color="homefone" min-width="270" class="header-menu" color="secondary">
         <v-list-item
           v-if="worker.canReceive"
           prepend-icon="mdi-calendar-month-outline"
           :title="calendarText.title"
+          v-bind="here('calendar')"
           @click="app.setPage('calendar')"
         />
         <v-list-item
           v-if="worker.canReceive"
           prepend-icon="mdi-email-outline"
           :title="messagesText.title"
+          v-bind="here('messages')"
           @click="app.setPage('messages')"
         >
           <template v-if="worker.unread" #append>
@@ -58,6 +60,7 @@
           v-if="worker.isAdmin"
           prepend-icon="mdi-shield-account-outline"
           :title="admin.openDashboard"
+          v-bind="here('admin')"
           @click="app.setPage('admin')"
         />
         <v-divider v-if="worker.canReceive || worker.isAdmin" />
@@ -196,6 +199,7 @@ import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { useWorkerStore } from '@/stores/worker'
+import type { Page } from '@/types'
 
 const signIn = defineModel<boolean>('signIn', { default: false })
 // const signUp = defineModel<boolean>('signUp', { default: false })
@@ -216,6 +220,9 @@ const {
 /** a phone with a signed in user: one menu instead of a row of buttons */
 const { smAndDown } = useDisplay()
 const compact = computed(() => user.signed && smAndDown.value)
+
+/** the page the user is on: marked, and not opened again */
+const here = (page: Page) => (app.page === page ? { active: true, class: 'pe-none' } : {})
 
 const short = computed(() => app.viewportWidth < 600)
 

@@ -64,6 +64,8 @@
           icon="mdi-calendar-month-outline"
           size="small"
           :aria-label="calendarText.title"
+          :active="app.page === 'calendar'"
+          :class="{ 'pe-none': app.page === 'calendar' }"
           @click="app.setPage('calendar')"
         />
       </template>
@@ -77,6 +79,8 @@
           icon
           size="small"
           :aria-label="messagesText.title"
+          :active="app.page === 'messages'"
+          :class="{ 'pe-none': app.page === 'messages' }"
           @click="app.setPage('messages')"
         >
           <v-badge :model-value="worker.unread > 0" :content="worker.unread" color="warning" floating>
@@ -94,6 +98,8 @@
           icon="mdi-shield-account-outline"
           size="small"
           :aria-label="admin.openDashboard"
+          :active="app.page === 'admin'"
+          :class="{ 'pe-none': app.page === 'admin' }"
           @click="app.setPage('admin')"
         />
       </template>

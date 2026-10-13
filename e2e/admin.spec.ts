@@ -212,5 +212,14 @@ test.describe('phone', () => {
 
     await menu.locator('.v-list-item', { hasText: 'Адміністрування' }).click()
     await expect(page.locator('.v-select', { hasText: 'Служителі' })).toBeVisible()
+
+    // the page the user is on is marked in the menu and not opened again
+    await page.getByRole('button', { name: 'Меню' }).click()
+    await expect(menu.locator('.v-list-item', { hasText: 'Адміністрування' })).toHaveClass(
+      /v-list-item--active/
+    )
+    await expect(menu.locator('.v-list-item', { hasText: 'Повідомлення' })).not.toHaveClass(
+      /v-list-item--active/
+    )
   })
 })
