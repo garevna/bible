@@ -5,7 +5,7 @@ compatibility_date = "2025-06-01"
 
 [vars]
 FIREBASE_PROJECT_ID = "bible-ukr"
-ALLOWED_ORIGINS = "https://garevna.github.io,http://localhost:5173,http://localhost:4179"
+ALLOWED_ORIGINS = "https://garevna.github.io,https://kcc-bible.pp.ua,https://www.kcc-bible.pp.ua,https://kcc-bible.pages.dev,http://localhost:5173,http://localhost:4179"
 # set in the Cloudflare dashboard (Workers > bible-worker > Settings > Variables) or in .dev.vars:
 #   TELEGRAM_CHAT_ID  the channel: @name or the -100… id
 #   OWNERS            user ids and verified emails of the owners (admins that the dashboard cannot change), separated by commas

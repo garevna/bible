@@ -55,6 +55,32 @@ pnpm dev
    Якщо `--check` не проходить, `--undo` повертає все як було до `--apply`
    (поки не виконано `--delete-legacy`).
 
+## Деплой: GitHub Pages і власний домен
+
+Кожен пуш у `main` (після перевірок) публікує застосунок двічі, незалежно:
+
+| Адреса                                                      | Де                                                    |
+| ----------------------------------------------------------- | ----------------------------------------------------- |
+| [garevna.github.io/bible](https://garevna.github.io/bible/) | GitHub Pages, job `deploy` (`BASE_PATH=/bible/`)      |
+| [kcc-bible.pp.ua](https://kcc-bible.pp.ua/)                 | Cloudflare Pages, job `deploy-domain` (`BASE_PATH=/`) |
+| [kcc-bible.pages.dev](https://kcc-bible.pages.dev/)         | той самий проєкт Cloudflare Pages (`kcc-bible`)       |
+
+Якщо домен «відвалиться», GitHub Pages працює далі: це окремий сайт, без переспрямування на домен.
+
+Що потрібно один раз:
+
+1. Домен у Cloudflare: cloudflare.com > Add a domain > `kcc-bible.pp.ua` (Free), і в панелі
+   реєстратора (nic.ua) замінити DNS-сервери на два, які дасть Cloudflare.
+2. Cloudflare > Workers & Pages > `kcc-bible` > Custom domains: додати `kcc-bible.pp.ua`
+   (і, за бажання, `www.kcc-bible.pp.ua`).
+3. API-токен Cloudflare (My Profile > API Tokens > Create Token > Custom: Account · Cloudflare Pages · Edit)
+   — секрет репозиторію `CLOUDFLARE_API_TOKEN` (GitHub > Settings > Secrets and variables > Actions > Secrets).
+   Змінна `CLOUDFLARE_ACCOUNT_ID` уже задана. Поки токена немає, `deploy-domain` пропускається.
+4. Firebase console > Authentication > Settings > Authorized domains: `kcc-bible.pp.ua`
+   (і `kcc-bible.pages.dev`) — для входу через Google.
+
+Адреси сайту дозволені й у worker (`ALLOWED_ORIGINS` у `worker/wrangler.toml`).
+
 ## E2E-тести
 
 Тести в `e2e/` запускаються на production-збірці (`vite build` + `vite preview` на порту 4179).
