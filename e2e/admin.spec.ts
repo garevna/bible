@@ -200,14 +200,15 @@ test.describe('phone', () => {
     await fakeWorker(page, ['users'])
     await signIn(page)
 
-    // no separate buttons: the messages, the dashboard, signing out and the language are in the menu
+    // the messages, the dashboard and signing out are in the menu; the language and the translation stay
     await expect(page.getByRole('button', { name: 'Адміністрування' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Вихід' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Меню' }).click()
     const menu = page.locator('.header-menu')
     await expect(menu.locator('.v-list-item', { hasText: 'Повідомлення' })).toBeVisible()
     await expect(menu.locator('.v-list-item', { hasText: 'Вихід' })).toBeVisible()
-    await expect(menu.locator('.v-list-item', { hasText: 'Синодальний переклад' })).toBeVisible()
+    await expect(menu.locator('.v-list-item', { hasText: 'Синодальний переклад' })).toHaveCount(0)
+    await expect(page.locator('.v-app-bar .mdi-book-cross')).toBeVisible()
 
     await menu.locator('.v-list-item', { hasText: 'Адміністрування' }).click()
     await expect(page.locator('.v-select', { hasText: 'Служителі' })).toBeVisible()

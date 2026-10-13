@@ -27,7 +27,7 @@
 
     <User :compact="compact" />
 
-    <!-- a phone: the messages, the dashboard, the language, the translation and signing out in one menu -->
+    <!-- a phone: the messages, the dashboard and signing out in one menu (the language and the translation stay) -->
     <v-menu v-if="compact" location="bottom end">
       <template #activator="{ props }">
         <v-btn v-bind="props" icon size="small" class="mr-2" :aria-label="header.menu">
@@ -55,38 +55,6 @@
           @click="app.setPage('admin')"
         />
         <v-divider v-if="worker.canReceive || worker.isAdmin" />
-
-        <v-list-subheader>{{ common.langMenuTooltip }}</v-list-subheader>
-        <v-list-item
-          v-for="item of langMenuItems"
-          :key="item.value"
-          :active="item.value === user.lang"
-          @click="user.updateUserLang(item.value)"
-        >
-          <template #prepend>
-            <img :src="item.icon" alt="" width="24" class="mr-3" />
-          </template>
-          <v-list-item-title class="text-wrap">{{ item.text[user.lang] }}</v-list-item-title>
-        </v-list-item>
-
-        <v-list-subheader>{{ header.translationMenu }}</v-list-subheader>
-        <v-list-item
-          v-for="item of translationMenuItems"
-          :key="item.value"
-          :active="item.value === user.translation"
-          @click="content.switchTranslation(item.value)"
-        >
-          <template #prepend>
-            <v-icon
-              :icon="item.rights ? 'mdi-file-document-alert-outline' : 'mdi-file-document-check-outline'"
-              :color="item.rights ? 'warning' : 'primary'"
-              class="mr-3"
-            />
-          </template>
-          <v-list-item-title class="text-wrap">{{ item.text[user.lang] }}</v-list-item-title>
-        </v-list-item>
-
-        <v-divider />
         <v-list-item prepend-icon="$signOut" :title="header.signOut" @click="user.signOut()" />
       </v-list>
     </v-menu>
@@ -117,7 +85,7 @@
       </v-tooltip> -->
     </template>
 
-    <v-menu v-if="!compact">
+    <v-menu>
       <template #activator="{ props: menu }">
         <v-tooltip :text="common.langMenuTooltip">
           <template #activator="{ props: tooltip }">
@@ -149,7 +117,7 @@
       </v-list>
     </v-menu>
 
-    <v-menu v-if="!compact">
+    <v-menu>
       <template #activator="{ props }">
         <!-- <ButtonTooltip
           v-bind="props"
