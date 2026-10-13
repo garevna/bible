@@ -57,7 +57,8 @@ export default defineConfig(({ command }) => ({
   // Prebundling them all up front avoids that.
   optimizeDeps: {
     entries: ['index.html', 'src/**/*.vue'],
-    include: ['vuetify/directives', ...vuetifyComponents()]
+    // libphonenumber-js: the phone input is in lazy pages, so the dev server would find it late and reload
+    include: ['vuetify/directives', 'libphonenumber-js', ...vuetifyComponents()]
   },
 
   resolve: {
