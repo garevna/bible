@@ -57,7 +57,7 @@
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
 
     <!-- ministers: the messages, with the number of unread ones -->
-    <v-tooltip v-if="worker.canReceive" :text="messagesText.title">
+    <v-tooltip v-if="!compact && worker.canReceive" :text="messagesText.title">
       <template #activator="{ props }">
         <v-btn
           v-bind="props"
@@ -74,7 +74,7 @@
     </v-tooltip>
 
     <!-- administrators: the dashboard of the roles -->
-    <v-tooltip v-if="worker.isAdmin" :text="admin.openDashboard">
+    <v-tooltip v-if="!compact && worker.isAdmin" :text="admin.openDashboard">
       <template #activator="{ props }">
         <v-btn
           v-bind="props"
@@ -86,7 +86,7 @@
       </template>
     </v-tooltip>
 
-    <v-tooltip :text="header.signOut">
+    <v-tooltip v-if="!compact" :text="header.signOut">
       <template #activator="{ props }">
         <v-btn
           v-bind="props"
@@ -110,6 +110,9 @@ import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { useWorkerStore } from '@/stores/worker'
 import { pickImage, resizeImage } from '@/utils/image'
+
+/** compact: on a phone the messages, the dashboard and signing out are in the menu of the header */
+defineProps<{ compact?: boolean }>()
 
 const app = useAppStore()
 const user = useUserStore()

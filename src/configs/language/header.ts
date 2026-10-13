@@ -79,6 +79,11 @@ export const header = {
     ru: 'Номер неправильный',
     en: 'The number is not valid'
   },
+  menu: {
+    ua: 'Меню',
+    ru: 'Меню',
+    en: 'Menu'
+  },
   uploadPhoto: {
     ua: 'Завантажити фото',
     ru: 'Загрузить фото',

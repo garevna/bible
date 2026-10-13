@@ -25,7 +25,71 @@
       </template>
     </v-tooltip>
 
-    <User />
+    <User :compact="compact" />
+
+    <!-- a phone: the messages, the dashboard, the language, the translation and signing out in one menu -->
+    <v-menu v-if="compact" location="bottom end">
+      <template #activator="{ props }">
+        <v-btn v-bind="props" icon size="small" class="mr-2" :aria-label="header.menu">
+          <v-badge :model-value="worker.unread > 0" :content="worker.unread" color="warning" floating>
+            <v-icon icon="mdi-menu" />
+          </v-badge>
+        </v-btn>
+      </template>
+
+      <v-list density="compact" bg-color="homefone" min-width="270" class="header-menu">
+        <v-list-item
+          v-if="worker.canReceive"
+          prepend-icon="mdi-email-outline"
+          :title="messagesText.title"
+          @click="app.setPage('messages')"
+        >
+          <template v-if="worker.unread" #append>
+            <v-badge :content="worker.unread" color="warning" inline />
+          </template>
+        </v-list-item>
+        <v-list-item
+          v-if="worker.isAdmin"
+          prepend-icon="mdi-shield-account-outline"
+          :title="admin.openDashboard"
+          @click="app.setPage('admin')"
+        />
+        <v-divider v-if="worker.canReceive || worker.isAdmin" />
+
+        <v-list-subheader>{{ common.langMenuTooltip }}</v-list-subheader>
+        <v-list-item
+          v-for="item of langMenuItems"
+          :key="item.value"
+          :active="item.value === user.lang"
+          @click="user.updateUserLang(item.value)"
+        >
+          <template #prepend>
+            <img :src="item.icon" alt="" width="24" class="mr-3" />
+          </template>
+          <v-list-item-title class="text-wrap">{{ item.text[user.lang] }}</v-list-item-title>
+        </v-list-item>
+
+        <v-list-subheader>{{ header.translationMenu }}</v-list-subheader>
+        <v-list-item
+          v-for="item of translationMenuItems"
+          :key="item.value"
+          :active="item.value === user.translation"
+          @click="content.switchTranslation(item.value)"
+        >
+          <template #prepend>
+            <v-icon
+              :icon="item.rights ? 'mdi-file-document-alert-outline' : 'mdi-file-document-check-outline'"
+              :color="item.rights ? 'warning' : 'primary'"
+              class="mr-3"
+            />
+          </template>
+          <v-list-item-title class="text-wrap">{{ item.text[user.lang] }}</v-list-item-title>
+        </v-list-item>
+
+        <v-divider />
+        <v-list-item prepend-icon="$signOut" :title="header.signOut" @click="user.signOut()" />
+      </v-list>
+    </v-menu>
 
     <template v-if="!user.signed">
       <v-tooltip :text="header.signIn">
@@ -53,7 +117,7 @@
       </v-tooltip> -->
     </template>
 
-    <v-menu>
+    <v-menu v-if="!compact">
       <template #activator="{ props: menu }">
         <v-tooltip :text="common.langMenuTooltip">
           <template #activator="{ props: tooltip }">
@@ -85,7 +149,7 @@
       </v-list>
     </v-menu>
 
-    <v-menu>
+    <v-menu v-if="!compact">
       <template #activator="{ props }">
         <!-- <ButtonTooltip
           v-bind="props"
@@ -146,6 +210,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useDisplay } from 'vuetify'
 
 import langFallbackIcon from '@/assets/lang.svg'
 import logo from '@/assets/logo.png'
@@ -156,6 +221,7 @@ import { useAppStore } from '@/stores/app'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
+import { useWorkerStore } from '@/stores/worker'
 
 const signIn = defineModel<boolean>('signIn', { default: false })
 // const signUp = defineModel<boolean>('signUp', { default: false })
@@ -163,7 +229,12 @@ const signIn = defineModel<boolean>('signIn', { default: false })
 const app = useAppStore()
 const content = useContentStore()
 const user = useUserStore()
-const { common, header, pages } = storeToRefs(useLanguageStore())
+const worker = useWorkerStore()
+const { admin, common, header, messages: messagesText, pages } = storeToRefs(useLanguageStore())
+
+/** a phone with a signed in user: one menu instead of a row of buttons */
+const { smAndDown } = useDisplay()
+const compact = computed(() => user.signed && smAndDown.value)
 
 const short = computed(() => app.viewportWidth < 600)
 

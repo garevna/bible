@@ -192,3 +192,24 @@ test('a role without functions of an administrator has no dashboard', async ({ p
   await withStores(page, (stores) => stores.app.setPage('admin'))
   await expect(page.getByText('Ця сторінка лише для адміністраторів')).toBeVisible()
 })
+
+test.describe('phone', () => {
+  test.use({ viewport: { width: 390, height: 800 } })
+
+  test('the header has one menu instead of a row of buttons', async ({ page }) => {
+    await fakeWorker(page, ['users'])
+    await signIn(page)
+
+    // no separate buttons: the messages, the dashboard, signing out and the language are in the menu
+    await expect(page.getByRole('button', { name: 'Адміністрування' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Вихід' })).toHaveCount(0)
+    await page.getByRole('button', { name: 'Меню' }).click()
+    const menu = page.locator('.header-menu')
+    await expect(menu.locator('.v-list-item', { hasText: 'Повідомлення' })).toBeVisible()
+    await expect(menu.locator('.v-list-item', { hasText: 'Вихід' })).toBeVisible()
+    await expect(menu.locator('.v-list-item', { hasText: 'Синодальний переклад' })).toBeVisible()
+
+    await menu.locator('.v-list-item', { hasText: 'Адміністрування' }).click()
+    await expect(page.locator('.v-select', { hasText: 'Служителі' })).toBeVisible()
+  })
+})
