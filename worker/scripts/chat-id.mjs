@@ -3,14 +3,17 @@
  * The token is read from worker/.dev.vars, so it is never typed in a terminal or a chat.
  *   1. add the bot to the channel as an administrator that may post messages
  *   2. post any message in the channel
- *   3. pnpm worker:chat-id
+ *   3. pnpm worker:chat-id            (the bot of the public channel)
+ *      pnpm worker:chat-id service    (the service bot: its service chat, before anybody links Telegram,
+ *                                      as the webhook takes the updates from then on)
  */
 import { readFileSync } from 'node:fs'
 
 const vars = readFileSync(new URL('../.dev.vars', import.meta.url), 'utf8')
-const token = vars.match(/^TELEGRAM_BOT_TOKEN=(.+)$/m)?.[1]?.trim()
+const name = process.argv[2] === 'service' ? 'SERVICE_BOT_TOKEN' : 'TELEGRAM_BOT_TOKEN'
+const token = vars.match(new RegExp(`^${name}=(.+)$`, 'm'))?.[1]?.trim()
 if (!token) {
-  console.error('TELEGRAM_BOT_TOKEN is empty in worker/.dev.vars')
+  console.error(`${name} is empty in worker/.dev.vars`)
   process.exit(1)
 }
 

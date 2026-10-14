@@ -98,5 +98,35 @@ export const header = {
     ua: 'Не вдалося відкрити цю картинку',
     ru: 'Не удалось открыть эту картинку',
     en: 'This picture could not be opened'
+  },
+  telegramLink: {
+    ua: 'Підключити Telegram',
+    ru: 'Подключить Telegram',
+    en: 'Link Telegram'
+  },
+  telegramLinkHint: {
+    ua: 'Запрошення й повідомлення в особистих',
+    ru: 'Приглашения и сообщения в личке',
+    en: 'Invitations and messages in private'
+  },
+  telegramLinked: {
+    ua: 'Telegram підключено',
+    ru: 'Telegram подключен',
+    en: 'Telegram is linked'
+  },
+  telegramUnlink: {
+    ua: 'Натисніть, щоб відключити',
+    ru: 'Нажмите, чтобы отключить',
+    en: 'Click to unlink'
+  },
+  telegramStart: {
+    ua: 'У Telegram натисніть «Start» (Почати) — і готово',
+    ru: 'В Telegram нажмите «Start» (Начать) — и готово',
+    en: 'Press Start in Telegram, and that is it'
+  },
+  telegramFailed: {
+    ua: 'Не вдалося підключити Telegram, спробуйте пізніше',
+    ru: 'Не удалось подключить Telegram, попробуйте позже',
+    en: 'Telegram could not be linked, try later'
   }
 }

@@ -20,12 +20,26 @@ import {
   type RoleDef
 } from './roles'
 import { d1Schedule, localDay, type ScheduleStore } from './schedule'
-import { handleSchedule } from './scheduleRoutes'
+import { handleSchedule, type ScheduleContext } from './scheduleRoutes'
+import {
+  answered,
+  askOf,
+  forgetChat,
+  linkUrl,
+  rememberChat,
+  reply,
+  serviceBot,
+  takeLink,
+  uidOfChat,
+  webhookSecret,
+  type ServiceBot
+} from './serviceBot'
 import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import { getTypes, parseTypes, setTypes } from './types'
 import {
   DIRECTORIES,
   getDirectory,
+  getUser,
   getMinistries,
   isPhone,
   listUsers,
@@ -35,11 +49,13 @@ import {
   roleOf,
   setDirectory,
   setOwnPhone,
+  setTelegramChat,
   touchUser,
   updateUser,
   type Directory,
   type UserRecord,
-  type UsersStore
+  type UsersStore,
+  type UserView
 } from './users'
 
 /**
@@ -48,6 +64,9 @@ import {
  *   PUT    /me                      { phone: '+380…' | null }: the user's own mobile number
  *   POST   /telegram/preview        the messages a post becomes, and the caption of its picture (nothing is sent)
  *   POST   /telegram/publish        sends the post to the Telegram channel
+ *   POST   /telegram/link           a one-time link to the service bot: Telegram is linked by Start in it
+ *   DELETE /telegram/link           unlinks Telegram
+ *   POST   /telegram/webhook        the updates of the service bot (Telegram calls it, with the secret header)
  *   GET    /types                   the types of notes and topics
  *   GET    /ministries              the ministries of the church
  *   GET    /messages                the messages to and from the user that have not expired
@@ -69,6 +88,10 @@ export interface Env {
   TELEGRAM_BOT_TOKEN: string
   /** the channel (@name or -100… id); the bot is its administrator */
   TELEGRAM_CHAT_ID: string
+  /** secret: the token of the service bot, which writes to the ministers in private (not the channel's bot) */
+  SERVICE_BOT_TOKEN?: string
+  /** the service chat of the ministers (a channel or a group, the service bot in it): the emergencies */
+  SERVICE_CHAT_ID?: string
   FIREBASE_PROJECT_ID: string
   /** user ids and verified emails of the owners: every right, the dashboard cannot change them */
   OWNERS: string
@@ -105,7 +128,8 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
 
 const ROUTES = [
   /^(GET|PUT) \/me$/,
-  /^POST \/telegram\/(preview|publish)$/,
+  /^POST \/telegram\/(preview|publish|webhook)$/,
+  /^(POST|DELETE) \/telegram\/link$/,
   /^GET \/(types|ministries)$/,
   /^GET \/messages(\/recipients)?$/,
   /^POST \/messages$/,
@@ -135,6 +159,147 @@ const rightsOf = (roles: RoleDef[], roleId: string) =>
 const serves = (roles: RoleDef[], roleId: string) =>
   roleId === 'owner' || (roleId !== READER && roles.some((role) => role.id === roleId))
 
+/** the service bot, writing to the linked users of the list */
+const botFor = (env: Env, deps: Deps, users: UserView[]): ServiceBot =>
+  serviceBot(
+    env.SERVICE_BOT_TOKEN,
+    env.SERVICE_CHAT_ID,
+    env.USERS,
+    (uid) => users.find((user) => user.uid === uid)?.telegramChatId,
+    deps.fetcher
+  )
+
+/** What the schedule needs for one user; null for a user who does not serve (a reader) */
+async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<ScheduleContext | null> {
+  const roles = await getRoles(env.USERS)
+  const roleId = roleOf(me, env.OWNERS)
+  if (!serves(roles, roleId)) return null
+  const users = await listUsers(env.USERS, env.OWNERS)
+  return {
+    me,
+    rights: rightsOf(roles, roleId),
+    servants: users.filter((user) => serves(roles, user.role)),
+    planners: users
+      .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
+      .map((user) => user.uid),
+    eventTypes: await getEventTypes(env.USERS),
+    calendar: await getCalendar(env.USERS),
+    schedule: deps.schedule ?? d1Schedule(env.DB),
+    messages: deps.messages ?? d1Store(env.DB),
+    bot: botFor(env, deps, users),
+    now: deps.now?.() ?? Date.now()
+  }
+}
+
+const NOT_ACTUAL = 'Це запрошення вже неактуальне'
+
+/**
+ * The updates of the service bot: /start <token> links the chat to the user of the token, /stop unlinks it,
+ * a button of an invitation answers it as the app would (the backup takes the place, or an emergency).
+ */
+async function handleWebhook(
+  request: Request,
+  env: Env,
+  deps: Deps,
+  json: (body: unknown, status?: number) => Response
+): Promise<Response> {
+  const token = env.SERVICE_BOT_TOKEN
+  if (!token || request.headers.get('x-telegram-bot-api-secret-token') !== (await webhookSecret(token)))
+    return json({ error: 'forbidden' }, 403)
+  const update = (await request.json().catch(() => null)) as {
+    message?: { chat: { id: number; type: string }; text?: string; from?: { first_name?: string } }
+    callback_query?: {
+      id: string
+      data?: string
+      from: { id: number }
+      message?: { chat: { id: number }; message_id: number; text?: string }
+    }
+  } | null
+  const { fetcher } = deps
+  const store = env.USERS
+
+  const message = update?.message
+  if (message?.chat.type === 'private' && typeof message.text === 'string') {
+    const chatId = message.chat.id
+    const [command, argument] = message.text.trim().split(/\s+/)
+    if (command === '/start' && argument) {
+      const uid = await takeLink(store, argument)
+      const record = uid ? await getUser(store, uid) : null
+      if (!record) {
+        await reply(
+          token,
+          fetcher,
+          chatId,
+          'Посилання застаріло. Відкрийте застосунок і натисніть «Підключити Telegram» ще раз.'
+        )
+        return json({ ok: true })
+      }
+      // one chat for a user, one user for a chat
+      if (record.telegramChatId && record.telegramChatId !== chatId)
+        await forgetChat(store, record.telegramChatId)
+      const previous = await uidOfChat(store, chatId)
+      const other = previous && previous !== record.uid ? await getUser(store, previous) : null
+      if (other) await setTelegramChat(store, other, null)
+      await setTelegramChat(store, record, chatId)
+      await rememberChat(store, chatId, record.uid)
+      await reply(
+        token,
+        fetcher,
+        chatId,
+        `Готово${record.name ? `, ${record.name}` : ''}! Сюди приходитимуть запрошення на служіння (відповісти можна кнопками) і повідомлення застосунку. Відключити: /stop`
+      )
+    } else if (command === '/stop') {
+      const uid = await uidOfChat(store, chatId)
+      const record = uid ? await getUser(store, uid) : null
+      if (record) await setTelegramChat(store, record, null)
+      await forgetChat(store, chatId)
+      await reply(token, fetcher, chatId, 'Telegram відключено. Підключити знову можна в застосунку.')
+    } else {
+      await reply(
+        token,
+        fetcher,
+        chatId,
+        'Це службовий бот церкви. Підключіть його в застосунку: меню аватара → «Підключити Telegram».'
+      )
+    }
+    return json({ ok: true })
+  }
+
+  const callback = update?.callback_query
+  if (callback?.data) {
+    const chatId = callback.message?.chat.id ?? callback.from.id
+    const [key = '', choice] = callback.data.split('|')
+    const ask = await askOf(store, key, chatId)
+    const uid = await uidOfChat(store, chatId)
+    const me = uid ? await getUser(store, uid) : null
+    const context = me ? await scheduleContext(me, env, deps) : null
+    if (!ask || !context) {
+      await answered(token, fetcher, callback.id, undefined, NOT_ACTUAL)
+      return json({ ok: true })
+    }
+    const confirm = choice === 'c'
+    const answer = new Request(new URL('/schedule/answer', request.url), {
+      method: 'POST',
+      body: JSON.stringify({
+        eventId: ask.eventId,
+        day: ask.day,
+        uid: ask.uid,
+        as: ask.as,
+        answer: confirm ? 'confirm' : 'decline',
+        reason: confirm ? undefined : 'Відповідь через Telegram'
+      })
+    })
+    const response = await handleSchedule(answer, context, json)
+    const notice = !response.ok
+      ? NOT_ACTUAL
+      : confirm
+        ? '✅ Підтверджено. Дякуємо!'
+        : '❌ Відмову передано відповідальному'
+    await answered(token, fetcher, callback.id, callback.message, notice)
+  }
+  return json({ ok: true })
+}
+
 export async function handle(request: Request, env: Env, deps: Deps = defaultDeps): Promise<Response> {
   const cors = corsHeaders(request, env)
   const json = (body: unknown, status = 200) =>
@@ -145,6 +310,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   const { pathname } = new URL(request.url)
   const route = `${request.method} ${pathname}`
   if (!ROUTES.some((pattern) => pattern.test(route))) return json({ error: 'not-found' }, 404)
+
+  // Telegram calls the webhook with its secret header, not with a user's token
+  if (route === 'POST /telegram/webhook') return handleWebhook(request, env, deps, json)
 
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1]
   if (!token) return json({ error: 'unauthorized' }, 401)
@@ -181,6 +349,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       canSend: rights.send,
       canReceive: serves(roles, roleId),
       phone: me.phone ?? null,
+      // the service bot: offered to the ministers, and whether the user linked it
+      serviceBot: Boolean(env.SERVICE_BOT_TOKEN) && serves(roles, roleId),
+      telegramLinked: Boolean(me.telegramChatId),
       // ministers are asked for their mobile number until they give it
       needsPhone: serves(roles, roleId) && !me.phone
     })
@@ -195,6 +366,18 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
 
   // the types of notes and topics: everyone who signed in reads them
   if (route === 'GET /types') return json({ types: await getTypes(env.USERS) })
+
+  if (pathname === '/telegram/link') {
+    if (!env.SERVICE_BOT_TOKEN || !serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    if (request.method === 'DELETE') {
+      if (me.telegramChatId) await forgetChat(env.USERS, me.telegramChatId)
+      await setTelegramChat(env.USERS, me, null)
+      return json({ linked: false })
+    }
+    const webhook = new URL('/telegram/webhook', request.url).toString()
+    const url = await linkUrl(env.SERVICE_BOT_TOKEN, env.USERS, me.uid, webhook, deps.fetcher)
+    return url ? json({ url }) : json({ error: 'telegram' }, 502)
+  }
 
   if (pathname.startsWith('/telegram/')) {
     if (!rights.publish) return json({ error: 'forbidden' }, 403)
@@ -216,25 +399,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   }
 
   if (pathname.startsWith('/schedule')) {
-    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
-    const users = await listUsers(env.USERS, env.OWNERS)
-    return handleSchedule(
-      request,
-      {
-        me,
-        rights,
-        servants: users.filter((user) => serves(roles, user.role)),
-        planners: users
-          .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
-          .map((user) => user.uid),
-        eventTypes: await getEventTypes(env.USERS),
-        calendar: await getCalendar(env.USERS),
-        schedule: deps.schedule ?? d1Schedule(env.DB),
-        messages: deps.messages ?? d1Store(env.DB),
-        now: deps.now?.() ?? Date.now()
-      },
-      json
-    )
+    const context = await scheduleContext(me, env, deps)
+    return context ? handleSchedule(request, context, json) : json({ error: 'forbidden' }, 403)
   }
 
   if (pathname.startsWith('/messages') || route === 'GET /ministries') {
@@ -442,6 +608,22 @@ async function handleMessages(
     readAt: null
   }))
   await store.insert(messages)
+  // the same in Telegram for the linked ones: the text, and what is attached
+  const bot = botFor(env, deps, users)
+  const attached = draft.attachment
+    ? `
+
+📎 ${draft.attachment.post.title || (draft.attachment.kind === 'topic' ? 'Тема' : 'Нотатка')} — у застосунку`
+    : ''
+  await Promise.all(
+    messages.map((message) =>
+      bot.send(
+        message.toUid,
+        `✉ ${message.fromName}:
+${message.text}${attached}`
+      )
+    )
+  )
   return json({ sent: messages.length })
 }
 

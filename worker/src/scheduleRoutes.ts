@@ -2,6 +2,7 @@ import type { CalendarSettings, EventType } from './eventTypes'
 import { MESSAGE_LIFE, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
 import { ANY_MINISTRY, type RoleDef } from './roles'
+import type { Ask, ServiceBot } from './serviceBot'
 import {
   daysOf,
   localDay,
@@ -47,6 +48,8 @@ export interface ScheduleContext {
   calendar: CalendarSettings
   schedule: ScheduleStore
   messages: MessagesStore
+  /** the service bot: the same notices in private in Telegram, with buttons for the invitations */
+  bot: ServiceBot
   now: number
 }
 
@@ -69,7 +72,7 @@ export async function handleSchedule(
   context: ScheduleContext,
   json: (body: unknown, status?: number) => Response
 ): Promise<Response> {
-  const { me, rights, servants, planners, eventTypes, calendar, schedule, messages, now } = context
+  const { me, rights, servants, planners, eventTypes, calendar, schedule, messages, bot, now } = context
   const url = new URL(request.url)
   const route = `${request.method} ${url.pathname}`
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>
@@ -83,8 +86,11 @@ export async function handleSchedule(
   const servant = (uid: unknown) =>
     typeof uid === 'string' ? servants.find((user) => user.uid === uid) : undefined
 
-  /** a message from the user to some people (the events speak through the messages) */
-  async function notify(uids: (string | null | undefined)[], text: string) {
+  /**
+   * A message from the user to some people (the events speak through the messages), and the same in
+   * Telegram for the linked ones; an invitation gets buttons there for its answers
+   */
+  async function notify(uids: (string | null | undefined)[], text: string, asks?: Ask[]) {
     const to = [...new Set(uids.filter((uid): uid is string => Boolean(uid) && uid !== me.uid))]
     const list: Message[] = to.map((uid) => ({
       id: crypto.randomUUID(),
@@ -100,6 +106,7 @@ export async function handleSchedule(
       readAt: null
     }))
     list.length && (await messages.insert(list))
+    await Promise.all(to.map((uid) => bot.send(uid, text, asks)))
   }
 
   /** the event and one of its days, not in the past */
@@ -251,7 +258,8 @@ export async function handleSchedule(
         !self &&
         (await notify(
           [person.uid],
-          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. Підтвердіть, будь ласка, у календарі служінь.`
+          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. Підтвердіть, будь ласка, у календарі служінь.`,
+          free.map((day) => ({ eventId: event.id, day, uid: person.uid, as: 'main' as const }))
         ))
     }
     return json({ invited })
@@ -300,12 +308,14 @@ export async function handleSchedule(
     self ||
       (await notify(
         [person.uid],
-        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. Підтвердіть, будь ласка, у календарі служінь.`
+        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. Підтвердіть, будь ласка, у календарі служінь.`,
+        [{ eventId: event.id, day, uid: person.uid, as: 'main' }]
       ))
     backup &&
       (await notify(
         [backup.uid],
-        `Вас просять бути дублером (${nameOf(person)}): ${label}. Підтвердіть, будь ласка, у календарі.`
+        `Вас просять бути дублером (${nameOf(person)}): ${label}. Підтвердіть, будь ласка, у календарі.`,
+        [{ eventId: event.id, day, uid: person.uid, as: 'backup' }]
       ))
     return json({ participant })
   }
@@ -469,10 +479,9 @@ export async function handleSchedule(
       )
       return json({ answered: true, replacedBy: participant.backupUid })
     }
-    await notify(
-      [...managers, ...planners],
-      `⚠ ТЕРМІНОВО: на служінні нікого немає. ${participant.name} не може, дублера немає: ${label}.${because}`
-    )
+    const emergency = `⚠ ТЕРМІНОВО: на служінні нікого немає. ${participant.name} не може, дублера немає: ${label}.${because}`
+    await notify([...managers, ...planners], emergency)
+    await bot.broadcast(emergency)
     return json({ answered: true, emergency: true })
   }
 

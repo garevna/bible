@@ -14,6 +14,8 @@ export interface UserRecord {
   ministries?: string[]
   /** the mobile number, '+380501234567' (ministers need one) */
   phone?: string
+  /** the private chat with the service bot, once the user linked Telegram */
+  telegramChatId?: number
   /** ms */
   lastSeen: number
   /** who gave the role and when */
@@ -151,6 +153,14 @@ export async function setOwnPhone(
 ): Promise<UserRecord> {
   const { phone: _old, ...rest } = me
   const updated: UserRecord = phone ? { ...rest, phone } : rest
+  await save(store, updated)
+  return updated
+}
+
+/** The user's chat with the service bot (null: unlinked) */
+export async function setTelegramChat(store: UsersStore, record: UserRecord, chatId: number | null) {
+  const { telegramChatId: _old, ...rest } = record
+  const updated: UserRecord = chatId ? { ...rest, telegramChatId: chatId } : rest
   await save(store, updated)
   return updated
 }

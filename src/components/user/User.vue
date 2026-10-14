@@ -42,6 +42,24 @@
           :base-color="worker.needsPhone ? 'warning' : undefined"
           @click="phoneDialog = true"
         />
+        <!-- the service bot: invitations with buttons and the messages in private in Telegram -->
+        <template v-if="worker.serviceBot">
+          <v-list-item
+            v-if="worker.telegramLinked"
+            prepend-icon="mdi-send-check-outline"
+            :title="header.telegramLinked"
+            :subtitle="header.telegramUnlink"
+            base-color="secondary"
+            @click="worker.unlinkTelegram()"
+          />
+          <v-list-item
+            v-else
+            prepend-icon="mdi-send-outline"
+            :title="header.telegramLink"
+            :subtitle="header.telegramLinkHint"
+            @click="linkTelegram"
+          />
+        </template>
         <v-list-item prepend-icon="mdi-camera-outline" :title="header.uploadPhoto" @click="uploadPhoto" />
         <v-list-item
           v-if="user.avatar"
@@ -53,6 +71,9 @@
     </v-menu>
 
     <v-snackbar v-model="failed" color="error" timeout="4000">{{ header.photoFailed }}</v-snackbar>
+    <v-snackbar v-model="telegramNote" :color="telegramFailed ? 'error' : 'secondary'" timeout="6000">
+      {{ telegramFailed ? header.telegramFailed : header.telegramStart }}
+    </v-snackbar>
 
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
 
@@ -159,6 +180,27 @@ watch(
   },
   { immediate: true }
 )
+
+/**
+ * Telegram is linked in the bot: a new tab opens it with a one-time link (opened at once, so the browser
+ * does not block it); back in the app, the worker says whether it is linked
+ */
+const telegramNote = ref(false)
+const telegramFailed = ref(false)
+async function linkTelegram() {
+  const tab = window.open('', '_blank')
+  telegramFailed.value = false
+  try {
+    const url = await worker.telegramLink()
+    if (tab) tab.location.href = url
+    else window.location.href = url
+    window.addEventListener('focus', () => worker.loadRole(), { once: true })
+  } catch {
+    tab?.close()
+    telegramFailed.value = true
+  }
+  telegramNote.value = true
+}
 
 /** a small square photo goes into the profile, so it loads fast and offline too */
 async function uploadPhoto() {

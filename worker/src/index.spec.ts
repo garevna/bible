@@ -5,6 +5,7 @@ import { isOwner, verifyIdToken, type AuthUser } from './auth'
 import { handle, type Env } from './index'
 import { memoryStore as memoryMessages } from './messages'
 import { memorySchedule } from './schedule'
+import { webhookSecret } from './serviceBot'
 import type { UserView, UsersStore } from './users'
 
 /** the answers of the worker in these tests */
@@ -18,9 +19,13 @@ interface Answer {
 function memoryStore(): UsersStore {
   const data = new Map<string, { value: string; metadata: unknown }>()
   return {
-    get: (async (name: string) => {
+    // as KV: the text, or with 'json' the parsed value
+    get: (async (name: string, type?: unknown) => {
       const item = data.get(name)
-      return item ? JSON.parse(item.value) : null
+      if (!item) return null
+      return type === 'json' || (type as { type?: string })?.type === 'json'
+        ? JSON.parse(item.value)
+        : item.value
     }) as UsersStore['get'],
     put: (async (name: string, value: string, options?: { metadata?: unknown }) => {
       data.set(name, { value, metadata: options?.metadata })
@@ -62,7 +67,7 @@ function setup() {
     // the messages are kept in memory (Deps.messages)
     DB: undefined as unknown as D1Database
   }
-  const fetcher = vi.fn(async () => new Response('{"ok":true}'))
+  const fetcher = vi.fn(async (_url: unknown, _init?: RequestInit) => new Response('{"ok":true}'))
   const verify = async (token: string) => {
     if (!users[token]) throw new Error('bad token')
     return users[token]
@@ -84,7 +89,7 @@ function setup() {
     const answer = (await response.json().catch(() => null)) as Answer
     return { status: response.status, body: answer, headers: response.headers }
   }
-  return { call, fetcher, env, clock }
+  return { call, fetcher, env, clock, messages, schedule }
 }
 
 const topic = { title: 'Тема', items: [{ kind: 'verse', text: 'Вірш', ref: 'Від Матвія 1:1' }] }
@@ -893,6 +898,162 @@ describe('messages between ministers', () => {
       await call('POST', '/messages', 'pastor', { to: ['musician-uid', 'leader-uid'], text: `№${index}` })
     }
     expect((await call('POST', '/messages', 'pastor', { to: ['musician-uid'], text: 'ще' })).status).toBe(429)
+  })
+})
+
+/** a request of the service bot to the Telegram API, as the tests read it */
+interface Sent {
+  chat_id?: number | string
+  text: string
+  reply_markup?: { inline_keyboard: { text: string; callback_data: string }[][] }
+  [name: string]: unknown
+}
+
+describe('the service bot', () => {
+  const DAY = '2026-10-13'
+
+  async function linked() {
+    const context = setup()
+    const { call, fetcher, env, clock, messages, schedule } = context
+    clock.now = Date.parse('2026-10-12T06:00:00Z')
+    env.SERVICE_BOT_TOKEN = 'SVC'
+    env.SERVICE_CHAT_ID = '-100777'
+    fetcher.mockImplementation(async (url: unknown) =>
+      String(url).endsWith('/getMe')
+        ? new Response('{"ok":true,"result":{"username":"kcc_service_bot"}}')
+        : new Response('{"ok":true}')
+    )
+    for (const user of ['owner', 'pastor', 'leader', 'reader']) await call('GET', '/me', user)
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'publisher' })
+    await call('PUT', '/admin/users/leader-uid', 'owner', { ministries: ['Молитовне служіння'] })
+
+    const secret = await webhookSecret('SVC')
+    const webhook = (update: unknown, header = secret) =>
+      handle(
+        new Request('https://worker.test/telegram/webhook', {
+          method: 'POST',
+          headers: { 'x-telegram-bot-api-secret-token': header, 'content-type': 'application/json' },
+          body: JSON.stringify(update)
+        }),
+        env,
+        {
+          verify: async () => {
+            throw new Error('no token')
+          },
+          fetcher: fetcher as unknown as typeof fetch,
+          messages,
+          schedule,
+          now: () => clock.now
+        }
+      )
+    /** what the bot sent with a method of the Telegram API */
+    const sent = (method: string) =>
+      fetcher.mock.calls
+        .filter(([url]) => String(url).endsWith(`/bot${'SVC'}/${method}`))
+        .map(([, init]) => JSON.parse(String(init?.body)) as Sent)
+
+    const link = (await call('POST', '/telegram/link', 'leader')).body.url as string
+    expect(link).toMatch(/^https:\/\/t\.me\/kcc_service_bot\?start=[0-9a-f]{32}$/)
+    expect(sent('setWebhook')[0]).toMatchObject({
+      url: 'https://worker.test/telegram/webhook',
+      secret_token: secret
+    })
+    const start = (token: string) =>
+      webhook({ message: { chat: { id: 555, type: 'private' }, text: `/start ${token}` } })
+    await start(link.split('start=')[1]!)
+    return { ...context, webhook, sent, start, link }
+  }
+
+  it('a minister links Telegram by Start in the bot; the link works once; readers have no bot', async () => {
+    const { call, sent, start, link, webhook } = await linked()
+    expect(sent('sendMessage').at(-1)).toMatchObject({
+      chat_id: 555,
+      text: expect.stringContaining('Готово, Лідер')
+    })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({
+      serviceBot: true,
+      telegramLinked: true
+    })
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({ serviceBot: false })
+    expect((await call('POST', '/telegram/link', 'reader')).status).toBe(403)
+
+    await start(link.split('start=')[1]!)
+    expect(sent('sendMessage').at(-1)!.text).toContain('Посилання застаріло')
+    // Telegram's secret header, nothing else
+    expect(
+      (await webhook({ message: { chat: { id: 1, type: 'private' }, text: '/stop' } }, 'wrong')).status
+    ).toBe(403)
+
+    await webhook({ message: { chat: { id: 555, type: 'private' }, text: '/stop' } })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({ telegramLinked: false })
+  })
+
+  it('an invitation comes with buttons; a button answers it; messages come too', async () => {
+    const { call, sent, webhook } = await linked()
+    const eventId = (
+      (
+        await call('POST', '/schedule/events', 'owner', {
+          ministry: 'Молитовне служіння',
+          title: 'Ранкова молитва',
+          weekdays: [1, 2, 3, 4, 5, 6],
+          time: '06:45',
+          responsibleUid: 'pastor-uid'
+        })
+      ).body.event as { id: string }
+    ).id
+    await call('POST', '/schedule/invitations', 'owner', {
+      eventId,
+      days: [DAY, '2026-10-14'],
+      uids: ['leader-uid']
+    })
+    const invitation = sent('sendMessage').at(-1)!
+    expect(invitation.chat_id).toBe(555)
+    expect(invitation.text).toContain('Запрошення на служіння')
+    // a row for each day
+    const rows = invitation.reply_markup!.inline_keyboard
+    expect(rows.map((row) => row.map((button) => button.text))).toEqual([
+      ['✅ 13.10: Підтвердити', '❌ 13.10: Не можу'],
+      ['✅ 14.10: Підтвердити', '❌ 14.10: Не можу']
+    ])
+
+    await webhook({
+      callback_query: {
+        id: 'cb1',
+        data: rows[0]![0]!.callback_data,
+        from: { id: 555 },
+        message: { chat: { id: 555 }, message_id: 7, text: invitation.text }
+      }
+    })
+    expect(sent('answerCallbackQuery').at(-1)).toEqual({
+      callback_query_id: 'cb1',
+      text: '✅ Підтверджено. Дякуємо!'
+    })
+    expect(sent('editMessageText').at(-1)).toMatchObject({ chat_id: 555, message_id: 7 })
+    const team = (await call('GET', `/schedule?from=${DAY}&to=${DAY}`, 'leader')).body.participants as {
+      status: string
+    }[]
+    expect(team).toMatchObject([{ status: 'confirmed' }])
+
+    // a button of another chat answers nothing
+    await webhook({ callback_query: { id: 'cb2', data: rows[1]![0]!.callback_data, from: { id: 999 } } })
+    expect(sent('answerCallbackQuery').at(-1)).toEqual({
+      callback_query_id: 'cb2',
+      text: 'Це запрошення вже неактуальне'
+    })
+
+    // declining by the button, nobody left: an emergency, the service chat too
+    await webhook({
+      callback_query: { id: 'cb3', data: rows[1]![1]!.callback_data, from: { id: 555 } }
+    })
+    expect(
+      sent('sendMessage').some((body) => body.chat_id === '-100777' && body.text.includes('ТЕРМІНОВО'))
+    ).toBe(true)
+
+    await call('POST', '/messages', 'pastor', { to: ['leader-uid'], text: 'Привіт' })
+    expect(sent('sendMessage').at(-1)).toMatchObject({
+      chat_id: 555,
+      text: expect.stringContaining('Привіт')
+    })
   })
 })
 

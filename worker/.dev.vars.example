@@ -2,3 +2,7 @@
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=@your_test_channel
 OWNERS=
+# the service bot (not the channel's): invitations and messages to the ministers in private
+SERVICE_BOT_TOKEN=
+# the service chat of the ministers (-100…, pnpm worker:chat-id service): the emergencies
+SERVICE_CHAT_ID=

@@ -134,6 +134,9 @@ export const useWorkerStore = defineStore('worker', () => {
   /** the mobile number of the user; ministers are asked for it */
   const phone = ref<string | null>(null)
   const needsPhone = ref(false)
+  /** the service bot writes to ministers in Telegram; the user linked it */
+  const serviceBot = ref(false)
+  const telegramLinked = ref(false)
   /** the types of notes and topics (the administrators keep them; the defaults until they come) */
   const types = ref<NoteType[]>(DEFAULT_TYPES)
 
@@ -175,6 +178,7 @@ export const useWorkerStore = defineStore('worker', () => {
     telegram.value = false
     ministries.value = []
     canSend.value = canReceive.value = needsPhone.value = false
+    serviceBot.value = telegramLinked.value = false
     phone.value = null
     if (!workerUrl || !user.signed) return
     try {
@@ -188,6 +192,8 @@ export const useWorkerStore = defineStore('worker', () => {
         canReceive?: boolean
         phone?: string | null
         needsPhone?: boolean
+        serviceBot?: boolean
+        telegramLinked?: boolean
       }>('GET', '/me')
       role.value = me.role
       roleName.value = me.roleName ?? ''
@@ -198,6 +204,8 @@ export const useWorkerStore = defineStore('worker', () => {
       canReceive.value = Boolean(me.canReceive)
       phone.value = me.phone ?? null
       needsPhone.value = Boolean(me.needsPhone)
+      serviceBot.value = Boolean(me.serviceBot)
+      telegramLinked.value = Boolean(me.telegramLinked)
       types.value = (await call<{ types: NoteType[] }>('GET', '/types')).types
     } catch (error) {
       console.warn('The role is not known\n', error)
@@ -300,6 +308,14 @@ export const useWorkerStore = defineStore('worker', () => {
     needsPhone.value = canReceive.value && !phone.value
   }
 
+  /** a one-time link to the service bot: Telegram is linked when the user presses Start there */
+  const telegramLink = async () => (await call<{ url: string }>('POST', '/telegram/link')).url
+
+  async function unlinkTelegram() {
+    await call('DELETE', '/telegram/link')
+    telegramLinked.value = false
+  }
+
   const removeUser = (uid: string) => call('DELETE', `/admin/users/${encodeURIComponent(uid)}`)
 
   const setTypes = async (list: NoteType[]) => {
@@ -321,6 +337,10 @@ export const useWorkerStore = defineStore('worker', () => {
     canReceive,
     phone,
     needsPhone,
+    serviceBot,
+    telegramLinked,
+    telegramLink,
+    unlinkTelegram,
     types,
     setTypes,
     setMyPhone,
