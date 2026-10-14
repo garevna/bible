@@ -76,16 +76,27 @@ async function onSelectionDone() {
  * A mouse paints when its button is let go. On a phone the text is selected by a long press and then
  * by dragging the handles, and none of it ends with a touch event of the page (Android even cancels it),
  * so there the selection is painted once it has stopped changing for a moment.
+ * The mouse is told by the pointer events: a phone also sends mouse events of its own (a mousedown
+ * after a long press with no mouseup), which would wait for a button that is never let go.
  */
 const SETTLE = 800
 let settleTimer: ReturnType<typeof setTimeout> | undefined
 let mouseSelecting = false
 
-const onMouseDown = () => (mouseSelecting = true)
+const byMouse = (event: Event) => (event as PointerEvent).pointerType === 'mouse'
 
-function onMouseUp() {
+function onPointerDown(event: Event) {
+  mouseSelecting = byMouse(event)
+}
+
+function onPointerUp(event: Event) {
+  if (!byMouse(event)) return
   mouseSelecting = false
   onSelectionDone()
+}
+
+function onPointerCancel() {
+  mouseSelecting = false
 }
 
 function onSelectionChange() {
@@ -94,11 +105,18 @@ function onSelectionChange() {
   settleTimer = setTimeout(onSelectionDone, SETTLE)
 }
 
+const listeners: Record<string, EventListener> = {
+  pointerdown: onPointerDown,
+  pointerup: onPointerUp,
+  pointercancel: onPointerCancel,
+  selectionchange: onSelectionChange
+}
+
 function setListeners(on: boolean) {
-  const method = on ? 'addEventListener' : 'removeEventListener'
-  document[method]('mousedown', onMouseDown)
-  document[method]('mouseup', onMouseUp)
-  document[method]('selectionchange', onSelectionChange)
+  for (const [name, listener] of Object.entries(listeners)) {
+    if (on) document.addEventListener(name, listener)
+    else document.removeEventListener(name, listener)
+  }
   on || clearTimeout(settleTimer)
 }
 

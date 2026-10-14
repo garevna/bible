@@ -49,7 +49,7 @@ test.describe('signed in: verse details, notes and keywords', () => {
       range.setEnd(text, 6)
       document.getSelection()!.removeAllRanges()
       document.getSelection()!.addRange(range)
-      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+      document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerType: 'mouse' }))
     }, verseId)
 
     const painted = verse(page, verseId).locator('span[style*="background"]')
@@ -61,8 +61,11 @@ test.describe('signed in: verse details, notes and keywords', () => {
 
   test('on a phone the selection is painted once it stops changing (no mouse events)', async ({ page }) => {
     await page.locator('.highlighter-bar .v-btn').nth(2).click()
-    // a long press and the handles: the selection changes, no mouseup or touchend follows
+    // a long press and the handles: the selection changes, no mouseup or touchend follows;
+    // a phone may send a mousedown of its own, and no mouseup
     await page.evaluate((id) => {
+      document.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType: 'touch' }))
+      document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
       const text = document.getElementById(id)!.firstChild!
       const range = document.createRange()
       range.setStart(text, 0)
