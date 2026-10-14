@@ -47,7 +47,7 @@
         />
         <v-list-item
           v-if="worker.canReceive"
-          prepend-icon="mdi-email-outline"
+          prepend-icon="mdi-message-arrow-left-outline"
           :title="messagesText.title"
           v-bind="here('messages')"
           @click="app.setPage('messages')"

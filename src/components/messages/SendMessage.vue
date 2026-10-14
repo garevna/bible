@@ -13,7 +13,7 @@
     </v-btn>
     <ButtonTooltip
       v-else
-      :icon="attach ? 'mdi-email-fast-outline' : 'mdi-email-plus-outline'"
+      icon="mdi-message-arrow-right"
       :text="attach ? text.send : text.newMessage"
       color="secondary"
       :small="small"
@@ -25,7 +25,7 @@
   <AppDialog
     v-model="open"
     :title="replyTo ? format(text.replyTo, { name: replyTo.fromName }) : attach ? text.send : text.newMessage"
-    icon="mdi-email-fast-outline"
+    icon="mdi-message-arrow-right"
     max-width="640"
   >
     <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-4" />

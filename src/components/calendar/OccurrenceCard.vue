@@ -33,7 +33,7 @@
           <template v-for="member of occurrence.team" :key="'me' + member.uid">
             <div v-if="member.uid === user.uid && member.status === 'invited'" class="my-part">
               <span class="my-part__what">
-                <v-icon icon="mdi-email-alert-outline" size="small" color="secondary" />
+                <v-icon icon="mdi-message-arrow-left-outline" size="small" color="secondary" />
                 {{ text.invitedYou }}
               </span>
               <v-btn
@@ -138,7 +138,7 @@
       <div class="d-flex flex-column">
         <ButtonTooltip
           v-if="schedule.invites(event)"
-          icon="mdi-email-fast-outline"
+          icon="mdi-message-arrow-right"
           :text="text.invitations"
           color="secondary"
           @click="emit('invite', occurrence)"

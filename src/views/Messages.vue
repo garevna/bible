@@ -26,7 +26,7 @@
       >
         <header class="d-flex align-center ga-2 mb-1">
           <v-icon
-            :icon="incoming(message) ? 'mdi-email-arrow-left-outline' : 'mdi-email-arrow-right-outline'"
+            :icon="incoming(message) ? 'mdi-message-arrow-left-outline' : 'mdi-message-arrow-right'"
             size="small"
             color="secondary"
           />
