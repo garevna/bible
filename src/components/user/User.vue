@@ -78,7 +78,7 @@
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
 
     <!-- ministers: the schedule of ministries -->
-    <v-tooltip v-if="!compact && worker.canReceive" :text="calendarText.title">
+    <v-tooltip v-if="!compact && worker.calendar" :text="calendarText.title">
       <template #activator="{ props }">
         <v-btn
           v-bind="props"

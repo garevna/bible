@@ -259,6 +259,11 @@ export const admin = {
     ru: 'На любое служение',
     en: 'To any ministry'
   },
+  leaders: {
+    ua: 'Керівники служіння',
+    ru: 'Руководители служения',
+    en: 'Leaders of the ministry'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',

@@ -42,15 +42,18 @@ import { getTypes, parseTypes, setTypes } from './types'
 import {
   DIRECTORIES,
   getDirectory,
+  getLeaders,
   getUser,
   getMinistries,
   isPhone,
   listUsers,
+  parseLeaders,
   parseMinistries,
   removeUser,
   RoleChangeError,
   roleOf,
   setDirectory,
+  setLeaders,
   setOwnPhone,
   setTelegramChat,
   touchUser,
@@ -138,7 +141,7 @@ const ROUTES = [
   /^POST \/messages$/,
   /^POST \/messages\/[^/]+\/read$/,
   /^GET \/admin\/(settings|users)$/,
-  /^PUT \/admin\/(roles|types|event-types|calendar)$/,
+  /^PUT \/admin\/(roles|types|event-types|calendar|leaders)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
   /^GET \/schedule(\/people|\/materials)?$/,
@@ -147,7 +150,8 @@ const ROUTES = [
   /^(POST|PUT|DELETE) \/schedule\/events(\/[^/]+)?$/,
   /^(POST|DELETE) \/schedule\/team$/,
   /^POST \/schedule\/invitations$/,
-  /^POST \/schedule\/(apply|approve|unapprove|role|answer|announce)$/
+  /^POST \/schedule\/(apply|approve|unapprove|role|answer|announce|guest)$/,
+  /^PUT \/schedule\/days$/
 ]
 
 const DAY = 24 * 60 * 60 * 1000
@@ -172,11 +176,20 @@ const botFor = (env: Env, deps: Deps, users: UserView[]): ServiceBot =>
     deps.fetcher
   )
 
-/** What the schedule needs for one user; null for a user who does not serve (a reader) */
-async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<ScheduleContext | null> {
+/**
+ * What the schedule needs for one user; null for a user who does not serve (a reader), unless readers
+ * are let in (to see and apply to the open events for everyone)
+ */
+async function scheduleContext(
+  me: UserRecord,
+  env: Env,
+  deps: Deps,
+  readers = false
+): Promise<ScheduleContext | null> {
   const roles = await getRoles(env.USERS)
   const roleId = roleOf(me, env.OWNERS)
-  if (!serves(roles, roleId)) return null
+  const reader = !serves(roles, roleId)
+  if (reader && !readers) return null
   // the owners serve too: they are invited, and get the notices
   const users = await listUsers(env.USERS, env.OWNERS, true)
   return {
@@ -191,6 +204,8 @@ async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<Sc
     schedule: deps.schedule ?? d1Schedule(env.DB),
     messages: deps.messages ?? d1Store(env.DB),
     bot: botFor(env, deps, users),
+    leaders: await getLeaders(env.USERS),
+    reader,
     now: deps.now?.() ?? Date.now()
   }
 }
@@ -330,7 +345,8 @@ async function handleWebhook(
     const ask = await askOf(store, key, chatId)
     const uid = await uidOfChat(store, callback.from.id)
     const me = uid ? await getUser(store, uid) : null
-    const context = me ? await scheduleContext(me, env, deps) : null
+    // an open call for everyone: the readers apply too
+    const context = me ? await scheduleContext(me, env, deps, ask?.as === 'apply') : null
     if (!ask || (me && !context)) {
       await toast(token, fetcher, callback.id, NOT_ACTUAL)
       return json({ ok: true })
@@ -453,6 +469,10 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       phone: me.phone ?? null,
       // the service bot: offered to the ministers, and whether the user linked it
       serviceBot: Boolean(env.SERVICE_BOT_TOKEN) && serves(roles, roleId),
+      // the ministries the user leads (plans their events)
+      leads: Object.entries(await getLeaders(env.USERS))
+        .filter(([, uids]) => uids.includes(me.uid))
+        .map(([ministry]) => ministry),
       telegramLinked: Boolean(me.telegramChatId),
       // ministers are asked for their mobile number until they give it
       needsPhone: serves(roles, roleId) && !me.phone
@@ -501,7 +521,13 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   }
 
   if (pathname.startsWith('/schedule')) {
-    const context = await scheduleContext(me, env, deps)
+    // a reader may see and apply to the open events for everyone
+    const context = await scheduleContext(
+      me,
+      env,
+      deps,
+      route === 'GET /schedule' || route === 'POST /schedule/apply'
+    )
     return context ? handleSchedule(request, context, json) : json({ error: 'forbidden' }, 403)
   }
 
@@ -526,8 +552,21 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       ministries: await getDirectory(env.USERS, 'ministries'),
       locations: await getDirectory(env.USERS, 'locations'),
       eventTypes: await getEventTypes(env.USERS),
-      calendar: await getCalendar(env.USERS)
+      calendar: await getCalendar(env.USERS),
+      leaders: await getLeaders(env.USERS)
     })
+  }
+
+  // the leaders of the ministries: kept with the list of the ministries
+  if (route === 'PUT /admin/leaders') {
+    if (!can('directories')) return json({ error: 'forbidden' }, 403)
+    const leaders = parseLeaders(
+      ((await body()) as { leaders?: unknown } | null)?.leaders,
+      await getDirectory(env.USERS, 'ministries')
+    )
+    if (!leaders) return json({ error: 'bad-request' }, 400)
+    await setLeaders(env.USERS, leaders)
+    return json({ leaders })
   }
 
   // the types of events and the settings of the calendar: the ones who plan the schedule

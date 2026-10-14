@@ -371,8 +371,9 @@ describe('the schedule of ministries', () => {
       '2026-10-17',
       '2026-10-19'
     ])
-    // readers have no schedule
-    expect((await call('GET', '/schedule', 'reader')).status).toBe(403)
+    // readers see the open events for everyone only
+    expect((await call('GET', '/schedule', 'reader')).body.days).toEqual([])
+    expect((await call('POST', '/schedule/team', 'reader', {})).status).toBe(403)
   })
 
   it('the backup agrees when invited; when the main one cannot, the backup leads', async () => {
@@ -700,6 +701,131 @@ describe('the schedule of ministries', () => {
         })
       ).body
     ).toEqual({ invited: 1 })
+  })
+
+  it('a leader of a ministry plans its events, not the events of another ministry', async () => {
+    const { call } = await church()
+    // the leader (a servant) leads the prayer ministry
+    expect(
+      (await call('PUT', '/admin/leaders', 'owner', { leaders: { 'Молитовне служіння': ['leader-uid'] } }))
+        .status
+    ).toBe(200)
+    expect(
+      (await call('PUT', '/admin/leaders', 'owner', { leaders: { Невідоме: ['leader-uid'] } })).status
+    ).toBe(400)
+    expect((await call('GET', '/me', 'leader')).body.leads).toEqual(['Молитовне служіння'])
+
+    const created = await call('POST', '/schedule/events', 'leader', {
+      ...prayer,
+      responsibleUid: 'leader-uid'
+    })
+    expect(created.status).toBe(200)
+    const eventId = (created.body.event as { id: string }).id
+    // another ministry: no
+    expect(
+      (await call('POST', '/schedule/events', 'leader', { ...prayer, ministry: 'Музичне служіння' })).status
+    ).toBe(403)
+    // the events of the ministry: invitations and the change of a day
+    expect(
+      (
+        await call('POST', '/schedule/invitations', 'leader', {
+          eventId,
+          days: ['2026-10-13'],
+          uids: ['musician-uid']
+        })
+      ).status
+    ).toBe(200)
+    expect(
+      (await call('PUT', '/schedule/days', 'musician', { eventId, day: '2026-10-13', cancelled: true }))
+        .status
+    ).toBe(403)
+  })
+
+  it('the time of a weekday; a day changed or cancelled, and the team is told', async () => {
+    const { call } = await church()
+    // Monday to Friday at 06:45, Saturday at 08:00
+    const eventId = (
+      (await call('POST', '/schedule/events', 'owner', { ...prayer, times: { 6: '08:00' } })).body.event as {
+        id: string
+        times: unknown
+      }
+    ).id
+    const { body } = await call('GET', '/schedule?from=2026-10-16&to=2026-10-17', 'leader')
+    expect((body.events as { times: unknown }[])[0]!.times).toEqual({ 6: '08:00' })
+
+    await call('POST', '/schedule/invitations', 'owner', {
+      eventId,
+      days: ['2026-10-17'],
+      uids: ['musician-uid']
+    })
+    // Saturday: another place, then cancelled
+    const moved = await call('PUT', '/schedule/days', 'owner', {
+      eventId,
+      day: '2026-10-17',
+      time: '09:00',
+      location: 'Церква',
+      note: 'Цього разу офлайн'
+    })
+    expect(moved.body.change).toMatchObject({ time: '09:00', location: 'Церква', cancelled: false })
+    const told = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
+    expect(told.map((message) => message.text)).toContainEqual(
+      expect.stringContaining('Зміни: Молитовне служіння: Ранкова молитва — 2026-10-17 09:00, Церква')
+    )
+    await call('PUT', '/schedule/days', 'owner', { eventId, day: '2026-10-17', cancelled: true })
+    const cancelled = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
+    expect(cancelled.map((message) => message.text)).toContainEqual(expect.stringContaining('Скасовано'))
+    // a cancelled day takes no answers
+    expect(
+      (
+        await call('POST', '/schedule/answer', 'musician', {
+          eventId,
+          day: '2026-10-17',
+          uid: 'musician-uid',
+          as: 'main',
+          answer: 'confirm'
+        })
+      ).status
+    ).toBe(409)
+    // all empty: the day is as the event again
+    expect(
+      (await call('PUT', '/schedule/days', 'owner', { eventId, day: '2026-10-17' })).body.change
+    ).toBeNull()
+  })
+
+  it('a guest is written by name; who applies is the choice of the event', async () => {
+    const { call } = await church()
+    const open = (applicants: string) =>
+      call('POST', '/schedule/events', 'owner', {
+        ...prayer,
+        title: applicants,
+        mode: 'open',
+        applicants,
+        responsibleUid: 'owner-uid'
+      }).then((answer) => (answer.body.event as { id: string }).id)
+    const day = '2026-10-13'
+
+    const ministry = await open('ministry')
+    expect((await call('POST', '/schedule/apply', 'musician', { eventId: ministry, day })).status).toBe(403)
+    const servants = await open('servants')
+    expect((await call('POST', '/schedule/apply', 'musician', { eventId: servants, day })).status).toBe(200)
+    expect((await call('POST', '/schedule/apply', 'reader', { eventId: servants, day })).status).toBe(403)
+    const everyone = await open('everyone')
+    expect((await call('POST', '/schedule/apply', 'reader', { eventId: everyone, day })).status).toBe(200)
+    // the reader sees that event, no other
+    const seen = (await call('GET', `/schedule?from=${day}&to=${day}`, 'reader')).body.events as {
+      id: string
+    }[]
+    expect(seen.map((event) => event.id)).toEqual([everyone])
+
+    const guest = await call('POST', '/schedule/guest', 'owner', {
+      eventId: ministry,
+      day,
+      name: 'Пастор Іван, Київ'
+    })
+    expect(guest.body.participant).toMatchObject({ name: 'Пастор Іван, Київ', status: 'confirmed' })
+    expect(
+      (await call('POST', '/schedule/guest', 'musician', { eventId: ministry, day, name: 'Хтось' })).status
+    ).toBe(403)
   })
 
   it('administrators keep the types of events and the settings of the calendar', async () => {

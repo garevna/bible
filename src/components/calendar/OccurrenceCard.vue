@@ -1,18 +1,39 @@
 <template>
-  <article class="occurrence" :class="{ 'occurrence--mine': schedule.isMine(occurrence) }">
+  <article
+    class="occurrence"
+    :class="{
+      'occurrence--mine': schedule.isMine(occurrence),
+      'occurrence--cancelled': occurrence.cancelled
+    }"
+  >
     <div class="d-flex align-start ga-3">
-      <div class="time">{{ event.time }}</div>
+      <div class="time">{{ occurrence.time }}</div>
       <div class="flex-grow-1 min-width-0">
         <div class="event-name">{{ schedule.nameOf(event) }}</div>
         <div class="details">
           <span v-if="schedule.nameOf(event) !== event.ministry">{{ event.ministry }}</span>
-          <span v-if="event.location">
-            <v-icon icon="mdi-map-marker-outline" size="x-small" /> {{ event.location }}
+          <span v-if="occurrence.location">
+            <v-icon icon="mdi-map-marker-outline" size="x-small" /> {{ occurrence.location }}
           </span>
           <span>{{ text.responsible }}: {{ event.responsibleName }}</span>
-          <span>{{ format(text.teamOf, { count: confirmed }) }} / {{ event.needed }}</span>
+          <span>{{ format(text.teamOf, { count: confirmed }) }} / {{ occurrence.needed }}</span>
         </div>
         <p v-if="event.description" class="description">{{ event.description }}</p>
+
+        <!-- this day: cancelled, or a word for the people -->
+        <v-chip
+          v-if="occurrence.cancelled"
+          size="small"
+          color="delete"
+          variant="flat"
+          prepend-icon="mdi-calendar-remove"
+          class="mt-1"
+        >
+          {{ text.dayIsCancelled }}
+        </v-chip>
+        <p v-if="occurrence.note" class="note">
+          <v-icon icon="mdi-information-outline" size="small" color="secondary" /> {{ occurrence.note }}
+        </p>
 
         <!-- what is not settled yet -->
         <div v-if="occurrence.issues.length" class="d-flex flex-wrap ga-1 mt-1">
@@ -29,7 +50,7 @@
         </div>
 
         <!-- the user's part in it: what it is, and what can be answered -->
-        <div class="d-flex flex-column ga-2 mt-2">
+        <div v-if="!occurrence.cancelled" class="d-flex flex-column ga-2 mt-2">
           <template v-for="member of occurrence.team" :key="'me' + member.uid">
             <div v-if="member.uid === user.uid && member.status === 'invited'" class="my-part">
               <span class="my-part__what">
@@ -119,7 +140,7 @@
             </div>
           </template>
         </div>
-        <div class="d-flex flex-wrap ga-2 mt-2">
+        <div v-if="!occurrence.cancelled" class="d-flex flex-wrap ga-2 mt-2">
           <v-btn
             v-if="canApply"
             size="small"
@@ -159,6 +180,14 @@
         />
         <ButtonTooltip
           v-if="schedule.manages(event)"
+          icon="mdi-calendar-edit"
+          :text="text.dayChange"
+          color="secondary"
+          large
+          @click="emit('day', occurrence)"
+        />
+        <ButtonTooltip
+          v-if="schedule.manages(event)"
           icon="$editNote"
           :text="text.editEvent"
           color="buttons"
@@ -169,7 +198,7 @@
     </div>
 
     <!-- the people, their roles, the materials of the roles -->
-    <div class="d-flex flex-wrap ga-2 mt-3">
+    <div v-if="!occurrence.cancelled" class="d-flex flex-wrap ga-2 mt-3">
       <v-btn
         v-for="item of sections"
         :key="item.value"
@@ -233,6 +262,7 @@ const emit = defineEmits<{
   decline: [member: Participant, as: 'main' | 'backup']
   edit: [event: ScheduleEvent]
   invite: [occurrence: Occurrence]
+  day: [occurrence: Occurrence]
 }>()
 
 const schedule = useScheduleStore()
@@ -355,6 +385,19 @@ const answer = (member: Participant, as: 'main' | 'backup', reply: 'confirm' | '
 .my-part__what {
   font-size: 14px;
   font-weight: 500;
+}
+
+/* a cancelled day: nothing to answer */
+.occurrence--cancelled .time,
+.occurrence--cancelled .event-name {
+  text-decoration: line-through;
+  color: var(--app-text-muted);
+}
+
+.note {
+  font-size: 14px;
+  margin: 6px 0 0;
+  color: rgb(var(--v-theme-secondary));
 }
 
 .section {

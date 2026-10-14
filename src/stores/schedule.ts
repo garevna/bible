@@ -36,6 +36,20 @@ export interface CalendarSettings {
 
 export const DEFAULT_CALENDAR: CalendarSettings = { redDays: 2, orangeDays: 5, filters: [...FILTERS] }
 
+export const APPLICANTS = ['ministry', 'servants', 'everyone'] as const
+export type Applicants = (typeof APPLICANTS)[number]
+
+/** One day of an event changed: another time or place, another number of people, or cancelled */
+export interface DayChange {
+  eventId: string
+  day: string
+  time: string | null
+  location: string | null
+  needed: number | null
+  cancelled: boolean
+  note: string
+}
+
 /** An event of the schedule of ministries (see worker/src/schedule.ts); days and times are the church's */
 export interface ScheduleEvent {
   id: string
@@ -51,8 +65,12 @@ export interface ScheduleEvent {
   time: string
   until: string | null
   needed: number
+  /** a repeated event: its time on some days of the week ('6': '08:00' on Saturday), else `time` */
+  times: Record<string, string> | null
   slots: Slot[]
   mode: 'invite' | 'open'
+  /** who may apply to an open event */
+  applicants: Applicants
   responsibleUid: string
   responsibleName: string
   deputyUid: string | null
@@ -71,8 +89,10 @@ export type EventDraft = Pick<
   | 'time'
   | 'until'
   | 'needed'
+  | 'times'
   | 'slots'
   | 'mode'
+  | 'applicants'
   | 'responsibleUid'
   | 'deputyUid'
 >
@@ -118,14 +138,26 @@ export interface Person {
 /** What is not settled at one day of an event */
 export type Issue = 'people' | 'roles' | 'materials'
 
-/** One day of an event, with its people and materials */
+/** One day of an event, with its people and materials, and what the change of the day makes of it */
 export interface Occurrence {
   event: ScheduleEvent
   day: string
+  time: string
+  location: string
+  needed: number
+  cancelled: boolean
+  note: string
   team: Participant[]
   materials: MaterialItem[]
   issues: Issue[]
 }
+
+/** The time of an event on a day: the change of the day, the time of its weekday, or its time */
+export const timeOf = (
+  event: Pick<ScheduleEvent, 'time' | 'times'>,
+  day: string,
+  change?: Pick<DayChange, 'time'> | null
+) => change?.time ?? event.times?.[String(new Date(`${day}T12:00:00Z`).getUTCDay())] ?? event.time
 
 /** How a day of the calendar is marked */
 export type DayState = 'ready' | 'red' | 'orange' | 'amber'
@@ -141,10 +173,15 @@ export interface Filters {
 const serving = (participant: Participant) => participant.status === 'confirmed'
 
 /** The issues of one day of an event: too few people confirmed, roles not given, materials not sent */
-export function issuesOf(event: ScheduleEvent, team: Participant[], materials: MaterialItem[]): Issue[] {
+export function issuesOf(
+  event: ScheduleEvent,
+  team: Participant[],
+  materials: MaterialItem[],
+  needed = event.needed
+): Issue[] {
   const confirmed = team.filter(serving)
   const issues: Issue[] = []
-  if (confirmed.length < event.needed) issues.push('people')
+  if (confirmed.length < needed) issues.push('people')
   if (event.slots.some((slot) => confirmed.filter((item) => item.role === slot.name).length < slot.count))
     issues.push('roles')
   const missing = confirmed.some((person) => {
@@ -213,6 +250,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const days = shallowRef<{ eventId: string; day: string }[]>([])
   const participants = shallowRef<Participant[]>([])
   const materials = shallowRef<MaterialItem[]>([])
+  const changes = shallowRef<DayChange[]>([])
   const types = shallowRef<EventType[]>([])
   const settings = shallowRef<CalendarSettings>(DEFAULT_CALENDAR)
   const people = shallowRef<Person[]>([])
@@ -229,10 +267,29 @@ export const useScheduleStore = defineStore('schedule', () => {
   const occurrences = computed<Occurrence[]>(() =>
     days.value.flatMap(({ eventId, day }) => {
       const event = events.value.find((item) => item.id === eventId)
-      if (!event || (day === today.value && isOver(event.time, now.value))) return []
+      if (!event) return []
+      const change = changes.value.find((item) => item.eventId === eventId && item.day === day)
+      const time = timeOf(event, day, change)
+      if (day === today.value && isOver(time, now.value)) return []
       const team = participants.value.filter((item) => item.eventId === eventId && item.day === day)
       const prepared = materials.value.filter((item) => item.eventId === eventId && item.day === day)
-      return [{ event, day, team, materials: prepared, issues: issuesOf(event, team, prepared) }]
+      const needed = change?.needed ?? event.needed
+      const cancelled = Boolean(change?.cancelled)
+      return [
+        {
+          event,
+          day,
+          time,
+          location: change?.location ?? event.location,
+          needed,
+          cancelled,
+          note: change?.note ?? '',
+          team,
+          materials: prepared,
+          // a cancelled day asks for nothing
+          issues: cancelled ? [] : issuesOf(event, team, prepared, needed)
+        }
+      ]
     })
   )
 
@@ -262,6 +319,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const byDay = computed(() => {
     const map = new Map<string, Occurrence[]>()
     shown.value.forEach((item) => map.set(item.day, [...(map.get(item.day) ?? []), item]))
+    map.forEach((list) => list.sort((a, b) => a.time.localeCompare(b.time)))
     return map
   })
 
@@ -271,8 +329,16 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
 
   /** the user may plan the event: the schedule function, or responsible for it */
+  /** the user plans the events of the ministry: the schedule function, or a leader of it */
+  const plans = (ministry: string) => worker.manages('schedule') || worker.leads.includes(ministry)
+  /** the user may create events: of every ministry, or of the ones they lead */
+  const canCreate = computed(() => worker.manages('schedule') || worker.leads.length > 0)
+
   const manages = (event: ScheduleEvent) =>
-    worker.manages('schedule') || event.responsibleUid === user.uid || event.deputyUid === user.uid
+    plans(event.ministry) ||
+    worker.manages('schedule') ||
+    event.responsibleUid === user.uid ||
+    event.deputyUid === user.uid
 
   /** the user takes applications and gives roles: a manager of the event, or a role with that right */
   const approves = (event: ScheduleEvent) => manages(event) || worker.rights.approve
@@ -300,17 +366,21 @@ export const useScheduleStore = defineStore('schedule', () => {
       materials?: MaterialItem[]
       types?: EventType[]
       calendar?: CalendarSettings
+      changes?: DayChange[]
       today: string
     }>('GET', `/schedule${query}`)
     events.value = answer.events.map((event) => ({
       ...event,
       typeId: event.typeId ?? null,
-      slots: event.slots ?? []
+      slots: event.slots ?? [],
+      times: event.times ?? null,
+      applicants: event.applicants ?? 'ministry'
     }))
     days.value = answer.days
     participants.value = answer.participants.map((item) => ({ ...item, role: item.role ?? null }))
     materials.value = answer.materials ?? []
     types.value = answer.types ?? []
+    changes.value = answer.changes ?? []
     settings.value = { ...DEFAULT_CALENDAR, ...answer.calendar }
     today.value = answer.today
   }
@@ -358,7 +428,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   }
 
   /** an action on one day of an event, then the schedule again */
-  const act = async (method: 'POST' | 'DELETE', path: string, body: Record<string, unknown>) => {
+  const act = async (method: 'POST' | 'PUT' | 'DELETE', path: string, body: Record<string, unknown>) => {
     const answer = await worker.request<Record<string, unknown>>(method, path, body)
     await reload()
     return answer
@@ -374,6 +444,17 @@ export const useScheduleStore = defineStore('schedule', () => {
   /** invitations to some days of an event, one message to each person */
   const inviteMany = (eventId: string, days: string[], uids: string[]) =>
     act('POST', '/schedule/invitations', { eventId, days, uids })
+  /** one day changed (another time, place, number of people) or cancelled; empty: as the event again */
+  const saveDay = (
+    eventId: string,
+    day: string,
+    change: Pick<DayChange, 'time' | 'location' | 'needed' | 'cancelled' | 'note'>
+  ) => act('PUT', '/schedule/days', { eventId, day, ...change })
+
+  /** somebody without the app (a guest) serves, written by name */
+  const addGuest = (eventId: string, day: string, name: string) =>
+    act('POST', '/schedule/guest', { eventId, day, name })
+
   /** an open call for applications in the service channel, for some days */
   const announce = (eventId: string, days: string[]) =>
     worker.request<{ announced: number }>('POST', '/schedule/announce', { eventId, days })
@@ -432,6 +513,10 @@ export const useScheduleStore = defineStore('schedule', () => {
     manages,
     approves,
     invites,
+    plans,
+    canCreate,
+    saveDay,
+    addGuest,
     typeOf,
     nameOf,
     stateOf,

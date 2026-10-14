@@ -64,6 +64,7 @@
             <AdminDirectory
               v-else-if="section === 'ministries'"
               v-model="settings.ministries"
+              v-model:leaders="settings.leaders"
               name="ministries"
               :title="text.sectionMinistries"
               @error="fail"
@@ -146,6 +147,7 @@ const settings = ref<{
   locations: string[]
   eventTypes: EventType[]
   calendar: CalendarSettings
+  leaders: Record<string, string[]>
 } | null>(null)
 const busy = ref(false)
 const error = ref('')

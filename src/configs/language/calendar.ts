@@ -514,6 +514,71 @@ export const calendar = {
     ru: 'Вас просят быть дублером ({name}):',
     en: 'You are asked to back up {name}:'
   },
+  timePerDay: {
+    ua: 'Різний час у різні дні',
+    ru: 'Разное время в разные дни',
+    en: 'Another time on some days'
+  },
+  whoApplies: {
+    ua: 'Хто може подати заявку',
+    ru: 'Кто может подать заявку',
+    en: 'Who may apply'
+  },
+  applicantsMinistry: {
+    ua: 'Учасники цього служіння',
+    ru: 'Участники этого служения',
+    en: 'The members of the ministry'
+  },
+  applicantsServants: {
+    ua: 'Будь-який служитель',
+    ru: 'Любой служитель',
+    en: 'Any minister'
+  },
+  applicantsEveryone: {
+    ua: 'Будь-хто з церкви',
+    ru: 'Любой из церкви',
+    en: 'Anyone of the church'
+  },
+  dayChange: {
+    ua: 'Змінити цей день',
+    ru: 'Изменить этот день',
+    en: 'Change this day'
+  },
+  dayHint: {
+    ua: 'Лише для цього дня. Порожні поля — як у події.',
+    ru: 'Только для этого дня. Пустые поля — как у события.',
+    en: 'This day only. Empty fields keep the ones of the event.'
+  },
+  dayCancelled: {
+    ua: 'Скасувати цей день',
+    ru: 'Отменить этот день',
+    en: 'Cancel this day'
+  },
+  dayIsCancelled: {
+    ua: 'Скасовано',
+    ru: 'Отменено',
+    en: 'Cancelled'
+  },
+  dayNote: {
+    ua: 'Слово для учасників (необов’язково)',
+    ru: 'Слово для участников (необязательно)',
+    en: 'A word for the people (optional)'
+  },
+  dayAsUsual: {
+    ua: 'Як у події',
+    ru: 'Как у события',
+    en: 'As the event'
+  },
+  guest: {
+    ua: 'Гість (без застосунку): ім’я, звідки',
+    ru: 'Гость (без приложения): имя, откуда',
+    en: 'A guest (no app): name, where from'
+  },
+  addGuest: {
+    ua: 'Додати гостя',
+    ru: 'Добавить гостя',
+    en: 'Add the guest'
+  },
   later: {
     ua: 'Пізніше',
     ru: 'Позже',

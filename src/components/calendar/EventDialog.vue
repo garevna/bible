@@ -18,7 +18,7 @@
     />
     <v-select
       v-model="draft.ministry"
-      :items="schedule.ministries"
+      :items="ministryItems"
       :label="text.ministry"
       density="compact"
       class="mb-2"
@@ -72,6 +72,28 @@
           {{ item.title }}
         </v-chip>
       </v-chip-group>
+      <!-- e.g. the morning prayer: 06:45 on weekdays, 08:00 on Saturday -->
+      <v-switch
+        v-model="perDay"
+        :label="text.timePerDay"
+        color="secondary"
+        density="compact"
+        hide-details
+        class="mt-1"
+      />
+      <div v-if="perDay" class="d-flex flex-wrap ga-2 mt-1">
+        <v-text-field
+          v-for="item of weekdayItems.filter((weekday) => weekdays.includes(weekday.value))"
+          :key="item.value"
+          v-model="times[item.value]"
+          :label="item.title"
+          :placeholder="draft.time"
+          type="time"
+          density="compact"
+          hide-details
+          class="day-time"
+        />
+      </div>
     </div>
 
     <v-combobox
@@ -115,10 +137,20 @@
       class="field mb-2"
     />
 
-    <v-radio-group v-model="draft.mode" density="compact" hide-details class="mb-4">
+    <v-radio-group v-model="draft.mode" density="compact" hide-details class="mb-2">
       <v-radio value="invite" :label="text.modeInvite" color="secondary" />
       <v-radio value="open" :label="text.modeOpen" color="secondary" />
     </v-radio-group>
+    <!-- an open event: who may apply -->
+    <v-select
+      v-if="draft.mode === 'open'"
+      v-model="draft.applicants"
+      :items="applicantItems"
+      :label="text.whoApplies"
+      density="compact"
+      class="mb-2 ml-8"
+    />
+    <div v-else class="mb-2" />
 
     <v-autocomplete
       v-model="draft.responsibleUid"
@@ -185,8 +217,10 @@ const empty = (): EventDraft => ({
   time: '10:00',
   until: null,
   needed: 1,
+  times: null,
   slots: [],
   mode: 'invite',
+  applicants: 'ministry',
   responsibleUid: user.uid ?? '',
   deputyUid: null
 })
@@ -198,6 +232,23 @@ const until = ref<string | null>(null)
 const weekdays = ref<number[]>([])
 const busy = ref(false)
 const error = ref('')
+
+/** a different time on some weekdays, and those times by the weekday */
+const perDay = ref(false)
+const times = ref<Record<string, string>>({})
+
+/** the ministries the user plans (a leader plans their own); a changed event keeps its own */
+const ministryItems = computed(() => {
+  const own = schedule.ministries.filter((ministry) => schedule.plans(ministry))
+  const current = props.event?.ministry
+  return current && !own.includes(current) ? [current, ...own] : own
+})
+
+const applicantItems = computed(() => [
+  { value: 'ministry', title: text.value.applicantsMinistry },
+  { value: 'servants', title: text.value.applicantsServants },
+  { value: 'everyone', title: text.value.applicantsEveryone }
+])
 
 const typeItems = computed(() => [
   { title: text.value.noType, value: null },
@@ -235,6 +286,8 @@ watch(open, (value) => {
   day.value = event?.day ?? (event ? '' : (startDay.value ?? schedule.today))
   until.value = event?.until ?? null
   weekdays.value = event?.weekdays ? [...event.weekdays] : []
+  perDay.value = Boolean(event?.times)
+  times.value = { ...event?.times }
   schedule.loadChoices().catch(() => undefined)
 })
 
@@ -270,6 +323,11 @@ const save = () =>
         location: draft.value.location ?? '',
         day: kind.value === 'single' ? day.value : null,
         weekdays: kind.value === 'repeated' ? weekdays.value : null,
+        // the times of the weekdays: an empty one is the time of the event
+        times:
+          kind.value === 'repeated' && perDay.value
+            ? Object.fromEntries(weekdays.value.map((day) => [day, times.value[day] || draft.value.time]))
+            : null,
         until: kind.value === 'repeated' ? until.value || null : null,
         needed: Number(draft.value.needed) || 1,
         slots: draft.value.slots.map((slot) => ({
@@ -291,6 +349,10 @@ const remove = () => run(() => schedule.deleteEvent(props.event!.id))
 .field {
   flex: 1 1 160px;
   max-width: 220px;
+}
+
+.day-time {
+  flex: 0 1 140px;
 }
 
 .label {

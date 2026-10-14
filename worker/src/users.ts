@@ -158,6 +158,36 @@ export async function setOwnPhone(
   return updated
 }
 
+/**
+ * The leaders of the ministries: { 'Молитовне служіння': [uid, …] }. A leader plans the events of the
+ * ministry: creates them, invites, calls for applications, approves and gives the roles there.
+ */
+export type Leaders = Record<string, string[]>
+
+const LEADERS_KEY = 'settings:leaders'
+
+export const getLeaders = async (store: UsersStore) => (await store.get<Leaders>(LEADERS_KEY, 'json')) ?? {}
+
+export const setLeaders = (store: UsersStore, leaders: Leaders) =>
+  store.put(LEADERS_KEY, JSON.stringify(leaders))
+
+/** { ministry: [uid, …] } of known ministries, each with up to twenty leaders; null when it is not that */
+export function parseLeaders(value: unknown, ministries: string[]): Leaders | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const leaders: Leaders = {}
+  for (const [ministry, uids] of Object.entries(value as Record<string, unknown>)) {
+    if (!ministries.includes(ministry)) return null
+    if (
+      !Array.isArray(uids) ||
+      uids.length > 20 ||
+      !uids.every((uid) => typeof uid === 'string' && uid.length <= 200)
+    )
+      return null
+    if (uids.length) leaders[ministry] = [...new Set(uids as string[])]
+  }
+  return leaders
+}
+
 /** The user's chat with the service bot (null: unlinked) */
 export async function setTelegramChat(store: UsersStore, record: UserRecord, chatId: number | null) {
   const { telegramChatId: _old, ...rest } = record

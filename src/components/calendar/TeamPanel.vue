@@ -147,6 +147,29 @@
         </v-btn>
       </div>
     </template>
+    <!-- somebody without the app: a guest pastor, say -->
+    <template v-if="canApprove || canInvite">
+      <p class="label mt-4">{{ text.guest }}</p>
+      <div class="d-flex flex-wrap ga-2 align-center">
+        <v-text-field
+          v-model="guest"
+          :label="text.guest"
+          density="compact"
+          hide-details
+          class="field"
+          @keyup.enter="addGuest"
+        />
+        <v-btn
+          variant="tonal"
+          color="buttons"
+          class="text-none"
+          :disabled="!guest.trim() || busy"
+          @click="addGuest"
+        >
+          {{ text.addGuest }}
+        </v-btn>
+      </div>
+    </template>
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-2">{{ error }}</v-alert>
   </div>
 </template>
@@ -171,6 +194,7 @@ const { smAndDown: stacked } = useDisplay()
 
 const chosen = ref<string | null>(null)
 const person = ref<string | null>(null)
+const guest = ref('')
 const backup = ref<string | null>(null)
 const busy = ref(false)
 const error = ref('')
@@ -219,6 +243,13 @@ const invite = () =>
   run(async () => {
     await schedule.invite(event.id, day, person.value!, backup.value)
     person.value = backup.value = null
+  })
+
+const addGuest = () =>
+  guest.value.trim() &&
+  run(async () => {
+    await schedule.addGuest(event.id, day, guest.value.trim())
+    guest.value = ''
   })
 
 onMounted(() => canInvite.value && schedule.loadChoices().catch(() => undefined))

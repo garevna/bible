@@ -297,6 +297,38 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
     })
   await expect(evening).toContainText('Набір оголошено в службовому каналі')
 
+  // a guest pastor, written by name
+  await communionCard.getByRole('button', { name: 'Учасники' }).click()
+  await communionCard.getByLabel('Гість (без застосунку): ім’я, звідки').fill('Пастор Іван, Київ')
+  await communionCard.getByRole('button', { name: 'Додати гостя' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/guest',
+      body: { eventId: 'communion', day: TODAY, name: 'Пастор Іван, Київ' }
+    })
+
+  // this day only: another place and a word for the people
+  await evening.locator('[aria-label="Змінити цей день"]').click()
+  const day = dialog(page)
+  await day.locator('.v-combobox input').fill('Церква')
+  await day.getByLabel('Слово для учасників (необов’язково)').fill('Цього разу офлайн')
+  await day.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/days',
+      body: {
+        eventId: 'evening',
+        day: TODAY,
+        time: null,
+        location: 'Церква',
+        needed: null,
+        cancelled: false,
+        note: 'Цього разу офлайн'
+      }
+    })
+
   // a new event of a type: then its invitations
   await page.getByRole('button', { name: 'Додати подію' }).click()
   const form = dialog(page)

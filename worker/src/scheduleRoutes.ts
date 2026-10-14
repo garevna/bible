@@ -8,7 +8,10 @@ import {
   daysOf,
   isOver,
   localDay,
+  parseChange,
   parseEvent,
+  timeOf,
+  type DayChange,
   type Material,
   type Participant,
   type ScheduleEvent,
@@ -37,7 +40,11 @@ import type { UserRecord, UserView } from './users'
  *   GET    /schedule/materials?eventId&day   the materials of one day of an event, with their posts
  *   POST   /schedule/materials        { eventId, day, role, kind, post }   the person of the role, the approvers
  *   DELETE /schedule/materials/:id    its author, the approvers
- * The managers of an event: the roles with the schedule function, its responsible person and the deputy.
+ *   PUT    /schedule/days             { eventId, day, time?, location?, needed?, cancelled?, note? }: one day changed
+ *                                     (all left empty: as the event)                the managers of the event
+ *   POST   /schedule/guest            { eventId, day, name }: somebody without the app (a guest) serves   the approvers
+ * The managers of an event: the roles with the schedule function, the leaders of its ministry,
+ * its responsible person and the deputy.
  * The approvers: the managers and the roles with the right to approve.
  * The inviters: the managers and the roles that invite to the ministry of the event.
  */
@@ -54,6 +61,10 @@ export interface ScheduleContext {
   messages: MessagesStore
   /** the service bot: the same notices in private in Telegram, with buttons for the invitations */
   bot: ServiceBot
+  /** the leaders of the ministries: they plan the events of their own ministry */
+  leaders: Record<string, string[]>
+  /** a reader (not a minister): sees and applies to the open events for everyone only */
+  reader?: boolean
   now: number
 }
 
@@ -61,9 +72,19 @@ const MAX_DAYS = 62
 
 const nameOf = (user: Pick<UserRecord, 'name' | 'email' | 'uid'>) => user.name ?? user.email ?? user.uid
 
-/** "Музичне служіння: Неділя — 2026-10-20 10:00, Церква" */
-export const eventLabel = (event: ScheduleEvent, day: string) =>
-  `${event.ministry}${event.title ? `: ${event.title}` : ''} — ${day} ${event.time}${event.location ? `, ${event.location}` : ''}`
+/** "Музичне служіння: Неділя — 2026-10-20 10:00, Церква" (with the change of the day, when there is one) */
+export const eventLabel = (event: ScheduleEvent, day: string, change?: DayChange | null) => {
+  const time = day.includes(',') ? event.time : timeOf(event, day, change)
+  const location = change?.location ?? event.location
+  return `${event.ministry}${event.title ? `: ${event.title}` : ''} — ${day} ${time}${location ? `, ${location}` : ''}`
+}
+
+/** who may apply, as an open call says it */
+const APPLY_TEXT = {
+  ministry: (ministry: string) => `Заявку подають учасники служіння «${ministry}»`,
+  servants: () => 'Заявку може подати будь-який служитель',
+  everyone: () => 'Заявку може подати кожен із церкви'
+}
 
 function addDays(day: string, count: number) {
   const date = new Date(`${day}T12:00:00Z`)
@@ -76,14 +97,20 @@ export async function handleSchedule(
   context: ScheduleContext,
   json: (body: unknown, status?: number) => Response
 ): Promise<Response> {
-  const { me, rights, servants, planners, eventTypes, calendar, schedule, messages, bot, now } = context
+  const { me, rights, servants, planners, eventTypes, calendar, schedule, messages, bot, leaders, now } =
+    context
   const url = new URL(request.url)
   const route = `${request.method} ${url.pathname}`
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>
   const today = localDay(now)
+  // a reader sees the open events for everyone and applies to them, nothing else
+  if (context.reader && route !== 'GET /schedule' && route !== 'POST /schedule/apply')
+    return json({ error: 'forbidden' }, 403)
   const plans = rights.manage.includes('schedule')
+  /** the user leads the ministry */
+  const leads = (ministry: string) => Boolean(leaders[ministry]?.includes(me.uid))
   const manages = (event: ScheduleEvent) =>
-    plans || me.uid === event.responsibleUid || me.uid === event.deputyUid
+    plans || leads(event.ministry) || me.uid === event.responsibleUid || me.uid === event.deputyUid
   const approves = (event: ScheduleEvent) => manages(event) || rights.approve
   const invites = (event: ScheduleEvent) =>
     manages(event) || rights.invite.includes(ANY_MINISTRY) || rights.invite.includes(event.ministry)
@@ -95,7 +122,12 @@ export async function handleSchedule(
    * Telegram for the linked ones; an invitation gets buttons there for its answers
    */
   async function notify(uids: (string | null | undefined)[], text: string, asks?: Ask[]) {
-    const to = [...new Set(uids.filter((uid): uid is string => Boolean(uid) && uid !== me.uid))]
+    // the guests have no app: nothing to send them
+    const to = [
+      ...new Set(
+        uids.filter((uid): uid is string => Boolean(uid) && uid !== me.uid && !uid!.startsWith('guest:'))
+      )
+    ]
     if (!to.length) return
     const toName = (uid: string) => nameOf(servant(uid) ?? { uid, name: null, email: null })
     const list: Message[] = to.map((uid) => ({
@@ -120,9 +152,11 @@ export async function handleSchedule(
 
   /** the notices of an event live until it begins (the last of its days), not to pile up */
   let until = now + 2 * MESSAGE_LIFE
-  const lastsUntil = (event: ScheduleEvent, days: string[]) => {
-    const start = Math.max(...days.map((day) => atLocal(day, event.time)))
-    until = Math.max(start, now + 10 * 60 * 1000)
+  const lastsUntil = async (event: ScheduleEvent, days: string[]) => {
+    const starts = await Promise.all(
+      days.map(async (day) => atLocal(day, timeOf(event, day, await schedule.change(event.id, day))))
+    )
+    until = Math.max(...starts, now + 10 * 60 * 1000)
   }
 
   /**
@@ -130,51 +164,63 @@ export async function handleSchedule(
    * (the days of the coming week when none are given)
    */
   async function announce(event: ScheduleEvent, days?: string[]) {
+    const changes = await schedule.changes(today, addDays(today, 62))
+    const changeOf = (day: string) => changes.find((item) => item.eventId === event.id && item.day === day)
     const coming =
       days ??
       daysOf(event, today, addDays(today, 13))
-        .filter((day) => day !== today || !isOver(day, event.time, now))
+        .filter((day) => !changeOf(day)?.cancelled)
+        .filter((day) => day !== today || !isOver(day, timeOf(event, day, changeOf(day)), now))
         .slice(0, 7)
     if (!coming.length) return 0
     await bot.broadcast(
-      `🙋 Набір на служіння: ${eventLabel(event, coming.join(', '))}\nЗаявку подають учасники служіння «${event.ministry}» — кнопкою нижче або в календарі служінь.`,
+      `🙋 Набір на служіння: ${eventLabel(event, coming.join(', '))}\n${APPLY_TEXT[event.applicants](event.ministry)} — кнопкою нижче або в календарі служінь.`,
       coming.map((day) => ({ eventId: event.id, day, uid: '', as: 'apply' as const }))
     )
     return coming.length
   }
 
-  /** the event and one of its days, not in the past */
+  /** the event and one of its days, not in the past, with the change of the day */
   async function eventDay(
     eventId: unknown = body.eventId,
     dayOf: unknown = body.day
-  ): Promise<{ event: ScheduleEvent; day: string } | Response> {
+  ): Promise<{ event: ScheduleEvent; day: string; change: DayChange | null } | Response> {
     const event = typeof eventId === 'string' ? await schedule.event(eventId) : null
     const day = typeof dayOf === 'string' ? dayOf : ''
     if (!event || day < today || !daysOf(event, day, day).length) return json({ error: 'not-found' }, 404)
-    return { event, day }
+    return { event, day, change: await schedule.change(event.id, day) }
   }
 
   if (route === 'GET /schedule') {
     const from = url.searchParams.get('from') ?? today
     const to = url.searchParams.get('to') ?? addDays(from, 30)
     if (to < from || to > addDays(from, MAX_DAYS)) return json({ error: 'bad-request' }, 400)
-    const events = await schedule.events(from, to)
+    // a reader: the open events for everyone only
+    const events = (await schedule.events(from, to)).filter(
+      (event) => !context.reader || (event.mode === 'open' && event.applicants === 'everyone')
+    )
+    const ids = new Set(events.map((event) => event.id))
+    const changes = (await schedule.changes(from, to)).filter((item) => ids.has(item.eventId))
+    const changeOf = (eventId: string, day: string) =>
+      changes.find((item) => item.eventId === eventId && item.day === day)
     const days = events
       .flatMap((event) =>
         daysOf(event, from < today ? today : from, to)
-          // the events of today that are over are gone
-          .filter((day) => day !== today || !isOver(day, event.time, now))
-          .map((day) => ({ eventId: event.id, day, time: event.time }))
+          .map((day) => ({ eventId: event.id, day, time: timeOf(event, day, changeOf(event.id, day)) }))
+          // the events of today that began are gone
+          .filter(({ day, time }) => day !== today || !isOver(day, time, now))
       )
       .sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time))
       .map(({ eventId, day }) => ({ eventId, day }))
     return json({
       events,
       days,
-      participants: await schedule.participants(from, to),
-      materials: await schedule.materials(from, to),
+      changes,
+      participants: (await schedule.participants(from, to)).filter((item) => ids.has(item.eventId)),
+      materials: context.reader ? [] : await schedule.materials(from, to),
       types: eventTypes,
       calendar,
+      leaders,
       today
     })
   }
@@ -213,9 +259,12 @@ export async function handleSchedule(
   if (route === 'POST /schedule/events' || (eventId && request.method === 'PUT')) {
     const old = eventId ? await schedule.event(decodeURIComponent(eventId)) : null
     if (eventId && !old) return json({ error: 'not-found' }, 404)
-    if (old ? !manages(old) : !plans) return json({ error: 'forbidden' }, 403)
+    if (old && !manages(old)) return json({ error: 'forbidden' }, 403)
     const draft = parseEvent(body)
     if (!draft) return json({ error: 'bad-request' }, 400)
+    // a new event, or one moved to another ministry: the planners, or the leaders of that ministry
+    if ((!old || old.ministry !== draft.ministry) && !plans && !leads(draft.ministry))
+      return json({ error: 'forbidden' }, 403)
     const type = draft.typeId ? eventTypes.find((item) => item.id === draft.typeId) : null
     if (draft.typeId && !type) return json({ error: 'unknown-type' }, 400)
     const responsible =
@@ -245,7 +294,8 @@ export async function handleSchedule(
   if (eventId && request.method === 'DELETE') {
     const event = await schedule.event(decodeURIComponent(eventId))
     if (!event) return json({ error: 'not-found' }, 404)
-    if (!plans && me.uid !== event.responsibleUid) return json({ error: 'forbidden' }, 403)
+    if (!plans && !leads(event.ministry) && me.uid !== event.responsibleUid)
+      return json({ error: 'forbidden' }, 403)
     await schedule.deleteEvent(event.id)
     return json({ removed: event.id })
   }
@@ -276,7 +326,7 @@ export async function handleSchedule(
       return json({ error: 'not-found' }, 404)
     if (people.some((person) => !person)) return json({ error: 'unknown-person' }, 400)
     const team = await schedule.participants(today, addDays(today, 366))
-    lastsUntil(event, days as string[])
+    await lastsUntil(event, days as string[])
     let invited = 0
     for (const person of people as UserView[]) {
       // whoever is there already keeps their place and answer
@@ -314,9 +364,58 @@ export async function handleSchedule(
 
   const found = await eventDay()
   if (found instanceof Response) return found
-  const { event, day } = found
-  const label = eventLabel(event, day)
-  lastsUntil(event, [day])
+  const { event, day, change } = found
+  const label = eventLabel(event, day, change)
+  await lastsUntil(event, [day])
+
+  // one day changed: another time or place, another number of people, cancelled; the team is told
+  if (route === 'PUT /schedule/days') {
+    if (!manages(event)) return json({ error: 'forbidden' }, 403)
+    const parsed = parseChange(body)
+    if (!parsed) return json({ error: 'bad-request' }, 400)
+    const next: DayChange = { eventId: event.id, day, ...parsed }
+    const empty = !next.time && !next.location && !next.needed && !next.cancelled && !next.note
+    if (empty) await schedule.deleteChange(event.id, day)
+    else await schedule.putChange(next)
+    const team = (await schedule.participants(day, day)).filter(
+      (item) => item.eventId === event.id && item.status !== 'declined'
+    )
+    const people = team.flatMap((item) => [item.uid, item.backupUid])
+    if (next.cancelled && !change?.cancelled)
+      await notify(people, `Скасовано: ${label}.${next.note ? ` ${next.note}` : ''}`)
+    else if (
+      !next.cancelled &&
+      (timeOf(event, day, next) !== timeOf(event, day, change) ||
+        (next.location ?? event.location) !== (change?.location ?? event.location))
+    )
+      await notify(people, `Зміни: ${eventLabel(event, day, next)}.${next.note ? ` ${next.note}` : ''}`)
+    return json({ change: empty ? null : next })
+  }
+
+  // a cancelled day takes no answers and no people
+  if (change?.cancelled) return json({ error: 'cancelled' }, 409)
+
+  // somebody without the app: a guest, written by name
+  if (route === 'POST /schedule/guest') {
+    if (!approves(event) && !invites(event)) return json({ error: 'forbidden' }, 403)
+    const name = typeof body.name === 'string' ? body.name.trim().slice(0, 80) : ''
+    if (!name) return json({ error: 'bad-request' }, 400)
+    const participant: Participant = {
+      eventId: event.id,
+      day,
+      uid: `guest:${crypto.randomUUID()}`,
+      name,
+      status: 'confirmed',
+      backupUid: null,
+      backupName: null,
+      backupStatus: null,
+      reason: null,
+      role: null,
+      updatedAt: now
+    }
+    await schedule.putParticipant(participant)
+    return json({ participant })
+  }
   const slotOf = (role: unknown) => event.slots.find((slot) => slot.name === role)
 
   /** a role may be given: it is a role of the event and not all its places are taken by others */
@@ -377,9 +476,13 @@ export async function handleSchedule(
   if (route === 'POST /schedule/apply') {
     const member = servant(me.uid) ?? { ...me, owner: false }
     // the approvers do not apply to themselves: they serve at once, at any event they approve
-    const self = approves(event)
-    if (!self && (event.mode !== 'open' || !member.ministries?.includes(event.ministry)))
-      return json({ error: 'forbidden' }, 403)
+    const self = !context.reader && approves(event)
+    const may =
+      event.mode === 'open' &&
+      (event.applicants === 'everyone' ||
+        (!context.reader &&
+          (event.applicants === 'servants' || Boolean(member.ministries?.includes(event.ministry)))))
+    if (!self && !may) return json({ error: 'forbidden' }, 403)
     if (await schedule.participant(event.id, day, me.uid)) return json({ error: 'already' }, 409)
     const participant: Participant = {
       eventId: event.id,

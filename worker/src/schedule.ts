@@ -21,16 +21,38 @@ export interface ScheduleEvent {
   /** a repeated event ends after this day */
   until: string | null
   needed: number
+  /** a repeated event: its time on some days of the week ('6': '08:00' on Saturday), else `time` */
+  times: Record<string, string> | null
   /** the roles of its people: copied from a type with fixed roles, or given to the event; none: [] */
   slots: Slot[]
-  /** 'invite': the responsible person invites; 'open': the members of the ministry apply */
+  /** 'invite': the responsible person invites; 'open': people apply */
   mode: 'invite' | 'open'
+  /** who may apply to an open event: the members of its ministry, any minister, anyone of the church */
+  applicants: Applicants
   responsibleUid: string
   responsibleName: string
   deputyUid: string | null
   deputyName: string | null
   createdBy: string
   createdAt: number
+}
+
+export const APPLICANTS = ['ministry', 'servants', 'everyone'] as const
+export type Applicants = (typeof APPLICANTS)[number]
+
+/**
+ * One day of an event changed: another time or place, another number of people, or cancelled.
+ * The fields left null keep the ones of the event.
+ */
+export interface DayChange {
+  eventId: string
+  day: string
+  time: string | null
+  location: string | null
+  needed: number | null
+  cancelled: boolean
+  /** a word for the people, e.g. "Цього разу — у малому залі" */
+  note: string
 }
 
 export type Status = 'invited' | 'applied' | 'confirmed' | 'declined'
@@ -99,14 +121,21 @@ export function atLocal(day: string, time: string) {
 /** an event is gone from the calendar, with its notices, once it begins: then it is too late to change anything */
 export const isOver = (day: string, time: string, now: number) => atLocal(day, time) <= now
 
+const weekdayOf = (day: string) => new Date(`${day}T12:00:00Z`).getUTCDay()
+
+/** The time of an event on a day: the change of the day, the time of its weekday, or its time */
+export const timeOf = (
+  event: Pick<ScheduleEvent, 'time' | 'times'>,
+  day: string,
+  change?: Pick<DayChange, 'time'> | null
+) => change?.time ?? event.times?.[String(weekdayOf(day))] ?? event.time
+
 /** the day after a day */
 const nextDay = (day: string) => {
   const date = new Date(`${day}T12:00:00Z`)
   date.setUTCDate(date.getUTCDate() + 1)
   return date.toISOString().slice(0, 10)
 }
-
-const weekdayOf = (day: string) => new Date(`${day}T12:00:00Z`).getUTCDay()
 
 /** The days of an event from one day to another (both included) */
 export function daysOf(
@@ -141,9 +170,11 @@ export interface EventDraft {
   time: string
   until: string | null
   needed: number
+  times: Record<string, string> | null
   /** the roles given to the event (its type may replace them) */
   slots: Slot[]
   mode: 'invite' | 'open'
+  applicants: Applicants
   responsibleUid: string
   deputyUid: string | null
 }
@@ -175,6 +206,20 @@ export function parseEvent(body: unknown): EventDraft | null {
   const typeId = typeof draft.typeId === 'string' && draft.typeId ? draft.typeId : null
   const slots = parseSlots(draft.slots ?? [])
   if (!slots) return null
+  // the times of some weekdays of a repeated event
+  let times: Record<string, string> | null = null
+  if (weekdays && draft.times && typeof draft.times === 'object') {
+    const entries = Object.entries(draft.times as Record<string, unknown>)
+    if (
+      entries.some(([key, value]) => !/^[0-6]$/.test(key) || typeof value !== 'string' || !TIME.test(value))
+    )
+      return null
+    const own = entries.filter(([key, value]) => weekdays.includes(Number(key)) && value !== time)
+    times = own.length ? (Object.fromEntries(own) as Record<string, string>) : null
+  }
+  const applicants = APPLICANTS.includes(draft.applicants as Applicants)
+    ? (draft.applicants as Applicants)
+    : 'ministry'
 
   return {
     typeId,
@@ -187,10 +232,36 @@ export function parseEvent(body: unknown): EventDraft | null {
     time,
     until: weekdays ? until : null,
     needed,
+    times,
     slots,
     mode,
+    applicants,
     responsibleUid,
     deputyUid
+  }
+}
+
+/** The body of a change of a day; null when it is not one */
+export function parseChange(body: unknown): Omit<DayChange, 'eventId' | 'day'> | null {
+  const change = (body ?? {}) as Record<string, unknown>
+  const time = change.time === null || change.time === undefined || change.time === '' ? null : change.time
+  const location =
+    change.location === null || change.location === undefined ? null : text(change.location, 120)
+  const needed =
+    change.needed === null || change.needed === undefined || change.needed === ''
+      ? null
+      : Number(change.needed)
+  const note = text(change.note ?? '', 500)
+  if (time !== null && (typeof time !== 'string' || !TIME.test(time))) return null
+  if (needed !== null && (!Number.isInteger(needed) || needed < 1 || needed > 100)) return null
+  if (note === null || (change.location !== null && change.location !== undefined && location === null))
+    return null
+  return {
+    time: time as string | null,
+    location: location || null,
+    needed,
+    cancelled: change.cancelled === true,
+    note
   }
 }
 
@@ -213,6 +284,11 @@ export interface ScheduleStore {
   material(id: string): Promise<Material | null>
   putMaterial(material: Material): Promise<void>
   deleteMaterial(id: string): Promise<void>
+  /** the changes of some days */
+  changes(from: string, to: string): Promise<DayChange[]>
+  change(eventId: string, day: string): Promise<DayChange | null>
+  putChange(change: DayChange): Promise<void>
+  deleteChange(eventId: string, day: string): Promise<void>
   /** the past goes: single events before the day, repeated ones that ended, the people and materials of past days */
   deletePast(today: string): Promise<void>
 }
@@ -229,8 +305,10 @@ interface EventRow {
   time: string
   until: string | null
   needed: number
+  times: string | null
   slots: string | null
   mode: string
+  applicants: string | null
   responsible_uid: string
   responsible_name: string
   deputy_uid: string | null
@@ -278,7 +356,9 @@ const eventOf = (row: EventRow): ScheduleEvent => ({
   time: row.time,
   until: row.until,
   needed: row.needed,
+  times: row.times ? (JSON.parse(row.times) as Record<string, string>) : null,
   slots: row.slots ? (JSON.parse(row.slots) as Slot[]) : [],
+  applicants: APPLICANTS.includes(row.applicants as Applicants) ? (row.applicants as Applicants) : 'ministry',
   mode: row.mode === 'open' ? 'open' : 'invite',
   responsibleUid: row.responsible_uid,
   responsibleName: row.responsible_name,
@@ -319,6 +399,26 @@ const materialOf = (row: MaterialRow): Material => ({
   post: JSON.parse(row.post ?? '{"title":"","items":[]}') as TopicPost
 })
 
+interface ChangeRow {
+  event_id: string
+  day: string
+  time: string | null
+  location: string | null
+  needed: number | null
+  cancelled: number
+  note: string
+}
+
+const changeOf = (row: ChangeRow): DayChange => ({
+  eventId: row.event_id,
+  day: row.day,
+  time: row.time,
+  location: row.location,
+  needed: row.needed,
+  cancelled: Boolean(row.cancelled),
+  note: row.note
+})
+
 const MATERIAL_ITEM = 'id, event_id, day, role, uid, name, kind, title, created_at'
 
 export function d1Schedule(db: D1Database): ScheduleStore {
@@ -339,7 +439,7 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async putEvent(e) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO events (id, type_id, ministry, title, description, location, day, weekdays, time, until, needed, slots, mode, responsible_uid, responsible_name, deputy_uid, deputy_name, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO events (id, type_id, ministry, title, description, location, day, weekdays, time, until, needed, times, slots, mode, applicants, responsible_uid, responsible_name, deputy_uid, deputy_name, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .bind(
           e.id,
@@ -353,8 +453,10 @@ export function d1Schedule(db: D1Database): ScheduleStore {
           e.time,
           e.until,
           e.needed,
+          e.times ? JSON.stringify(e.times) : null,
           e.slots.length ? JSON.stringify(e.slots) : null,
           e.mode,
+          e.applicants,
           e.responsibleUid,
           e.responsibleName,
           e.deputyUid,
@@ -368,6 +470,7 @@ export function d1Schedule(db: D1Database): ScheduleStore {
       await db.batch([
         db.prepare('DELETE FROM participants WHERE event_id = ?').bind(id),
         db.prepare('DELETE FROM materials WHERE event_id = ?').bind(id),
+        db.prepare('DELETE FROM day_changes WHERE event_id = ?').bind(id),
         db.prepare('DELETE FROM events WHERE id = ?').bind(id)
       ])
     },
@@ -451,8 +554,34 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async deleteMaterial(id) {
       await db.prepare('DELETE FROM materials WHERE id = ?').bind(id).run()
     },
+    async changes(from, to) {
+      const { results } = await db
+        .prepare('SELECT * FROM day_changes WHERE day BETWEEN ? AND ?')
+        .bind(from, to)
+        .all<ChangeRow>()
+      return results.map(changeOf)
+    },
+    async change(eventId, day) {
+      const row = await db
+        .prepare('SELECT * FROM day_changes WHERE event_id = ? AND day = ?')
+        .bind(eventId, day)
+        .first<ChangeRow>()
+      return row ? changeOf(row) : null
+    },
+    async putChange(c) {
+      await db
+        .prepare(
+          'INSERT OR REPLACE INTO day_changes (event_id, day, time, location, needed, cancelled, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(c.eventId, c.day, c.time, c.location, c.needed, c.cancelled ? 1 : 0, c.note)
+        .run()
+    },
+    async deleteChange(eventId, day) {
+      await db.prepare('DELETE FROM day_changes WHERE event_id = ? AND day = ?').bind(eventId, day).run()
+    },
     async deletePast(today) {
       await db.batch([
+        db.prepare('DELETE FROM day_changes WHERE day < ?').bind(today),
         db.prepare('DELETE FROM participants WHERE day < ?').bind(today),
         db.prepare('DELETE FROM materials WHERE day < ?').bind(today),
         db
@@ -470,6 +599,7 @@ export function memorySchedule(): ScheduleStore {
   let events: ScheduleEvent[] = []
   let participants: Participant[] = []
   let materials: Material[] = []
+  let changes: DayChange[] = []
   const key = (p: Pick<Participant, 'eventId' | 'day' | 'uid'>) => `${p.eventId}|${p.day}|${p.uid}`
   return {
     events: async (from, to) =>
@@ -480,6 +610,7 @@ export function memorySchedule(): ScheduleStore {
       events = events.filter((e) => e.id !== id)
       participants = participants.filter((p) => p.eventId !== id)
       materials = materials.filter((m) => m.eventId !== id)
+      changes = changes.filter((c) => c.eventId !== id)
     },
     participants: async (from, to) => participants.filter((p) => p.day >= from && p.day <= to),
     participant: async (eventId, day, uid) =>
@@ -495,7 +626,17 @@ export function memorySchedule(): ScheduleStore {
     putMaterial: async (material) =>
       void (materials = [...materials.filter((m) => m.id !== material.id), material]),
     deleteMaterial: async (id) => void (materials = materials.filter((m) => m.id !== id)),
+    changes: async (from, to) => changes.filter((c) => c.day >= from && c.day <= to),
+    change: async (eventId, day) => changes.find((c) => c.eventId === eventId && c.day === day) ?? null,
+    putChange: async (change) =>
+      void (changes = [
+        ...changes.filter((c) => !(c.eventId === change.eventId && c.day === change.day)),
+        change
+      ]),
+    deleteChange: async (eventId, day) =>
+      void (changes = changes.filter((c) => !(c.eventId === eventId && c.day === day))),
     deletePast: async (today) => {
+      changes = changes.filter((c) => c.day >= today)
       participants = participants.filter((p) => p.day >= today)
       materials = materials.filter((m) => m.day >= today)
       events = events.filter((e) => !(e.day && e.day < today) && !(e.until && e.until < today))

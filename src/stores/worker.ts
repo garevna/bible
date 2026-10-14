@@ -146,6 +146,10 @@ export const useWorkerStore = defineStore('worker', () => {
   const needsPhone = ref(false)
   /** the service bot writes to ministers in Telegram; the user linked it */
   const serviceBot = ref(false)
+  /** the ministries the user leads: they plan their events */
+  const leads = ref<string[]>([])
+  /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
+  const calendar = ref(false)
   const telegramLinked = ref(false)
   /** the types of notes and topics (the administrators keep them; the defaults until they come) */
   const types = ref<NoteType[]>(DEFAULT_TYPES)
@@ -189,6 +193,8 @@ export const useWorkerStore = defineStore('worker', () => {
     ministries.value = []
     canSend.value = canReceive.value = needsPhone.value = false
     serviceBot.value = telegramLinked.value = false
+    leads.value = []
+    calendar.value = false
     phone.value = null
     if (!workerUrl || !user.signed) return
     try {
@@ -203,6 +209,7 @@ export const useWorkerStore = defineStore('worker', () => {
         phone?: string | null
         needsPhone?: boolean
         serviceBot?: boolean
+        leads?: string[]
         telegramLinked?: boolean
       }>('GET', '/me')
       role.value = me.role
@@ -215,6 +222,8 @@ export const useWorkerStore = defineStore('worker', () => {
       phone.value = me.phone ?? null
       needsPhone.value = Boolean(me.needsPhone)
       serviceBot.value = Boolean(me.serviceBot)
+      leads.value = me.leads ?? []
+      calendar.value = true
       telegramLinked.value = Boolean(me.telegramLinked)
       types.value = (await call<{ types: NoteType[] }>('GET', '/types')).types
     } catch (error) {
@@ -290,7 +299,12 @@ export const useWorkerStore = defineStore('worker', () => {
       locations: string[]
       eventTypes: EventType[]
       calendar: CalendarSettings
+      leaders: Record<string, string[]>
     }>('GET', '/admin/settings')
+
+  /** the leaders of the ministries: they plan the events of their own ministry */
+  const setLeaders = async (leaders: Record<string, string[]>) =>
+    (await call<{ leaders: Record<string, string[]> }>('PUT', '/admin/leaders', { leaders })).leaders
 
   const setEventTypes = async (list: EventType[]) =>
     (await call<{ eventTypes: EventType[] }>('PUT', '/admin/event-types', { eventTypes: list })).eventTypes
@@ -348,6 +362,8 @@ export const useWorkerStore = defineStore('worker', () => {
     phone,
     needsPhone,
     serviceBot,
+    leads,
+    calendar,
     telegramLinked,
     telegramLink,
     unlinkTelegram,
@@ -366,6 +382,7 @@ export const useWorkerStore = defineStore('worker', () => {
     getSettings,
     setEventTypes,
     setCalendar,
+    setLeaders,
     setRoles,
     setDirectory,
     loadMessages,

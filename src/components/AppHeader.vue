@@ -39,7 +39,7 @@
 
       <v-list density="compact" bg-color="homefone" min-width="270" class="header-menu" color="secondary">
         <v-list-item
-          v-if="worker.canReceive"
+          v-if="worker.calendar"
           prepend-icon="mdi-calendar-month-outline"
           :title="calendarText.title"
           v-bind="here('calendar')"
@@ -63,7 +63,7 @@
           v-bind="here('admin')"
           @click="app.setPage('admin')"
         />
-        <v-divider v-if="worker.canReceive || worker.isAdmin" />
+        <v-divider v-if="worker.calendar || worker.isAdmin" />
         <v-list-item prepend-icon="$signOut" :title="header.signOut" @click="user.signOut()" />
       </v-list>
     </v-menu>

@@ -1,12 +1,12 @@
 <template>
   <div class="page mx-auto" style="max-width: 960px">
-    <p v-if="!worker.canReceive" class="text-medium-emphasis">{{ admin.noAccess }}</p>
+    <p v-if="!worker.calendar" class="text-medium-emphasis">{{ admin.noAccess }}</p>
 
     <template v-else>
       <div class="d-flex align-center justify-end flex-wrap ga-2 mb-2">
         <p class="hint flex-grow-1 mb-0">{{ text.hint }}</p>
         <v-btn
-          v-if="worker.manages('schedule')"
+          v-if="schedule.canCreate"
           variant="tonal"
           color="buttons"
           class="text-none"
@@ -47,6 +47,7 @@
           @decline="decline"
           @edit="edit"
           @invite="(occurrence) => openInvitations(occurrence.event, occurrence.day)"
+          @day="(occurrence) => ((changing = occurrence), (dayDialog = true))"
         />
       </section>
     </template>
@@ -57,6 +58,7 @@
       :event="editing"
       @created="(event) => openInvitations(event)"
     />
+    <DayDialog v-model="dayDialog" :occurrence="changing" />
     <InvitationsDialog v-model="invitationsDialog" :event="inviting" :day="invitingDay" @sent="showSent" />
 
     <!-- "I can't": a reason, or the usual words -->
@@ -83,12 +85,13 @@ import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import CalendarFilters from '@/components/calendar/CalendarFilters.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
+import DayDialog from '@/components/calendar/DayDialog.vue'
 import EventDialog from '@/components/calendar/EventDialog.vue'
 import InvitationsDialog from '@/components/calendar/InvitationsDialog.vue'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
 import OccurrenceCard from '@/components/calendar/OccurrenceCard.vue'
 import { useLanguageStore } from '@/stores/language'
-import { useScheduleStore, type Participant, type ScheduleEvent } from '@/stores/schedule'
+import { useScheduleStore, type Occurrence, type Participant, type ScheduleEvent } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
 import { useWorkerStore, WorkerError } from '@/stores/worker'
 import { format } from '@/utils/format'
@@ -135,7 +138,7 @@ async function run(action: () => Promise<unknown>) {
 }
 
 async function load() {
-  if (!worker.canReceive) return
+  if (!worker.calendar) return
   busy.value = true
   await run(async () => {
     await schedule.loadMonth()
@@ -174,6 +177,9 @@ async function sendDecline() {
 /* ---------- planning ---------- */
 
 const eventDialog = ref(false)
+/** one day changed */
+const dayDialog = ref(false)
+const changing = shallowRef<Occurrence | null>(null)
 const editing = shallowRef<ScheduleEvent | null>(null)
 
 function edit(event: ScheduleEvent | null) {
@@ -201,7 +207,7 @@ function showSent(count: number) {
 
 onMounted(load)
 // the rights come from the worker after the page may already be open
-watch(() => worker.canReceive, load)
+watch(() => worker.calendar, load)
 </script>
 
 <style scoped>
