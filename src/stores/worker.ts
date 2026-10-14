@@ -85,6 +85,14 @@ export interface Attachment {
   post: TopicPost
 }
 
+/** A day of an event a message asks to answer: as the main person (uid) or as their backup */
+export interface Ask {
+  eventId: string
+  day: string
+  uid: string
+  as: 'main' | 'backup' | 'apply'
+}
+
 /** A message between ministers (see worker/src/messages.ts); it lives for a day */
 export interface Message {
   id: string
@@ -95,6 +103,8 @@ export interface Message {
   text: string
   attachment: Attachment | null
   replyTo: string | null
+  /** an invitation: the days it asks to answer (see worker/src/serviceBot.ts) */
+  asks?: Ask[] | null
   createdAt: number
   expiresAt: number
   readAt: number | null

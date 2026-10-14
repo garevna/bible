@@ -654,6 +654,11 @@ describe('the schedule of ministries', () => {
     const toMusician = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
     expect(toMusician).toHaveLength(1)
     expect(toMusician[0]!.text).toContain('2026-10-13, 2026-10-14')
+    // the message has the days to answer by its buttons in the app
+    expect((toMusician[0] as unknown as { asks: unknown[] }).asks).toEqual([
+      { eventId, day: '2026-10-13', uid: 'musician-uid', as: 'main' },
+      { eventId, day: '2026-10-14', uid: 'musician-uid', as: 'main' }
+    ])
     // not a day of the event (Sunday)
     expect(
       (

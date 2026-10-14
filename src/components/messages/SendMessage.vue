@@ -25,7 +25,7 @@
   <AppDialog
     v-model="open"
     :title="replyTo ? format(text.replyTo, { name: replyTo.fromName }) : attach ? text.send : text.newMessage"
-    icon="mdi-message-arrow-left-outline"
+    icon="mdi-send-variant-outline"
     max-width="640"
   >
     <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-4" />

@@ -128,5 +128,20 @@ export const messages = {
     ua: 'Чекає на відповідь',
     ru: 'Ждет ответа',
     en: 'Waiting for an answer'
+  },
+  youConfirmed: {
+    ua: '✅ Ви підтвердили',
+    ru: '✅ Вы подтвердили',
+    en: '✅ You confirmed'
+  },
+  youDeclined: {
+    ua: '❌ Ви не можете',
+    ru: '❌ Вы не можете',
+    en: '❌ You cannot'
+  },
+  notActual: {
+    ua: 'Уже неактуально',
+    ru: 'Уже неактуально',
+    en: 'No longer actual'
   }
 }

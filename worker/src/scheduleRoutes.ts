@@ -107,6 +107,7 @@ export async function handleSchedule(
       text,
       attachment: null,
       replyTo: null,
+      asks: asks ?? null,
       createdAt: now,
       expiresAt: until,
       readAt: null
@@ -304,7 +305,7 @@ export async function handleSchedule(
         !self &&
         (await notify(
           [person.uid],
-          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. Підтвердіть, будь ласка, у календарі служінь.`,
+          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. Підтвердіть, будь ласка, кнопками нижче або в календарі служінь.`,
           free.map((day) => ({ eventId: event.id, day, uid: person.uid, as: 'main' as const }))
         ))
     }
@@ -355,13 +356,13 @@ export async function handleSchedule(
     self ||
       (await notify(
         [person.uid],
-        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. Підтвердіть, будь ласка, у календарі служінь.`,
+        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. Підтвердіть, будь ласка, кнопками нижче або в календарі служінь.`,
         [{ eventId: event.id, day, uid: person.uid, as: 'main' }]
       ))
     backup &&
       (await notify(
         [backup.uid],
-        `Вас просять бути дублером (${nameOf(person)}): ${label}. Підтвердіть, будь ласка, у календарі.`,
+        `Вас просять бути дублером (${nameOf(person)}): ${label}. Підтвердіть, будь ласка, кнопками нижче або в календарі.`,
         [{ eventId: event.id, day, uid: person.uid, as: 'backup' }]
       ))
     return json({ participant })

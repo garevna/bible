@@ -221,6 +221,86 @@ test('an answer is shown inside the message it answers; answered and waiting mes
   await expect(waiting.getByLabel('Чекає на відповідь')).toBeVisible()
 })
 
+test('an invitation is answered right in the message, a day at a time', async ({ page }) => {
+  const now = Date.now()
+  const asks = [
+    { eventId: 'prayer', day: '2026-11-02', uid: 'e2e-uid', as: 'main' },
+    { eventId: 'prayer', day: '2026-11-03', uid: 'e2e-uid', as: 'main' }
+  ]
+  const invitation = {
+    id: 'invitation',
+    fromUid: 'pastor-uid',
+    fromName: 'Пастор',
+    toUid: 'e2e-uid',
+    toName: 'E2E',
+    text: 'Запрошення на служіння: Ранкова молитва',
+    attachment: null,
+    replyTo: null,
+    asks,
+    createdAt: now,
+    expiresAt: now + 86_400_000,
+    readAt: now
+  }
+  await fakeWorker(page, 'member', [invitation])
+  // the calendar: who answered what (the answers change it)
+  const status: Record<string, string> = { '2026-11-02': 'invited', '2026-11-03': 'invited' }
+  const answers: unknown[] = []
+  await page.route('**/worker-test/schedule**', async (route) => {
+    const request = route.request()
+    if (request.method() === 'POST') {
+      const body = request.postDataJSON()
+      answers.push(body)
+      status[body.day] = body.answer === 'confirm' ? 'confirmed' : 'declined'
+      return route.fulfill({ json: { answered: true } })
+    }
+    return route.fulfill({
+      json: {
+        events: [],
+        days: [],
+        today: '2026-11-01',
+        participants: Object.entries(status).map(([day, value]) => ({
+          eventId: 'prayer',
+          day,
+          uid: 'e2e-uid',
+          name: 'E2E',
+          status: value,
+          backupUid: null,
+          backupName: null,
+          backupStatus: null,
+          reason: null,
+          role: null
+        }))
+      }
+    })
+  })
+  await signIn(page)
+  await page.getByRole('button', { name: 'Повідомлення' }).click()
+
+  const card = page.locator('.message', { hasText: 'Ранкова молитва' })
+  await expect(card.getByLabel('Чекає на відповідь')).toBeVisible()
+  const days = card.locator('.ask')
+  await expect(days).toHaveCount(2)
+
+  await days.first().getByRole('button', { name: 'Підтвердити' }).click()
+  await expect(days.first()).toContainText('✅ Ви підтвердили')
+  await days.last().getByRole('button', { name: 'Не можу' }).click()
+  await dialog(page).getByRole('button', { name: 'Не можу' }).click()
+  await expect(days.last()).toContainText('❌ Ви не можете')
+  // every day answered: the message is answered
+  await expect(card.getByLabel('Ви відповіли')).toBeVisible()
+  expect(answers).toEqual([
+    { eventId: 'prayer', day: '2026-11-02', uid: 'e2e-uid', as: 'main', answer: 'confirm' },
+    {
+      eventId: 'prayer',
+      day: '2026-11-03',
+      uid: 'e2e-uid',
+      as: 'main',
+      answer: 'decline',
+      reason: 'На жаль, я не маю можливості взяти участь у цьому служінні.'
+    }
+  ])
+})
+
 test('a minister without a mobile number is asked for it; an empty group cannot be chosen', async ({
   page
 }) => {

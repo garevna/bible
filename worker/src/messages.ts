@@ -1,4 +1,5 @@
 import { parsePost, type TopicPost } from './post'
+import type { Ask } from './serviceBot'
 
 /**
  * Messages between ministers. Publishers and administrators (the pastor, preachers) write to
@@ -27,6 +28,8 @@ export interface Message {
   attachment: Attachment | null
   /** the message this one answers */
   replyTo: string | null
+  /** an invitation: the days it asks to answer, answered by its buttons in the app too */
+  asks?: Ask[] | null
   createdAt: number
   expiresAt: number
   readAt: number | null
@@ -93,6 +96,7 @@ interface Row {
   text: string
   attachment: string | null
   reply_to: string | null
+  asks?: string | null
   created_at: number
   expires_at: number
   read_at: number | null
@@ -107,6 +111,7 @@ const fromRow = (row: Row): Message => ({
   text: row.text,
   attachment: row.attachment ? (JSON.parse(row.attachment) as Attachment) : null,
   replyTo: row.reply_to,
+  asks: row.asks ? (JSON.parse(row.asks) as Ask[]) : null,
   createdAt: row.created_at,
   expiresAt: row.expires_at,
   readAt: row.read_at
@@ -116,7 +121,7 @@ export function d1Store(db: D1Database): MessagesStore {
   return {
     async insert(messages) {
       const statement = db.prepare(
-        'INSERT INTO messages (id, from_uid, from_name, to_uid, to_name, text, attachment, reply_to, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO messages (id, from_uid, from_name, to_uid, to_name, text, attachment, reply_to, asks, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
       )
       await db.batch(
         messages.map((m) =>
@@ -129,6 +134,7 @@ export function d1Store(db: D1Database): MessagesStore {
             m.text,
             m.attachment ? JSON.stringify(m.attachment) : null,
             m.replyTo,
+            m.asks?.length ? JSON.stringify(m.asks) : null,
             m.createdAt,
             m.expiresAt
           )

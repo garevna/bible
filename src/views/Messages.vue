@@ -56,6 +56,29 @@
           </header>
 
           <p v-if="message.text" class="message__text">{{ message.text }}</p>
+          <!-- an invitation: an answer for each of its days, right here -->
+          <div v-if="incoming(message) && message.asks?.length" class="asks">
+            <div v-for="ask of message.asks" :key="askKey(ask)" class="ask">
+              <span class="ask__day">{{ dayLabel(ask.day) }}</span>
+              <template v-if="stateOf(ask) === 'waiting'">
+                <v-btn
+                  size="small"
+                  variant="flat"
+                  color="primary"
+                  class="text-none"
+                  @click="answer(ask, 'confirm')"
+                >
+                  {{ ask.as === 'backup' ? calendar.confirmBackup : calendar.confirm }}
+                </v-btn>
+                <v-btn size="small" variant="tonal" color="delete" class="text-none" @click="decline(ask)">
+                  {{ calendar.cannot }}
+                </v-btn>
+              </template>
+              <v-chip v-else size="small" variant="tonal" :color="stateColor(stateOf(ask))">
+                {{ stateText(stateOf(ask)) }}
+              </v-chip>
+            </div>
+          </div>
           <AttachmentView v-if="message.attachment" :attachment="message.attachment" class="mb-2" />
 
           <div v-if="incoming(message)" class="d-flex flex-wrap ga-2">
@@ -82,26 +105,48 @@
         </div>
       </article>
     </template>
+
+    <!-- "I can't": a reason, or the usual words -->
+    <AppDialog
+      v-model="declineDialog"
+      :title="calendar.cannotTitle"
+      icon="mdi-calendar-remove"
+      max-width="480"
+    >
+      <p v-if="declining?.as === 'main'" class="hint">{{ calendar.backupFirst }}</p>
+      <v-textarea v-model="reason" :label="calendar.reason" rows="3" auto-grow />
+      <template #actions>
+        <DialogButtons
+          :confirm-text="calendar.cannot"
+          danger
+          @cancel="declineDialog = false"
+          @confirm="sendDecline"
+        />
+      </template>
+    </AppDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import DialogButtons from '@/components/DialogButtons.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
 import SendMessage from '@/components/messages/SendMessage.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
-import { useWorkerStore, WorkerError, type Message } from '@/stores/worker'
+import type { Participant } from '@/stores/schedule'
+import { useWorkerStore, WorkerError, type Ask, type Message } from '@/stores/worker'
 import { format } from '@/utils/format'
 import { saveAttachment } from '@/utils/saveAttachment'
 
 /** Messages between ministers of the last day: what one got and what one sent */
 const worker = useWorkerStore()
 const user = useUserStore()
-const { admin, messages: text, publish } = storeToRefs(useLanguageStore())
+const { admin, calendar, messages: text, publish } = storeToRefs(useLanguageStore())
 
 const busy = ref(false)
 const error = ref('')
@@ -109,9 +154,94 @@ const savedIds = ref<string[]>([])
 
 const incoming = (message: Message) => message.toUid === user.uid
 
-/** the user answered the message */
+/* ---------- invitations: answered right in the message ---------- */
+
+/** the people of the days the invitations ask about, as the calendar has them */
+const team = shallowRef<Participant[]>([])
+const askKey = (ask: Ask) => `${ask.eventId}|${ask.day}|${ask.uid}|${ask.as}`
+
+type AskState = 'waiting' | 'confirmed' | 'declined' | 'gone'
+
+/** what became of an invitation, wherever it was answered (here, the calendar, Telegram) */
+function stateOf(ask: Ask): AskState {
+  const member = team.value.find(
+    (item) => item.eventId === ask.eventId && item.day === ask.day && item.uid === ask.uid
+  )
+  if (!member) return 'gone'
+  if (ask.as === 'backup') {
+    if (member.backupUid !== user.uid) return 'gone'
+    if (member.backupStatus === 'invited') return 'waiting'
+    return member.backupStatus === 'confirmed' ? 'confirmed' : 'declined'
+  }
+  if (member.status === 'invited') return 'waiting'
+  return member.status === 'declined' ? 'declined' : 'confirmed'
+}
+
+const stateText = (state: AskState) =>
+  ({
+    waiting: '',
+    confirmed: text.value.youConfirmed,
+    declined: text.value.youDeclined,
+    gone: text.value.notActual
+  })[state]
+const stateColor = (state: AskState) =>
+  ({ waiting: 'secondary', confirmed: 'primary', declined: 'delete', gone: 'secondary' })[state]
+
+const dayLabel = (day: string) =>
+  new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  })
+
+async function loadTeam() {
+  const days = worker.messages
+    .flatMap((message) => (incoming(message) ? (message.asks ?? []) : []))
+    .map((ask) => ask.day)
+  if (!days.length) return
+  const from = days.reduce((a, b) => (a < b ? a : b))
+  const to = days.reduce((a, b) => (a > b ? a : b))
+  const answer = await worker.request<{ participants: Participant[] }>(
+    'GET',
+    `/schedule?from=${from}&to=${to}`
+  )
+  team.value = answer.participants
+}
+
+async function answer(ask: Ask, reply: 'confirm' | 'decline', why?: string) {
+  await run(async () => {
+    await worker.request('POST', '/schedule/answer', {
+      eventId: ask.eventId,
+      day: ask.day,
+      uid: ask.uid,
+      as: ask.as,
+      answer: reply,
+      reason: why
+    })
+    await loadTeam()
+  })
+}
+
+const declineDialog = ref(false)
+const declining = shallowRef<Ask | null>(null)
+const reason = ref('')
+
+function decline(ask: Ask) {
+  declining.value = ask
+  reason.value = calendar.value.defaultReason
+  declineDialog.value = true
+}
+
+async function sendDecline() {
+  declineDialog.value = false
+  await answer(declining.value!, 'decline', reason.value)
+}
+
+/** the user answered the message: by a message, or (an invitation) by the buttons of all its days */
 const answered = (message: Message) =>
-  worker.messages.some((item) => item.replyTo === message.id && item.fromUid === user.uid)
+  message.asks?.length
+    ? message.asks.every((ask) => stateOf(ask) !== 'waiting')
+    : worker.messages.some((item) => item.replyTo === message.id && item.fromUid === user.uid)
 
 /**
  * Threads: a message that answers none (or whose message is gone) with all the answers of its chain
@@ -169,6 +299,7 @@ async function load() {
   busy.value = true
   await run(async () => {
     await worker.loadMessages()
+    await loadTeam()
     await Promise.all(
       worker.messages.filter((message) => incoming(message) && !message.readAt).map(worker.markRead)
     )
@@ -213,6 +344,26 @@ watch(() => worker.canReceive, load)
 
 .message--unread {
   border-color: rgb(var(--v-theme-secondary));
+}
+
+.asks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ask__day {
+  min-width: 110px;
+  font-weight: 500;
+  font-size: 14px;
 }
 
 .reply {
