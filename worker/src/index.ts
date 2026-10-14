@@ -177,7 +177,8 @@ async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<Sc
   const roles = await getRoles(env.USERS)
   const roleId = roleOf(me, env.OWNERS)
   if (!serves(roles, roleId)) return null
-  const users = await listUsers(env.USERS, env.OWNERS)
+  // the owners serve too: they are invited, and get the notices
+  const users = await listUsers(env.USERS, env.OWNERS, true)
   return {
     me,
     rights: rightsOf(roles, roleId),
@@ -660,21 +661,13 @@ async function handleMessages(
     readAt: null
   }))
   await store.insert(messages)
-  // the same in Telegram for the linked ones: the text, and what is attached
-  const bot = botFor(env, deps, users)
+  // the same in Telegram for the linked ones (the owners too): the text, and what is attached
+  const bot = botFor(env, deps, await listUsers(env.USERS, env.OWNERS, true))
   const attached = draft.attachment
-    ? `
-
-📎 ${draft.attachment.post.title || (draft.attachment.kind === 'topic' ? 'Тема' : 'Нотатка')} — у застосунку`
+    ? `\n\n📎 ${draft.attachment.post.title || (draft.attachment.kind === 'topic' ? 'Тема' : 'Нотатка')} — у застосунку`
     : ''
   await Promise.all(
-    messages.map((message) =>
-      bot.send(
-        message.toUid,
-        `✉ ${message.fromName}:
-${message.text}${attached}`
-      )
-    )
+    messages.map((message) => bot.send(message.toUid, `✉ ${message.fromName}:\n${message.text}${attached}`))
   )
   return json({ sent: messages.length })
 }

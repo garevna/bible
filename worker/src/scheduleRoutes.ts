@@ -114,12 +114,8 @@ export async function handleSchedule(
     }))
     await messages.insert(list)
     await Promise.all(to.map((uid) => bot.send(uid, text, asks)))
-    // the service channel: the same, with whom it is for; the invited answer there by the same buttons
-    await bot.broadcast(
-      `${text}
-👤 ${to.map(toName).join(', ')}`,
-      asks
-    )
+    // the service channel: whom it is for first, then the same; the invited answer there by the same buttons
+    await bot.broadcast(`👤 Кому: ${to.map(toName).join(', ')}\n──────────\n${text}`, asks)
   }
 
   /** the notices of an event live until it is over (the last of its days), not to pile up */
@@ -141,8 +137,7 @@ export async function handleSchedule(
         .slice(0, 7)
     if (!coming.length) return 0
     await bot.broadcast(
-      `🙋 Набір на служіння: ${eventLabel(event, coming.join(', '))}
-Заявку подають учасники служіння «${event.ministry}» — кнопкою нижче або в календарі служінь.`,
+      `🙋 Набір на служіння: ${eventLabel(event, coming.join(', '))}\nЗаявку подають учасники служіння «${event.ministry}» — кнопкою нижче або в календарі служінь.`,
       coming.map((day) => ({ eventId: event.id, day, uid: '', as: 'apply' as const }))
     )
     return coming.length

@@ -28,10 +28,14 @@
           </v-chip>
         </div>
 
-        <!-- what the user answers -->
-        <div class="d-flex flex-wrap ga-2 mt-2">
+        <!-- the user's part in it: what it is, and what can be answered -->
+        <div class="d-flex flex-column ga-2 mt-2">
           <template v-for="member of occurrence.team" :key="'me' + member.uid">
-            <template v-if="member.uid === user.uid && member.status === 'invited'">
+            <div v-if="member.uid === user.uid && member.status === 'invited'" class="my-part">
+              <span class="my-part__what">
+                <v-icon icon="mdi-email-alert-outline" size="small" color="secondary" />
+                {{ text.invitedYou }}
+              </span>
               <v-btn
                 size="small"
                 variant="flat"
@@ -50,21 +54,31 @@
               >
                 {{ text.cannot }}
               </v-btn>
-            </template>
-            <v-btn
-              v-if="member.uid === user.uid && member.status === 'confirmed'"
-              size="small"
-              variant="text"
-              color="delete"
-              class="text-none"
-              @click="emit('decline', member, 'main')"
-            >
-              {{ text.cannot }}
-            </v-btn>
-            <template v-if="member.backupUid === user.uid && member.backupStatus === 'invited'">
-              <span class="details align-self-center">{{
-                format(text.youBackup, { name: member.name })
-              }}</span>
+            </div>
+            <div v-if="member.uid === user.uid && member.status === 'confirmed'" class="my-part">
+              <v-chip size="small" color="primary" variant="tonal" prepend-icon="mdi-check-circle-outline">
+                {{ text.youServe }}<template v-if="member.role"> · {{ member.role }}</template>
+              </v-chip>
+              <v-btn
+                size="small"
+                variant="text"
+                color="delete"
+                class="text-none"
+                @click="emit('decline', member, 'main')"
+              >
+                {{ text.withdraw }}
+              </v-btn>
+            </div>
+            <div v-if="member.uid === user.uid && member.status === 'applied'" class="my-part">
+              <v-chip size="small" color="warning" variant="tonal" prepend-icon="mdi-hand-back-right-outline">
+                {{ text.yourApplication }}
+              </v-chip>
+            </div>
+            <div v-if="member.backupUid === user.uid && member.backupStatus === 'invited'" class="my-part">
+              <span class="my-part__what">
+                <v-icon icon="mdi-account-switch-outline" size="small" color="secondary" />
+                {{ format(text.askedBackup, { name: member.name }) }}
+              </span>
               <v-btn
                 size="small"
                 variant="flat"
@@ -83,8 +97,29 @@
               >
                 {{ text.cannot }}
               </v-btn>
-            </template>
+            </div>
+            <div v-if="member.backupUid === user.uid && member.backupStatus === 'confirmed'" class="my-part">
+              <v-chip
+                size="small"
+                color="secondary"
+                variant="tonal"
+                prepend-icon="mdi-account-switch-outline"
+              >
+                {{ format(text.youBackup, { name: member.name }) }}
+              </v-chip>
+              <v-btn
+                size="small"
+                variant="text"
+                color="delete"
+                class="text-none"
+                @click="emit('decline', member, 'backup')"
+              >
+                {{ text.withdraw }}
+              </v-btn>
+            </div>
           </template>
+        </div>
+        <div class="d-flex flex-wrap ga-2 mt-2">
           <v-btn
             v-if="canApply"
             size="small"
@@ -305,6 +340,18 @@ const answer = (member: Participant, as: 'main' | 'backup', reply: 'confirm' | '
   font-size: 14px;
   margin: 4px 0 0;
   white-space: pre-wrap;
+}
+
+.my-part {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-part__what {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .section {

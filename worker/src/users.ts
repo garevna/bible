@@ -79,14 +79,15 @@ export const view = (record: UserRecord, owners: string): UserView => ({
   owner: isOwner(record, owners)
 })
 
-/** All users but the owners (they stay out of sight), the last seen first */
-export async function listUsers(store: UsersStore, owners: string): Promise<UserView[]> {
+/** All users but the owners (they stay out of the dashboard; the calendar has them too), the last seen first */
+export async function listUsers(store: UsersStore, owners: string, withOwners = false): Promise<UserView[]> {
   const users: UserView[] = []
   let cursor: string | undefined
   do {
     const page = await store.list<UserRecord>({ prefix: 'user:', cursor })
     page.keys.forEach(
-      ({ metadata }) => metadata && !isOwner(metadata, owners) && users.push(view(metadata, owners))
+      ({ metadata }) =>
+        metadata && (withOwners || !isOwner(metadata, owners)) && users.push(view(metadata, owners))
     )
     cursor = page.list_complete ? undefined : page.cursor
   } while (cursor)

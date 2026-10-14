@@ -489,6 +489,31 @@ export const calendar = {
     ru: 'Набор объявлен в служебном канале',
     en: 'The call is posted in the service channel'
   },
+  invitedYou: {
+    ua: 'Вас запрошено:',
+    ru: 'Вас пригласили:',
+    en: 'You are invited:'
+  },
+  youServe: {
+    ua: 'Ви берете участь',
+    ru: 'Вы участвуете',
+    en: 'You serve'
+  },
+  withdraw: {
+    ua: 'Відмовитися від участі',
+    ru: 'Отказаться от участия',
+    en: 'Withdraw'
+  },
+  yourApplication: {
+    ua: 'Вашу заявку подано, чекає на розгляд',
+    ru: 'Ваша заявка подана, ждет рассмотрения',
+    en: 'Your application is waiting'
+  },
+  askedBackup: {
+    ua: 'Вас просять бути дублером ({name}):',
+    ru: 'Вас просят быть дублером ({name}):',
+    en: 'You are asked to back up {name}:'
+  },
   later: {
     ua: 'Пізніше',
     ru: 'Позже',

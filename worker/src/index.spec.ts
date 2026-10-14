@@ -1010,7 +1010,8 @@ describe('the service bot', () => {
     expect(invitation.text).toContain('Запрошення на служіння')
     // the service channel: the same, with whom it is for, and buttons of its own
     const post = sent('sendMessage').find((body) => body.chat_id === '-100777' && body.reply_markup)!
-    expect(post.text).toContain('👤 Лідер')
+    // whom it is for first, then the message
+    expect(post.text).toMatch(/^👤 Кому: Лідер\n─+\nЗапрошення на служіння/)
     expect(post.reply_markup!.inline_keyboard).toHaveLength(2)
     // a row for each day
     const rows = invitation.reply_markup!.inline_keyboard
