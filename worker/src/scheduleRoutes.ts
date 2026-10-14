@@ -7,7 +7,6 @@ import {
   atLocal,
   daysOf,
   isOver,
-  LASTS,
   localDay,
   parseEvent,
   type Material,
@@ -118,11 +117,11 @@ export async function handleSchedule(
     await bot.broadcast(`👤 Кому: ${to.map(toName).join(', ')}\n──────────\n${text}`, asks)
   }
 
-  /** the notices of an event live until it is over (the last of its days), not to pile up */
+  /** the notices of an event live until it begins (the last of its days), not to pile up */
   let until = now + 2 * MESSAGE_LIFE
   const lastsUntil = (event: ScheduleEvent, days: string[]) => {
-    const end = Math.max(...days.map((day) => atLocal(day, event.time) + LASTS))
-    until = Math.max(end, now + 10 * 60 * 1000)
+    const start = Math.max(...days.map((day) => atLocal(day, event.time)))
+    until = Math.max(start, now + 10 * 60 * 1000)
   }
 
   /**

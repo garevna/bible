@@ -96,11 +96,8 @@ export function atLocal(day: string, time: string) {
   return guess - (shown - guess)
 }
 
-/** an event is over an hour after it begins: then it is gone from the calendar, with its notices */
-export const LASTS = 60 * 60 * 1000
-
-/** The day of an event is over (or the day is in the past) */
-export const isOver = (day: string, time: string, now: number) => atLocal(day, time) + LASTS <= now
+/** an event is gone from the calendar, with its notices, once it begins: then it is too late to change anything */
+export const isOver = (day: string, time: string, now: number) => atLocal(day, time) <= now
 
 /** the day after a day */
 const nextDay = (day: string) => {

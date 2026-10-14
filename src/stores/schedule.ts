@@ -183,8 +183,8 @@ const churchTime = (ms: number) =>
 
 const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
 
-/** an event is over an hour after it begins, and gone from the calendar (as the worker says) */
-export const isOver = (time: string, now: string) => minutes(time) + 60 <= minutes(now)
+/** an event is gone from the calendar once it begins (as the worker says): then it is too late to change */
+export const isOver = (time: string, now: string) => minutes(time) <= minutes(now)
 
 /** 'YYYY-MM-DD' of a date in local time */
 export const isoDay = (date: Date) =>

@@ -96,9 +96,9 @@ describe('the grid of a month', () => {
 })
 
 describe('the events of today', () => {
-  it('are over an hour after they begin', () => {
-    expect(isOver('06:45', '07:44')).toBe(false)
-    expect(isOver('06:45', '07:45')).toBe(true)
-    expect(isOver('23:30', '23:59')).toBe(false)
+  it('are gone once they begin', () => {
+    expect(isOver('06:45', '06:44')).toBe(false)
+    expect(isOver('06:45', '06:45')).toBe(true)
+    expect(isOver('23:59', '23:58')).toBe(false)
   })
 })
