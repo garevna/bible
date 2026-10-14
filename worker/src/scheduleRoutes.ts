@@ -27,6 +27,8 @@ import type { UserRecord, UserView } from './users'
  *   DELETE /schedule/events/:id       removes it                                    schedule, its responsible person
  *   POST   /schedule/team             { eventId, day, uid, backupUid?, role? }: invites   the inviters of the event
  *   POST   /schedule/invitations      { eventId, days, uids }: invites people to some days   the inviters
+ *   POST   /schedule/announce         { eventId, days? }: an open call in the service channel   the inviters
+ *                                     (a new open event is announced by itself, for its coming week)
  *   DELETE /schedule/team             { eventId, day, uid }                          the managers of the event
  *   POST   /schedule/apply            { eventId, day }: asks to serve (an open event, its ministry)
  *   POST   /schedule/approve          { eventId, day, uid }: takes an application   the approvers of the event
@@ -127,6 +129,25 @@ export async function handleSchedule(
     until = Math.max(end, now + 10 * 60 * 1000)
   }
 
+  /**
+   * An open call in the service channel: whoever of the ministry presses "Подати заявку" applies
+   * (the days of the coming week when none are given)
+   */
+  async function announce(event: ScheduleEvent, days?: string[]) {
+    const coming =
+      days ??
+      daysOf(event, today, addDays(today, 13))
+        .filter((day) => day !== today || !isOver(day, event.time, now))
+        .slice(0, 7)
+    if (!coming.length) return 0
+    await bot.broadcast(
+      `🙋 Набір на служіння: ${eventLabel(event, coming.join(', '))}
+Заявку подають учасники служіння «${event.ministry}» — кнопкою нижче або в календарі служінь.`,
+      coming.map((day) => ({ eventId: event.id, day, uid: '', as: 'apply' as const }))
+    )
+    return coming.length
+  }
+
   /** the event and one of its days, not in the past */
   async function eventDay(
     eventId: unknown = body.eventId,
@@ -221,6 +242,8 @@ export async function handleSchedule(
       createdAt: old?.createdAt ?? now
     }
     await schedule.putEvent(event)
+    // a new open event calls for applications in the service channel
+    if (!old && event.mode === 'open') await announce(event)
     return json({ event })
   }
 
@@ -230,6 +253,17 @@ export async function handleSchedule(
     if (!plans && me.uid !== event.responsibleUid) return json({ error: 'forbidden' }, 403)
     await schedule.deleteEvent(event.id)
     return json({ removed: event.id })
+  }
+
+  if (route === 'POST /schedule/announce') {
+    const event = typeof body.eventId === 'string' ? await schedule.event(body.eventId) : null
+    if (!event) return json({ error: 'not-found' }, 404)
+    if (!invites(event)) return json({ error: 'forbidden' }, 403)
+    if (event.mode !== 'open') return json({ error: 'not-open' }, 409)
+    const days = Array.isArray(body.days) ? [...new Set(body.days)] : undefined
+    if (days?.some((day) => typeof day !== 'string' || day < today || !daysOf(event, day, day).length))
+      return json({ error: 'not-found' }, 404)
+    return json({ announced: await announce(event, days as string[] | undefined) })
   }
 
   // invitations to some days of an event: one message to each person, with the days

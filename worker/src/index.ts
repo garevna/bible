@@ -147,7 +147,7 @@ const ROUTES = [
   /^(POST|PUT|DELETE) \/schedule\/events(\/[^/]+)?$/,
   /^(POST|DELETE) \/schedule\/team$/,
   /^POST \/schedule\/invitations$/,
-  /^POST \/schedule\/(apply|approve|unapprove|role|answer)$/
+  /^POST \/schedule\/(apply|approve|unapprove|role|answer|announce)$/
 ]
 
 const DAY = 24 * 60 * 60 * 1000
@@ -197,6 +197,8 @@ async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<Sc
 const NOT_ACTUAL = 'Це запрошення вже неактуальне'
 const NOT_LINKED = 'Спершу підключіть Telegram у застосунку: меню аватара → «Підключити Telegram»'
 const NOT_YOURS = 'Це запрошення не вам'
+const NOT_MINISTRY = 'Заявки приймаються від учасників цього служіння'
+const ALREADY = 'Ви вже в команді цього дня'
 
 /**
  * The updates of the service bot: /start <token> links the chat to the user of the token, /stop unlinks it,
@@ -287,6 +289,35 @@ async function handleWebhook(
       await toast(token, fetcher, callback.id, NOT_LINKED)
       return json({ ok: true })
     }
+    const name = me.name ?? me.email ?? ''
+
+    // an open call: whoever of the ministry applies; the button stays for the others
+    if (ask.as === 'apply') {
+      const apply = new Request(new URL('/schedule/apply', request.url), {
+        method: 'POST',
+        body: JSON.stringify({ eventId: ask.eventId, day: ask.day })
+      })
+      const response = await handleSchedule(apply, context, json)
+      if (!response.ok) {
+        const notice = { 403: NOT_MINISTRY, 409: ALREADY }[response.status] ?? NOT_ACTUAL
+        await toast(token, fetcher, callback.id, notice)
+        return json({ ok: true })
+      }
+      const { participant } = (await response.json()) as { participant: { status: string } }
+      const joined = participant.status === 'confirmed'
+      await answered(
+        token,
+        fetcher,
+        callback.id,
+        callback.message,
+        callback.data,
+        joined ? '✅ Ви в команді' : '🙋 Заявку подано, відповідальний її розгляне',
+        `🙋 ${shortDay(ask.day)}: ${name} — ${joined ? 'у команді' : 'заявка'}`,
+        true
+      )
+      return json({ ok: true })
+    }
+
     const confirm = choice === 'c'
     const answer = new Request(new URL('/schedule/answer', request.url), {
       method: 'POST',
@@ -294,7 +325,7 @@ async function handleWebhook(
         eventId: ask.eventId,
         day: ask.day,
         uid: ask.uid,
-        as: ask.as,
+        as: ask.as === 'backup' ? 'backup' : 'main',
         answer: confirm ? 'confirm' : 'decline',
         reason: confirm ? undefined : 'Відповідь через Telegram'
       })
@@ -305,7 +336,6 @@ async function handleWebhook(
       return json({ ok: true })
     }
     // the message gets a line of the answer: in the channel with the name, everybody sees it
-    const name = me.name ?? me.email ?? ''
     const channel = chatId !== callback.from.id
     const what = confirm ? (ask.as === 'backup' ? 'згоден(на) бути дублером' : 'підтвердив(ла)') : 'не може'
     const line = `${confirm ? '✅' : '❌'} ${shortDay(ask.day)}: ${channel ? `${name} ${what}` : confirm ? 'підтверджено' : 'відмову передано відповідальному'}`

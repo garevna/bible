@@ -109,6 +109,18 @@
           @click="emit('invite', occurrence)"
         />
         <ButtonTooltip
+          v-if="event.mode === 'open' && worker.serviceBot && schedule.invites(event)"
+          icon="mdi-bullhorn-outline"
+          :text="text.announce"
+          color="secondary"
+          @click="
+            run(
+              async () =>
+                (announced = Boolean((await schedule.announce(event.id, [occurrence.day])).announced))
+            )
+          "
+        />
+        <ButtonTooltip
           v-if="schedule.manages(event)"
           icon="$editNote"
           :text="text.editEvent"
@@ -143,6 +155,17 @@
       </div>
     </v-expand-transition>
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-2">{{ error }}</v-alert>
+    <v-alert
+      v-if="announced"
+      type="success"
+      variant="tonal"
+      density="compact"
+      closable
+      class="mt-2"
+      @click:close="announced = false"
+    >
+      {{ text.announced }}
+    </v-alert>
   </article>
 </template>
 
@@ -181,6 +204,7 @@ const { calendar: text, publish } = storeToRefs(useLanguageStore())
 
 const opened = ref<'team' | 'roles' | 'materials' | null>(null)
 const error = ref('')
+const announced = ref(false)
 
 const event = computed(() => props.occurrence.event)
 const confirmed = computed(

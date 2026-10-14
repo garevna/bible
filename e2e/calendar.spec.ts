@@ -78,7 +78,8 @@ async function fakeWorker(page: Page, planner = false) {
           canSend: false,
           canReceive: true,
           phone: '+380501234567',
-          needsPhone: false
+          needsPhone: false,
+          serviceBot: planner
         }
       })
     }
@@ -152,6 +153,7 @@ async function fakeWorker(page: Page, planner = false) {
       })
     }
     if (path === '/schedule/invitations') return route.fulfill({ json: { invited: 1 } })
+    if (path === '/schedule/announce') return route.fulfill({ json: { announced: 1 } })
     return route.fulfill({ json: { ok: true } })
   })
   return posted
@@ -283,6 +285,17 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
     kind: 'note',
     post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино' }] }
   })
+
+  // the evening prayer is open: a call for applications in the service channel
+  const evening = card(page, 'Вечірня молитва')
+  await evening.locator('[aria-label="Оголосити набір у службовому каналі"]').click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/announce',
+      body: { eventId: 'evening', days: [TODAY] }
+    })
+  await expect(evening).toContainText('Набір оголошено в службовому каналі')
 
   // a new event of a type: then its invitations
   await page.getByRole('button', { name: 'Додати подію' }).click()

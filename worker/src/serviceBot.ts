@@ -10,13 +10,16 @@ import type { UsersStore } from './users'
  * in private or in the channel (the id of a private chat is the id of its user).
  */
 
-/** an answer asked by the buttons of a message: to an invitation, as the main person or the backup */
+/**
+ * An answer asked by the buttons of a message: to an invitation, as the main person or the backup,
+ * or an application to an open event (whoever of its ministry presses it)
+ */
 export interface Ask {
   eventId: string
   day: string
-  /** the main person of the invitation (the backup answers for their place) */
+  /** the main person of the invitation (the backup answers for their place); '' for an application */
   uid: string
-  as: 'main' | 'backup'
+  as: 'main' | 'backup' | 'apply'
 }
 
 export interface ServiceBot {
@@ -80,6 +83,7 @@ async function buttons(store: UsersStore, chatId: number | string, asks: Ask[]):
         expirationTtl: ASK_LIFE
       })
       const day = asks.length > 1 ? `${shortDay(ask.day)}: ` : ''
+      if (ask.as === 'apply') return [{ text: `🙋 ${day}Подати заявку`, callback_data: `${key}|a` }]
       const yes = ask.as === 'backup' ? 'Згоден бути дублером' : 'Підтвердити'
       return [
         { text: `✅ ${day}${yes}`, callback_data: `${key}|c` },
@@ -184,7 +188,8 @@ export const toast = (token: string, fetcher: typeof fetch, callbackId: string, 
 
 /**
  * The button was pressed and answered: a short notice, and the message keeps its text with the answer
- * added; the row of the answered day goes, the rows of the other days stay
+ * added; the row of the answered day goes, the rows of the other days stay (all of them stay when
+ * others may press the same button, as in an open call for applications)
  */
 export async function answered(
   token: string,
@@ -193,7 +198,8 @@ export async function answered(
   message: ButtonsMessage | undefined,
   pressed: string,
   notice: string,
-  line: string
+  line: string,
+  keepRows = false
 ) {
   await call(fetcher, token, 'answerCallbackQuery', { callback_query_id: callbackId, text: notice }).catch(
     () => undefined
@@ -201,7 +207,7 @@ export async function answered(
   if (!message) return
   const key = pressed.split('|')[0]
   const rows = (message.reply_markup?.inline_keyboard ?? []).filter(
-    (row) => !row.some((button) => button.callback_data.split('|')[0] === key)
+    (row) => keepRows || !row.some((button) => button.callback_data.split('|')[0] === key)
   )
   await call(fetcher, token, 'editMessageText', {
     chat_id: message.chat.id,

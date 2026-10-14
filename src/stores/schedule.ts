@@ -374,6 +374,9 @@ export const useScheduleStore = defineStore('schedule', () => {
   /** invitations to some days of an event, one message to each person */
   const inviteMany = (eventId: string, days: string[], uids: string[]) =>
     act('POST', '/schedule/invitations', { eventId, days, uids })
+  /** an open call for applications in the service channel, for some days */
+  const announce = (eventId: string, days: string[]) =>
+    worker.request<{ announced: number }>('POST', '/schedule/announce', { eventId, days })
   const removeFromTeam = (eventId: string, day: string, uid: string) =>
     act('DELETE', '/schedule/team', { eventId, day, uid })
   const apply = (eventId: string, day: string) => act('POST', '/schedule/apply', { eventId, day })
@@ -439,6 +442,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     deleteEvent,
     invite,
     inviteMany,
+    announce,
     removeFromTeam,
     apply,
     approve,

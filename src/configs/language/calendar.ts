@@ -479,6 +479,16 @@ export const calendar = {
     ru: 'Фильтры',
     en: 'Filters'
   },
+  announce: {
+    ua: 'Оголосити набір у службовому каналі',
+    ru: 'Объявить набор в служебном канале',
+    en: 'Call for applications in the service channel'
+  },
+  announced: {
+    ua: 'Набір оголошено в службовому каналі',
+    ru: 'Набор объявлен в служебном канале',
+    en: 'The call is posted in the service channel'
+  },
   later: {
     ua: 'Пізніше',
     ru: 'Позже',

@@ -1089,6 +1089,85 @@ describe('the service bot', () => {
       text: expect.stringContaining('Привіт')
     })
   })
+
+  it('a new open event calls for applications in the channel; its ministry applies by the button', async () => {
+    const { call, sent, webhook, start } = await linked()
+    // the pastor (who approves) and a musician (another ministry) link Telegram too
+    await call('GET', '/me', 'musician')
+    await call('PUT', '/admin/users/musician-uid', 'owner', { ministries: ['Музичне служіння'] })
+    for (const [token, chat] of [
+      ['pastor', 777],
+      ['musician', 888]
+    ] as const) {
+      const url = (await call('POST', '/telegram/link', token)).body.url as string
+      await webhook({
+        message: { chat: { id: chat, type: 'private' }, text: `/start ${url.split('start=')[1]}` }
+      })
+    }
+    void start
+
+    const created = await call('POST', '/schedule/events', 'owner', {
+      ministry: 'Молитовне служіння',
+      title: 'Вечірня молитва',
+      weekdays: [0, 1, 2, 3, 4, 5, 6],
+      time: '19:00',
+      mode: 'open',
+      responsibleUid: 'owner-uid'
+    })
+    const eventId = (created.body.event as { id: string }).id
+    const call_ = sent('sendMessage').find(
+      (body) => body.chat_id === '-100777' && body.text.includes('Набір')
+    )!
+    // today (Monday 09:00) and the six days after it
+    const rows = call_.reply_markup!.inline_keyboard
+    expect(rows).toHaveLength(7)
+    expect(rows[0]![0]!.text).toBe('🙋 12.10: Подати заявку')
+
+    const press = (id: string, from: number) =>
+      webhook({
+        callback_query: {
+          id,
+          data: rows[1]![0]!.callback_data,
+          from: { id: from },
+          message: {
+            chat: { id: -100777 },
+            message_id: 11,
+            text: call_.text,
+            reply_markup: call_.reply_markup
+          }
+        }
+      })
+    await press('a1', 888)
+    expect(sent('answerCallbackQuery').at(-1)!.text).toBe('Заявки приймаються від учасників цього служіння')
+    // the one who approves joins at once
+    await press('a0', 777)
+    expect(sent('answerCallbackQuery').at(-1)!.text).toBe('✅ Ви в команді')
+    await press('a2', 555)
+    expect(sent('editMessageText').at(-1)).toMatchObject({
+      text: expect.stringContaining('🙋 13.10: Лідер — заявка'),
+      // the button stays for the others
+      reply_markup: { inline_keyboard: rows }
+    })
+    await press('a3', 555)
+    expect(sent('answerCallbackQuery').at(-1)!.text).toBe('Ви вже в команді цього дня')
+    const team = (await call('GET', '/schedule?from=2026-10-13&to=2026-10-13', 'owner')).body
+      .participants as {
+      uid: string
+      status: string
+    }[]
+    expect(team.map(({ uid, status }) => [uid, status]).sort()).toEqual([
+      ['leader-uid', 'applied'],
+      ['pastor-uid', 'confirmed']
+    ])
+
+    // again, by hand, for one day
+    expect(
+      (await call('POST', '/schedule/announce', 'owner', { eventId, days: ['2026-10-15'] })).body
+    ).toEqual({
+      announced: 1
+    })
+    expect((await call('POST', '/schedule/announce', 'leader', { eventId })).status).toBe(403)
+  })
 })
 
 describe('Firebase ID tokens', async () => {
