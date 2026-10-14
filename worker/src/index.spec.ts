@@ -905,7 +905,7 @@ describe('messages between ministers', () => {
 interface Sent {
   chat_id?: number | string
   text: string
-  reply_markup?: { inline_keyboard: { text: string; callback_data: string }[][] }
+  reply_markup?: { inline_keyboard?: { text: string; callback_data: string }[][]; [name: string]: unknown }
   [name: string]: unknown
 }
 
@@ -988,6 +988,40 @@ describe('the service bot', () => {
     expect((await call('GET', '/me', 'leader')).body).toMatchObject({ telegramLinked: false })
   })
 
+  it('a minister links by the number of their own Telegram account, the one of the app', async () => {
+    const { call, sent, webhook } = await linked()
+    await call('GET', '/me', 'musician')
+    await call('PUT', '/admin/users/musician-uid', 'owner', {
+      ministries: ['Музичне служіння'],
+      phone: '+380501112233'
+    })
+    const contact = (phone: string, userId = 900, from = 900) =>
+      webhook({
+        message: {
+          chat: { id: from, type: 'private' },
+          from: { id: from },
+          contact: { phone_number: phone, user_id: userId }
+        }
+      })
+
+    // the first message: the button that shares the number
+    await webhook({ message: { chat: { id: 900, type: 'private' }, from: { id: 900 }, text: '/start' } })
+    expect(sent('sendMessage').at(-1)!.reply_markup).toMatchObject({
+      keyboard: [[{ request_contact: true }]]
+    })
+    // somebody else's contact is not taken; an unknown number is not either
+    await contact('380501112233', 1)
+    expect(sent('sendMessage').at(-1)!.text).toContain('власний номер')
+    await contact('380999999999')
+    expect(sent('sendMessage').at(-1)!.text).toContain('не знайдено')
+
+    await contact('380501112233')
+    expect(sent('sendMessage').at(-1)!.text).toContain('Готово, Музикант')
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({ telegramLinked: true })
+    await webhook({ message: { chat: { id: 900, type: 'private' }, from: { id: 900 }, text: '/me' } })
+    expect(sent('sendMessage').at(-1)!.text).toContain('Ви підключені як: Музикант (+380501112233)')
+  })
+
   it('an invitation comes with buttons; a button answers it; messages come too', async () => {
     const { call, sent, webhook } = await linked()
     const eventId = (
@@ -1006,15 +1040,19 @@ describe('the service bot', () => {
       days: [DAY, '2026-10-14'],
       uids: ['leader-uid']
     })
-    const invitation = sent('sendMessage').find((body) => body.chat_id === 555 && body.reply_markup)!
+    const invitation = sent('sendMessage').find(
+      (body) => body.chat_id === 555 && body.reply_markup?.inline_keyboard
+    )!
     expect(invitation.text).toContain('Запрошення на служіння')
     // the service channel: the same, with whom it is for, and buttons of its own
-    const post = sent('sendMessage').find((body) => body.chat_id === '-100777' && body.reply_markup)!
+    const post = sent('sendMessage').find(
+      (body) => body.chat_id === '-100777' && body.reply_markup?.inline_keyboard
+    )!
     // whom it is for first, then the message
     expect(post.text).toMatch(/^👤 Кому: Лідер\n─+\nЗапрошення на служіння/)
-    expect(post.reply_markup!.inline_keyboard).toHaveLength(2)
+    expect(post.reply_markup!.inline_keyboard!).toHaveLength(2)
     // a row for each day
-    const rows = invitation.reply_markup!.inline_keyboard
+    const rows = invitation.reply_markup!.inline_keyboard!
     expect(rows.map((row) => row.map((button) => button.text))).toEqual([
       ['✅ 13.10: Підтвердити', '❌ 13.10: Не можу'],
       ['✅ 14.10: Підтвердити', '❌ 14.10: Не можу']
@@ -1058,7 +1096,7 @@ describe('the service bot', () => {
     })
 
     // in the channel: somebody who did not link Telegram, the invited one who did
-    const channelRows = post.reply_markup!.inline_keyboard
+    const channelRows = post.reply_markup!.inline_keyboard!
     const inChannel = (id: string, data: string, from: number) =>
       webhook({
         callback_query: {
@@ -1120,7 +1158,7 @@ describe('the service bot', () => {
       (body) => body.chat_id === '-100777' && body.text.includes('Набір')
     )!
     // today (Monday 09:00) and the six days after it
-    const rows = call_.reply_markup!.inline_keyboard
+    const rows = call_.reply_markup!.inline_keyboard!
     expect(rows).toHaveLength(7)
     expect(rows[0]![0]!.text).toBe('🙋 12.10: Подати заявку')
 

@@ -167,8 +167,14 @@ export async function askOf(store: UsersStore, key: string, chatId: number) {
   return ask && String(ask.chatId) === String(chatId) ? ask : null
 }
 
-export const reply = (token: string, fetcher: typeof fetch, chatId: number, text: string) =>
-  call(fetcher, token, 'sendMessage', { chat_id: chatId, text }).catch(() => undefined)
+/** a message to a private chat, with a keyboard of its own (e.g. the button that shares the number) */
+export const reply = (
+  token: string,
+  fetcher: typeof fetch,
+  chatId: number,
+  text: string,
+  reply_markup?: unknown
+) => call(fetcher, token, 'sendMessage', { chat_id: chatId, text, reply_markup }).catch(() => undefined)
 
 /** a message with the buttons, as a callback brings it */
 export interface ButtonsMessage {

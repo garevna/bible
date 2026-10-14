@@ -135,12 +135,13 @@
       </div>
 
       <!-- planning it -->
-      <div class="d-flex flex-column">
+      <div class="d-flex flex-column gr-5">
         <ButtonTooltip
           v-if="schedule.invites(event)"
-          icon="mdi-message-arrow-left-outline"
+          icon="mdi-send-circle-outline"
           :text="text.invitations"
           color="secondary"
+          large
           @click="emit('invite', occurrence)"
         />
         <ButtonTooltip
@@ -148,6 +149,7 @@
           icon="mdi-bullhorn-outline"
           :text="text.announce"
           color="secondary"
+          large
           @click="
             run(
               async () =>
@@ -160,6 +162,7 @@
           icon="$editNote"
           :text="text.editEvent"
           color="buttons"
+          large
           @click="emit('edit', event)"
         />
       </div>

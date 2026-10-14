@@ -13,7 +13,7 @@
     </v-btn>
     <ButtonTooltip
       v-else
-      icon="mdi-message-arrow-left-outline"
+      icon="mdi-send-circle-outline"
       :text="attach ? text.send : text.newMessage"
       color="secondary"
       :small="small"

@@ -1,5 +1,5 @@
 <template>
-  <AppDialog v-model="open" :title="title" icon="mdi-message-arrow-left-outline" max-width="600">
+  <AppDialog v-model="open" :title="title" icon="mdi-send-circle-outline" max-width="600">
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-4">{{ error }}</v-alert>
     <p class="hint">{{ text.invitationsHint }}</p>
 

@@ -195,6 +195,13 @@ async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<Sc
   }
 }
 
+/** a button under the field of the chat: Telegram sends the number of the user's own account */
+const ASK_PHONE = {
+  keyboard: [[{ text: '📱 Поділитися номером', request_contact: true }]],
+  resize_keyboard: true,
+  one_time_keyboard: true
+}
+
 const NOT_ACTUAL = 'Це запрошення вже неактуальне'
 const NOT_LINKED = 'Спершу підключіть Telegram у застосунку: меню аватара → «Підключити Telegram»'
 const NOT_YOURS = 'Це запрошення не вам'
@@ -215,7 +222,12 @@ async function handleWebhook(
   if (!token || request.headers.get('x-telegram-bot-api-secret-token') !== (await webhookSecret(token)))
     return json({ error: 'forbidden' }, 403)
   const update = (await request.json().catch(() => null)) as {
-    message?: { chat: { id: number; type: string }; text?: string; from?: { first_name?: string } }
+    message?: {
+      chat: { id: number; type: string }
+      text?: string
+      from?: { id: number; first_name?: string }
+      contact?: { phone_number: string; user_id?: number }
+    }
     callback_query?: {
       id: string
       data?: string
@@ -227,22 +239,10 @@ async function handleWebhook(
   const store = env.USERS
 
   const message = update?.message
-  if (message?.chat.type === 'private' && typeof message.text === 'string') {
+  if (message?.chat.type === 'private') {
     const chatId = message.chat.id
-    const [command, argument] = message.text.trim().split(/\s+/)
-    if (command === '/start' && argument) {
-      const uid = await takeLink(store, argument)
-      const record = uid ? await getUser(store, uid) : null
-      if (!record) {
-        await reply(
-          token,
-          fetcher,
-          chatId,
-          'Посилання застаріло. Відкрийте застосунок і натисніть «Підключити Telegram» ще раз.'
-        )
-        return json({ ok: true })
-      }
-      // one chat for a user, one user for a chat
+    /** the chat becomes the user's: one chat for a user, one user for a chat */
+    const link = async (record: UserRecord) => {
       if (record.telegramChatId && record.telegramChatId !== chatId)
         await forgetChat(store, record.telegramChatId)
       const previous = await uidOfChat(store, chatId)
@@ -254,20 +254,69 @@ async function handleWebhook(
         token,
         fetcher,
         chatId,
-        `Готово${record.name ? `, ${record.name}` : ''}! Сюди приходитимуть запрошення на служіння (відповісти можна кнопками) і повідомлення застосунку. Відключити: /stop`
+        `Готово, ${record.name ?? record.email ?? 'ви підключені'}! Сюди приходитимуть запрошення на служіння (відповісти можна кнопками, і тут, і в службовому каналі) та повідомлення застосунку.\nХто я для бота: /me. Відключити: /stop`,
+        { remove_keyboard: true }
       )
+    }
+
+    // the number of the user's own account: the minister of the app with that number
+    if (message.contact) {
+      if (message.contact.user_id !== message.from?.id) {
+        await reply(
+          token,
+          fetcher,
+          chatId,
+          'Надішліть, будь ласка, власний номер — кнопкою нижче.',
+          ASK_PHONE
+        )
+        return json({ ok: true })
+      }
+      const phone = `+${message.contact.phone_number.replace(/\D/g, '')}`
+      const found = (await listUsers(store, env.OWNERS, true)).filter((user) => user.phone === phone)
+      if (found.length === 1) await link(found[0]!)
+      else
+        await reply(
+          token,
+          fetcher,
+          chatId,
+          found.length
+            ? 'Цей номер є в кількох користувачів застосунку. Підключіться, будь ласка, через застосунок: меню аватара → «Підключити Telegram».'
+            : `Номер ${phone} не знайдено в застосунку. Перевірте його там (меню аватара → «Номер мобільного») і надішліть ще раз, або підключіться через застосунок: меню аватара → «Підключити Telegram».`,
+          found.length ? { remove_keyboard: true } : ASK_PHONE
+        )
+      return json({ ok: true })
+    }
+
+    const [command, argument] = (message.text ?? '').trim().split(/\s+/)
+    if (command === '/start' && argument) {
+      const uid = await takeLink(store, argument)
+      const record = uid ? await getUser(store, uid) : null
+      if (record) await link(record)
+      else
+        await reply(
+          token,
+          fetcher,
+          chatId,
+          'Посилання застаріло. Можна підключитися за номером телефону — кнопкою нижче.',
+          ASK_PHONE
+        )
     } else if (command === '/stop') {
       const uid = await uidOfChat(store, chatId)
       const record = uid ? await getUser(store, uid) : null
       if (record) await setTelegramChat(store, record, null)
       await forgetChat(store, chatId)
-      await reply(token, fetcher, chatId, 'Telegram відключено. Підключити знову можна в застосунку.')
+      await reply(token, fetcher, chatId, 'Telegram відключено. Підключити знову — кнопкою нижче.', ASK_PHONE)
     } else {
+      const uid = await uidOfChat(store, chatId)
+      const record = uid ? await getUser(store, uid) : null
       await reply(
         token,
         fetcher,
         chatId,
-        'Це службовий бот церкви. Підключіть його в застосунку: меню аватара → «Підключити Telegram».'
+        record
+          ? `Ви підключені як: ${record.name ?? record.email}${record.phone ? ` (${record.phone})` : ''}. Не ви? Відключіться (/stop) і підключіться знову.`
+          : 'Це службовий бот церкви. Щоб отримувати запрошення на служіння й відповідати на них, поділіться номером телефону — кнопкою нижче. Він має збігатися з номером у застосунку.',
+        record ? undefined : ASK_PHONE
       )
     }
     return json({ ok: true })
