@@ -172,6 +172,20 @@ export function dayStateOf(
   return left < settings.redDays + settings.orangeDays ? 'orange' : 'amber'
 }
 
+/** 'HH:MM' now in the time zone of the church (the worker counts the days in it too) */
+const churchTime = (ms: number) =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Kyiv',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).format(new Date(ms))
+
+const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+
+/** an event is over an hour after it begins, and gone from the calendar (as the worker says) */
+export const isOver = (time: string, now: string) => minutes(time) + 60 <= minutes(now)
+
 /** 'YYYY-MM-DD' of a date in local time */
 export const isoDay = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -208,11 +222,14 @@ export const useScheduleStore = defineStore('schedule', () => {
   /** the month shown, 'YYYY-MM' */
   const month = ref(isoDay(new Date()).slice(0, 7))
   const filters = ref<Filters>({ type: null, ministry: null, event: null, person: null, mine: false })
+  /** the time of the church, every minute: the events of today go when they are over */
+  const now = ref(churchTime(Date.now()))
+  setInterval(() => (now.value = churchTime(Date.now())), 60_000)
 
   const occurrences = computed<Occurrence[]>(() =>
     days.value.flatMap(({ eventId, day }) => {
       const event = events.value.find((item) => item.id === eventId)
-      if (!event) return []
+      if (!event || (day === today.value && isOver(event.time, now.value))) return []
       const team = participants.value.filter((item) => item.eventId === eventId && item.day === day)
       const prepared = materials.value.filter((item) => item.eventId === eventId && item.day === day)
       return [{ event, day, team, materials: prepared, issues: issuesOf(event, team, prepared) }]

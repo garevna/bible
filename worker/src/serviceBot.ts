@@ -1,11 +1,13 @@
 import type { UsersStore } from './users'
 
 /**
- * The service bot: a bot of its own (not the one of the public channel) that writes to the ministers
- * in private: invitations with the buttons "Підтвердити" / "Не можу", the notices of the calendar,
- * the messages of the app. A minister links Telegram once: the app opens the bot with a one-time token
- * (t.me/<bot>?start=<token>), the minister presses Start. An optional service chat (a channel or a
- * group of the ministers) gets the emergencies too.
+ * The service bot: a bot of its own (not the one of the public channel). It writes to the ministers
+ * in private (invitations with the buttons "Підтвердити" / "Не можу", the notices of the calendar,
+ * the messages of the app) and duplicates the notices of the calendar into the service channel,
+ * where the invited minister may answer by the same buttons.
+ * A minister links Telegram once: the app opens the bot with a one-time token
+ * (t.me/<bot>?start=<token>), the minister presses Start. Then the bot knows who pressed a button,
+ * in private or in the channel (the id of a private chat is the id of its user).
  */
 
 /** an answer asked by the buttons of a message: to an invitation, as the main person or the backup */
@@ -20,8 +22,8 @@ export interface Ask {
 export interface ServiceBot {
   /** a private message to a linked user (nothing for one who is not linked); a row of buttons for each answer */
   send(uid: string, text: string, asks?: Ask[]): Promise<void>
-  /** a message to the service chat, when there is one */
-  broadcast(text: string): Promise<void>
+  /** a message to the service channel, when there is one; the buttons answer for the invited person */
+  broadcast(text: string, asks?: Ask[]): Promise<void>
 }
 
 export const NO_BOT: ServiceBot = { send: async () => undefined, broadcast: async () => undefined }
@@ -61,6 +63,32 @@ export async function webhookSecret(token: string) {
     .replace(/=+$/, '')
 }
 
+/** '15.10' of '2026-10-15' */
+export const shortDay = (day: string) => `${day.slice(8)}.${day.slice(5, 7)}`
+
+interface Button {
+  text: string
+  callback_data: string
+}
+
+/** The buttons of the answers: a row for each, which says its day when there are several */
+async function buttons(store: UsersStore, chatId: number | string, asks: Ask[]): Promise<Button[][]> {
+  return Promise.all(
+    asks.map(async (ask) => {
+      const key = crypto.randomUUID().replace(/-/g, '').slice(0, 20)
+      await store.put(askKey(key), JSON.stringify({ ...ask, chatId: String(chatId) }), {
+        expirationTtl: ASK_LIFE
+      })
+      const day = asks.length > 1 ? `${shortDay(ask.day)}: ` : ''
+      const yes = ask.as === 'backup' ? 'Згоден бути дублером' : 'Підтвердити'
+      return [
+        { text: `✅ ${day}${yes}`, callback_data: `${key}|c` },
+        { text: `❌ ${day}Не можу`, callback_data: `${key}|d` }
+      ]
+    })
+  )
+}
+
 /** The bot of the worker: chats of the linked users come from the users' records */
 export function serviceBot(
   token: string | undefined,
@@ -70,31 +98,19 @@ export function serviceBot(
   fetcher: typeof fetch
 ): ServiceBot {
   if (!token) return NO_BOT
+  /** a failed message must not fail what the user did in the app */
+  const post = async (chatId: number | string, text: string, asks: Ask[]) => {
+    const rows = await buttons(store, chatId, asks)
+    const reply_markup = rows.length ? { inline_keyboard: rows } : undefined
+    await call(fetcher, token, 'sendMessage', { chat_id: chatId, text, reply_markup }).catch(() => undefined)
+  }
   return {
     async send(uid, text, asks = []) {
       const chatId = chatOf(uid)
-      if (!chatId) return
-      // several days: each row says its day
-      const rows = await Promise.all(
-        asks.map(async (ask) => {
-          const key = crypto.randomUUID().replace(/-/g, '').slice(0, 20)
-          await store.put(askKey(key), JSON.stringify({ ...ask, chatId }), { expirationTtl: ASK_LIFE })
-          const day = asks.length > 1 ? `${ask.day.slice(8)}.${ask.day.slice(5, 7)}: ` : ''
-          const yes = ask.as === 'backup' ? 'Згоден бути дублером' : 'Підтвердити'
-          return [
-            { text: `✅ ${day}${yes}`, callback_data: `${key}|c` },
-            { text: `❌ ${day}Не можу`, callback_data: `${key}|d` }
-          ]
-        })
-      )
-      const reply_markup = rows.length ? { inline_keyboard: rows } : undefined
-      // a failed message must not fail what the user did in the app
-      await call(fetcher, token, 'sendMessage', { chat_id: chatId, text, reply_markup }).catch(
-        () => undefined
-      )
+      if (chatId) await post(chatId, text, asks)
     },
-    async broadcast(text) {
-      if (chat) await call(fetcher, token, 'sendMessage', { chat_id: chat, text }).catch(() => undefined)
+    async broadcast(text, asks = []) {
+      if (chat) await post(chat, text, asks)
     }
   }
 }
@@ -141,30 +157,56 @@ export const rememberChat = (store: UsersStore, chatId: number, uid: string) =>
   store.put(chatKey(chatId), uid)
 export const forgetChat = (store: UsersStore, chatId: number) => store.delete(chatKey(chatId))
 
-/** The answer asked by a button, for the chat that has it */
+/** The answer asked by a button, for the chat that has it (a private chat, or the service channel) */
 export async function askOf(store: UsersStore, key: string, chatId: number) {
-  const ask = await store.get<Ask & { chatId: number }>(askKey(key), 'json')
-  return ask && ask.chatId === chatId ? ask : null
+  const ask = await store.get<Ask & { chatId: string | number }>(askKey(key), 'json')
+  return ask && String(ask.chatId) === String(chatId) ? ask : null
 }
 
 export const reply = (token: string, fetcher: typeof fetch, chatId: number, text: string) =>
   call(fetcher, token, 'sendMessage', { chat_id: chatId, text }).catch(() => undefined)
 
-/** the button was pressed: a short notice, and the message keeps its text with the answer, without buttons */
+/** a message with the buttons, as a callback brings it */
+export interface ButtonsMessage {
+  chat: { id: number }
+  message_id: number
+  text?: string
+  reply_markup?: { inline_keyboard: Button[][] }
+}
+
+/** A short notice to the one who pressed a button (an answer that changed nothing) */
+export const toast = (token: string, fetcher: typeof fetch, callbackId: string, text: string) =>
+  call(fetcher, token, 'answerCallbackQuery', {
+    callback_query_id: callbackId,
+    text,
+    show_alert: true
+  }).catch(() => undefined)
+
+/**
+ * The button was pressed and answered: a short notice, and the message keeps its text with the answer
+ * added; the row of the answered day goes, the rows of the other days stay
+ */
 export async function answered(
   token: string,
   fetcher: typeof fetch,
   callbackId: string,
-  message: { chat: { id: number }; message_id: number; text?: string } | undefined,
-  notice: string
+  message: ButtonsMessage | undefined,
+  pressed: string,
+  notice: string,
+  line: string
 ) {
   await call(fetcher, token, 'answerCallbackQuery', { callback_query_id: callbackId, text: notice }).catch(
     () => undefined
   )
   if (!message) return
+  const key = pressed.split('|')[0]
+  const rows = (message.reply_markup?.inline_keyboard ?? []).filter(
+    (row) => !row.some((button) => button.callback_data.split('|')[0] === key)
+  )
   await call(fetcher, token, 'editMessageText', {
     chat_id: message.chat.id,
     message_id: message.message_id,
-    text: `${message.text ?? ''}\n\n${notice}`
+    text: `${message.text ?? ''}\n${line}`,
+    reply_markup: { inline_keyboard: rows }
   }).catch(() => undefined)
 }

@@ -79,6 +79,29 @@ export const localDay = (ms: number) =>
     day: '2-digit'
   }).format(new Date(ms))
 
+/** 'HH:MM' of a moment in the time zone of the church */
+export const localTime = (ms: number) =>
+  new Intl.DateTimeFormat('en-GB', {
+    timeZone: TIME_ZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23'
+  }).format(new Date(ms))
+
+/** The moment (ms) of a day and time of the church */
+export function atLocal(day: string, time: string) {
+  const guess = Date.parse(`${day}T${time}:00Z`)
+  // the time the guess shows in the time zone of the church tells how far off it is
+  const shown = Date.parse(`${localDay(guess)}T${localTime(guess)}:00Z`)
+  return guess - (shown - guess)
+}
+
+/** an event is over an hour after it begins: then it is gone from the calendar, with its notices */
+export const LASTS = 60 * 60 * 1000
+
+/** The day of an event is over (or the day is in the past) */
+export const isOver = (day: string, time: string, now: number) => atLocal(day, time) + LASTS <= now
+
 /** the day after a day */
 const nextDay = (day: string) => {
   const date = new Date(`${day}T12:00:00Z`)

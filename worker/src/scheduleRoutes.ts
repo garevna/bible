@@ -4,7 +4,10 @@ import { parsePost } from './post'
 import { ANY_MINISTRY, type RoleDef } from './roles'
 import type { Ask, ServiceBot } from './serviceBot'
 import {
+  atLocal,
   daysOf,
+  isOver,
+  LASTS,
   localDay,
   parseEvent,
   type Material,
@@ -92,21 +95,36 @@ export async function handleSchedule(
    */
   async function notify(uids: (string | null | undefined)[], text: string, asks?: Ask[]) {
     const to = [...new Set(uids.filter((uid): uid is string => Boolean(uid) && uid !== me.uid))]
+    if (!to.length) return
+    const toName = (uid: string) => nameOf(servant(uid) ?? { uid, name: null, email: null })
     const list: Message[] = to.map((uid) => ({
       id: crypto.randomUUID(),
       fromUid: me.uid,
       fromName: nameOf(me),
       toUid: uid,
-      toName: nameOf(servant(uid) ?? { uid, name: null, email: null }),
+      toName: toName(uid),
       text,
       attachment: null,
       replyTo: null,
       createdAt: now,
-      expiresAt: now + 2 * MESSAGE_LIFE,
+      expiresAt: until,
       readAt: null
     }))
-    list.length && (await messages.insert(list))
+    await messages.insert(list)
     await Promise.all(to.map((uid) => bot.send(uid, text, asks)))
+    // the service channel: the same, with whom it is for; the invited answer there by the same buttons
+    await bot.broadcast(
+      `${text}
+👤 ${to.map(toName).join(', ')}`,
+      asks
+    )
+  }
+
+  /** the notices of an event live until it is over (the last of its days), not to pile up */
+  let until = now + 2 * MESSAGE_LIFE
+  const lastsUntil = (event: ScheduleEvent, days: string[]) => {
+    const end = Math.max(...days.map((day) => atLocal(day, event.time) + LASTS))
+    until = Math.max(end, now + 10 * 60 * 1000)
   }
 
   /** the event and one of its days, not in the past */
@@ -127,11 +145,10 @@ export async function handleSchedule(
     const events = await schedule.events(from, to)
     const days = events
       .flatMap((event) =>
-        daysOf(event, from < today ? today : from, to).map((day) => ({
-          eventId: event.id,
-          day,
-          time: event.time
-        }))
+        daysOf(event, from < today ? today : from, to)
+          // the events of today that are over are gone
+          .filter((day) => day !== today || !isOver(day, event.time, now))
+          .map((day) => ({ eventId: event.id, day, time: event.time }))
       )
       .sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time))
       .map(({ eventId, day }) => ({ eventId, day }))
@@ -230,6 +247,7 @@ export async function handleSchedule(
       return json({ error: 'not-found' }, 404)
     if (people.some((person) => !person)) return json({ error: 'unknown-person' }, 400)
     const team = await schedule.participants(today, addDays(today, 366))
+    lastsUntil(event, days as string[])
     let invited = 0
     for (const person of people as UserView[]) {
       // whoever is there already keeps their place and answer
@@ -269,6 +287,7 @@ export async function handleSchedule(
   if (found instanceof Response) return found
   const { event, day } = found
   const label = eventLabel(event, day)
+  lastsUntil(event, [day])
   const slotOf = (role: unknown) => event.slots.find((slot) => slot.name === role)
 
   /** a role may be given: it is a role of the event and not all its places are taken by others */
@@ -479,9 +498,10 @@ export async function handleSchedule(
       )
       return json({ answered: true, replacedBy: participant.backupUid })
     }
-    const emergency = `⚠ ТЕРМІНОВО: на служінні нікого немає. ${participant.name} не може, дублера немає: ${label}.${because}`
-    await notify([...managers, ...planners], emergency)
-    await bot.broadcast(emergency)
+    await notify(
+      [...managers, ...planners],
+      `⚠ ТЕРМІНОВО: на служінні нікого немає. ${participant.name} не може, дублера немає: ${label}.${because}`
+    )
     return json({ answered: true, emergency: true })
   }
 

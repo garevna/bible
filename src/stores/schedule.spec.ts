@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayStateOf, issuesOf, monthGrid, type Participant, type ScheduleEvent } from './schedule'
+import { dayStateOf, isOver, issuesOf, monthGrid, type Participant, type ScheduleEvent } from './schedule'
 
 const event = (change: Partial<ScheduleEvent> = {}): ScheduleEvent => ({
   id: 'e1',
@@ -92,5 +92,13 @@ describe('the grid of a month', () => {
     expect(days[0]).toBe('2026-09-28')
     expect(days.at(-1)).toBe('2026-11-01')
     expect(days).toHaveLength(35)
+  })
+})
+
+describe('the events of today', () => {
+  it('are over an hour after they begin', () => {
+    expect(isOver('06:45', '07:44')).toBe(false)
+    expect(isOver('06:45', '07:45')).toBe(true)
+    expect(isOver('23:30', '23:59')).toBe(false)
   })
 })

@@ -362,8 +362,8 @@ describe('the schedule of ministries', () => {
     expect(created.body.event).toMatchObject({ responsibleName: 'pastor@example.com', mode: 'invite' })
 
     const { body } = await call('GET', '/schedule?from=2026-10-12&to=2026-10-19', 'leader')
+    // Monday 09:00: the prayer of 06:45 today is over and gone
     expect((body.days as { day: string }[]).map((item) => item.day)).toEqual([
-      '2026-10-12',
       '2026-10-13',
       '2026-10-14',
       '2026-10-15',
@@ -1006,9 +1006,12 @@ describe('the service bot', () => {
       days: [DAY, '2026-10-14'],
       uids: ['leader-uid']
     })
-    const invitation = sent('sendMessage').at(-1)!
-    expect(invitation.chat_id).toBe(555)
+    const invitation = sent('sendMessage').find((body) => body.chat_id === 555 && body.reply_markup)!
     expect(invitation.text).toContain('Запрошення на служіння')
+    // the service channel: the same, with whom it is for, and buttons of its own
+    const post = sent('sendMessage').find((body) => body.chat_id === '-100777' && body.reply_markup)!
+    expect(post.text).toContain('👤 Лідер')
+    expect(post.reply_markup!.inline_keyboard).toHaveLength(2)
     // a row for each day
     const rows = invitation.reply_markup!.inline_keyboard
     expect(rows.map((row) => row.map((button) => button.text))).toEqual([
@@ -1028,28 +1031,59 @@ describe('the service bot', () => {
       callback_query_id: 'cb1',
       text: '✅ Підтверджено. Дякуємо!'
     })
-    expect(sent('editMessageText').at(-1)).toMatchObject({ chat_id: 555, message_id: 7 })
+    // the answered day goes from the buttons, the other stays
+    expect(sent('editMessageText').at(-1)).toMatchObject({
+      chat_id: 555,
+      message_id: 7,
+      text: expect.stringContaining('✅ 13.10: підтверджено')
+    })
     const team = (await call('GET', `/schedule?from=${DAY}&to=${DAY}`, 'leader')).body.participants as {
       status: string
     }[]
     expect(team).toMatchObject([{ status: 'confirmed' }])
 
-    // a button of another chat answers nothing
-    await webhook({ callback_query: { id: 'cb2', data: rows[1]![0]!.callback_data, from: { id: 999 } } })
-    expect(sent('answerCallbackQuery').at(-1)).toEqual({
+    // a button of a private chat does not answer in another chat
+    await webhook({
+      callback_query: {
+        id: 'cb2',
+        data: rows[1]![0]!.callback_data,
+        from: { id: 555 },
+        message: { chat: { id: 556 }, message_id: 8 }
+      }
+    })
+    expect(sent('answerCallbackQuery').at(-1)).toMatchObject({
       callback_query_id: 'cb2',
       text: 'Це запрошення вже неактуальне'
     })
 
-    // declining by the button, nobody left: an emergency, the service chat too
-    await webhook({
-      callback_query: { id: 'cb3', data: rows[1]![1]!.callback_data, from: { id: 555 } }
+    // in the channel: somebody who did not link Telegram, the invited one who did
+    const channelRows = post.reply_markup!.inline_keyboard
+    const inChannel = (id: string, data: string, from: number) =>
+      webhook({
+        callback_query: {
+          id,
+          data,
+          from: { id: from },
+          message: { chat: { id: -100777 }, message_id: 9, text: post.text, reply_markup: post.reply_markup }
+        }
+      })
+    await inChannel('cb3', channelRows[1]![1]!.callback_data, 999)
+    expect(sent('answerCallbackQuery').at(-1)!.text).toContain('Спершу підключіть Telegram')
+    await inChannel('cb4', channelRows[1]![1]!.callback_data, 555)
+    expect(sent('editMessageText').at(-1)).toMatchObject({
+      chat_id: -100777,
+      text: expect.stringContaining('❌ 14.10: Лідер не може'),
+      reply_markup: { inline_keyboard: [channelRows[0]] }
     })
+    // nobody left: an emergency, in the channel too
     expect(
       sent('sendMessage').some((body) => body.chat_id === '-100777' && body.text.includes('ТЕРМІНОВО'))
     ).toBe(true)
 
+    // a message between ministers goes in private only, not to the channel
+    const posts = sent('sendMessage').filter((body) => body.chat_id === '-100777').length
     await call('POST', '/messages', 'pastor', { to: ['leader-uid'], text: 'Привіт' })
+    expect(sent('sendMessage').filter((body) => body.chat_id === '-100777')).toHaveLength(posts)
     expect(sent('sendMessage').at(-1)).toMatchObject({
       chat_id: 555,
       text: expect.stringContaining('Привіт')

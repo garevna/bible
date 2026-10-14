@@ -16,7 +16,8 @@ const event = (id: string, fields: Record<string, unknown>) => ({
   location: 'Онлайн',
   day: null,
   weekdays: [0, 1, 2, 3, 4, 5, 6],
-  time: '06:45',
+  // late: the events of today are gone an hour after they begin, and the tests run at any time
+  time: '23:10',
   until: null,
   needed: 2,
   slots: [],
@@ -107,12 +108,12 @@ async function fakeWorker(page: Page, planner = false) {
         json: {
           events: [
             event('morning', { title: 'Ранкова молитва' }),
-            event('evening', { title: 'Вечірня молитва', time: '19:00', mode: 'open' }),
+            event('evening', { title: 'Вечірня молитва', time: '23:30', mode: 'open' }),
             event('communion', {
               typeId: 'communion',
               ministry: 'Пасторське',
               location: 'Церква',
-              time: '11:00',
+              time: '23:20',
               needed: 3,
               slots: communion.slots,
               responsibleUid: 'pastor-uid',

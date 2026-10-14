@@ -28,10 +28,13 @@ import {
   linkUrl,
   rememberChat,
   reply,
+  shortDay,
   serviceBot,
   takeLink,
+  toast,
   uidOfChat,
   webhookSecret,
+  type ButtonsMessage,
   type ServiceBot
 } from './serviceBot'
 import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
@@ -192,6 +195,8 @@ async function scheduleContext(me: UserRecord, env: Env, deps: Deps): Promise<Sc
 }
 
 const NOT_ACTUAL = 'Це запрошення вже неактуальне'
+const NOT_LINKED = 'Спершу підключіть Telegram у застосунку: меню аватара → «Підключити Telegram»'
+const NOT_YOURS = 'Це запрошення не вам'
 
 /**
  * The updates of the service bot: /start <token> links the chat to the user of the token, /stop unlinks it,
@@ -212,7 +217,7 @@ async function handleWebhook(
       id: string
       data?: string
       from: { id: number }
-      message?: { chat: { id: number }; message_id: number; text?: string }
+      message?: ButtonsMessage
     }
   } | null
   const { fetcher } = deps
@@ -267,14 +272,19 @@ async function handleWebhook(
 
   const callback = update?.callback_query
   if (callback?.data) {
+    // a private chat, or the service channel; who pressed is told by their own private chat with the bot
     const chatId = callback.message?.chat.id ?? callback.from.id
     const [key = '', choice] = callback.data.split('|')
     const ask = await askOf(store, key, chatId)
-    const uid = await uidOfChat(store, chatId)
+    const uid = await uidOfChat(store, callback.from.id)
     const me = uid ? await getUser(store, uid) : null
     const context = me ? await scheduleContext(me, env, deps) : null
-    if (!ask || !context) {
-      await answered(token, fetcher, callback.id, undefined, NOT_ACTUAL)
+    if (!ask || (me && !context)) {
+      await toast(token, fetcher, callback.id, NOT_ACTUAL)
+      return json({ ok: true })
+    }
+    if (!me || !context) {
+      await toast(token, fetcher, callback.id, NOT_LINKED)
       return json({ ok: true })
     }
     const confirm = choice === 'c'
@@ -290,12 +300,24 @@ async function handleWebhook(
       })
     })
     const response = await handleSchedule(answer, context, json)
-    const notice = !response.ok
-      ? NOT_ACTUAL
-      : confirm
-        ? '✅ Підтверджено. Дякуємо!'
-        : '❌ Відмову передано відповідальному'
-    await answered(token, fetcher, callback.id, callback.message, notice)
+    if (!response.ok) {
+      await toast(token, fetcher, callback.id, response.status === 403 ? NOT_YOURS : NOT_ACTUAL)
+      return json({ ok: true })
+    }
+    // the message gets a line of the answer: in the channel with the name, everybody sees it
+    const name = me.name ?? me.email ?? ''
+    const channel = chatId !== callback.from.id
+    const what = confirm ? (ask.as === 'backup' ? 'згоден(на) бути дублером' : 'підтвердив(ла)') : 'не може'
+    const line = `${confirm ? '✅' : '❌'} ${shortDay(ask.day)}: ${channel ? `${name} ${what}` : confirm ? 'підтверджено' : 'відмову передано відповідальному'}`
+    await answered(
+      token,
+      fetcher,
+      callback.id,
+      callback.message,
+      callback.data,
+      confirm ? '✅ Підтверджено. Дякуємо!' : '❌ Відмову передано відповідальному',
+      line
+    )
   }
   return json({ ok: true })
 }
