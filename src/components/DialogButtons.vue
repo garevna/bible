@@ -1,5 +1,5 @@
 <template>
-  <v-btn variant="text" class="text-none" @click="emit('cancel')">{{ common.cancel }}</v-btn>
+  <v-btn variant="text" class="text-none" @click="emit('cancel')">{{ cancelText ?? common.cancel }}</v-btn>
   <v-btn
     variant="flat"
     :color="danger ? 'delete' : 'primary'"
@@ -17,8 +17,14 @@ import { storeToRefs } from 'pinia'
 
 import { useLanguageStore } from '@/stores/language'
 
-/** "Cancel" and the main action, for the footer of AppDialog */
-defineProps<{ confirmText: string; disabled?: boolean; loading?: boolean; danger?: boolean }>()
+/** "Cancel" (or another word for it) and the main action, for the footer of AppDialog */
+defineProps<{
+  confirmText: string
+  cancelText?: string
+  disabled?: boolean
+  loading?: boolean
+  danger?: boolean
+}>()
 const emit = defineEmits<{ cancel: []; confirm: [] }>()
 
 const { common } = storeToRefs(useLanguageStore())

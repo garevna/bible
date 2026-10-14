@@ -10,6 +10,8 @@ const role = (id: string, name: string, change: Record<string, unknown> = {}) =>
   sendToRoles: [],
   sendToPeople: false,
   messageDays: 1,
+  approve: false,
+  invite: [] as string[],
   manage: [],
   ...change
 })
@@ -70,14 +72,26 @@ async function fakeWorker(page: Page, manage: string[]) {
     if (path === '/messages') return route.fulfill({ json: { messages: [], unread: 0 } })
     if (path === '/admin/settings') {
       return route.fulfill({
-        json: { roles: ROLES, types: [], ministries: ['Музичне служіння'], locations: ['Церква'] }
+        json: {
+          roles: ROLES,
+          types: [],
+          ministries: ['Музичне служіння', 'Молитовне служіння'],
+          locations: ['Церква'],
+          eventTypes: [
+            { id: 'morning-prayer', name: 'Ранкова молитва', ministry: null, roles: 'none', slots: [] }
+          ],
+          calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] }
+        }
       })
     }
     if (path === '/admin/users')
       return route.fulfill({ json: { users, roles: ROLES, ministries: ['Музичне служіння'] } })
     const body = request.postData() ? request.postDataJSON() : null
     requests.push({ method: request.method(), path, body })
-    if (path === '/admin/roles' || path.startsWith('/admin/directories/'))
+    if (
+      ['/admin/roles', '/admin/event-types', '/admin/calendar'].includes(path) ||
+      path.startsWith('/admin/directories/')
+    )
       return route.fulfill({ json: body })
     const uid = decodeURIComponent(path.replace('/admin/users/', ''))
     const user = users.find((item) => item.uid === uid)!
@@ -140,6 +154,9 @@ test('roles: rights are changed, a role is added and the roles are saved togethe
   await expect(panels).toHaveCount(5)
   await panels.last().getByLabel('Назва ролі').fill('Координатор молитви')
   await panels.last().getByLabel('Розклад служінь').check()
+  await panels.last().getByLabel('Затверджувати учасників служінь і давати їм ролі').check()
+  // invitations: to the prayer ministry only
+  await panels.last().getByLabel('Молитовне служіння').check()
 
   await expect(page.getByText('Є незбережені зміни')).toBeVisible()
   await page.getByRole('button', { name: 'Зберегти ролі' }).click()
@@ -152,7 +169,54 @@ test('roles: rights are changed, a role is added and the roles are saved togethe
     publish: false,
     sendToRoles: ['servant', 'admin']
   })
-  expect(saved.roles.at(-1)).toMatchObject({ name: 'Координатор молитви', manage: ['schedule'] })
+  expect(saved.roles.at(-1)).toMatchObject({
+    name: 'Координатор молитви',
+    manage: ['schedule'],
+    approve: true,
+    invite: ['Молитовне служіння']
+  })
+})
+
+test('events of the calendar: the colors of the days, its filters, the types with their roles', async ({
+  page
+}) => {
+  const requests = await fakeWorker(page, ['schedule'])
+  await openDashboard(page)
+  await expect(page.getByRole('heading', { name: 'Календар', exact: true })).toBeVisible()
+
+  await page.getByLabel('Червоних днів (сьогодні — перший)').fill('1')
+  await page.getByLabel('Конкретна подія').uncheck()
+  await page.getByRole('button', { name: 'Зберегти налаштування календаря' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.path === '/admin/calendar')?.body)
+    .toEqual({ calendar: { redDays: 1, orangeDays: 5, filters: ['type', 'ministry', 'person', 'mine'] } })
+
+  // a type whose pastor prepares notes
+  await page.getByRole('button', { name: 'Додати тип' }).click()
+  const panel = page.locator('.type-panel').last()
+  await panel.getByLabel('Назва типу').fill('Причастя')
+  await panel.getByLabel('Ролі однакові для всіх подій типу').check()
+  const save = page.getByRole('button', { name: 'Зберегти типи подій' })
+  // a type of fixed roles needs a role
+  await expect(save).toBeDisabled()
+  await panel.getByRole('button', { name: 'Додати роль' }).click()
+  await panel.getByLabel('Роль', { exact: true }).fill('Пастор')
+  await panel.getByLabel('Готує матеріали').check()
+  await panel.getByLabel('Що підготувати').fill('Нотатки, вірші')
+  await save.click()
+  await expect
+    .poll(() => requests.find((request) => request.path === '/admin/event-types')?.body)
+    .toMatchObject({
+      eventTypes: [
+        { id: 'morning-prayer', roles: 'none' },
+        {
+          name: 'Причастя',
+          ministry: null,
+          roles: 'fixed',
+          slots: [{ name: 'Пастор', count: 1, materials: true, hint: 'Нотатки, вірші' }]
+        }
+      ]
+    })
 })
 
 test('the lists of ministries and locations', async ({ page }) => {
@@ -168,7 +232,7 @@ test('the lists of ministries and locations', async ({ page }) => {
     .toContainEqual({
       method: 'PUT',
       path: '/admin/directories/ministries',
-      body: { items: ['Музичне служіння', 'Дитяче служіння'] }
+      body: { items: ['Музичне служіння', 'Молитовне служіння', 'Дитяче служіння'] }
     })
 
   await page.locator('.admin-nav').getByText('Локації').click()

@@ -74,6 +74,37 @@
                 class="days mt-2"
               />
             </div>
+            <v-switch
+              v-model="role.approve"
+              :label="text.rightApprove"
+              color="secondary"
+              density="compact"
+              hide-details
+            />
+
+            <!-- the ministries whose events its people invite to -->
+            <p class="label mt-2">{{ text.rightInvite }}</p>
+            <v-checkbox
+              :model-value="role.invite.includes(ANY_MINISTRY)"
+              :label="text.inviteAny"
+              color="secondary"
+              density="compact"
+              hide-details
+              @update:model-value="(any: boolean | null) => (role.invite = any ? [ANY_MINISTRY] : [])"
+            />
+            <div v-if="!role.invite.includes(ANY_MINISTRY)" class="d-flex flex-wrap ga-x-4 ml-6">
+              <v-checkbox
+                v-for="ministry of ministries"
+                :key="ministry"
+                v-model="role.invite"
+                :value="ministry"
+                :label="ministry"
+                color="secondary"
+                density="compact"
+                hide-details
+                class="flex-grow-0"
+              />
+            </div>
 
             <p class="label mt-2">{{ text.rightManage }}</p>
             <v-checkbox
@@ -117,17 +148,23 @@ import { storeToRefs } from 'pinia'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import { useLanguageStore } from '@/stores/language'
-import { MANAGE, READER, useWorkerStore, type Manage, type RoleDef } from '@/stores/worker'
+import { ANY_MINISTRY, MANAGE, READER, useWorkerStore, type Manage, type RoleDef } from '@/stores/worker'
 
 /** The roles and what their people may do; the changes are saved together */
 const roles = defineModel<RoleDef[]>({ required: true })
+defineProps<{ ministries: string[] }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
 const worker = useWorkerStore()
 const { admin: text } = storeToRefs(useLanguageStore())
 
 const copy = (list: RoleDef[]) =>
-  list.map((role) => ({ ...role, sendToRoles: [...role.sendToRoles], manage: [...role.manage] }))
+  list.map((role) => ({
+    ...role,
+    sendToRoles: [...role.sendToRoles],
+    invite: [...(role.invite ?? [])],
+    manage: [...role.manage]
+  }))
 const draft = ref<RoleDef[]>(copy(roles.value))
 watch(roles, (value) => (draft.value = copy(value)))
 
@@ -157,6 +194,8 @@ function add() {
     sendToRoles: [],
     sendToPeople: false,
     messageDays: 1,
+    approve: false,
+    invite: [],
     manage: []
   })
   opened.value = id

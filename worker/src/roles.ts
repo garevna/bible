@@ -22,11 +22,18 @@ export interface RoleDef {
   sendToPeople: boolean
   /** days the messages it sends are kept */
   messageDays: number
+  /** approves the people who applied for a ministry of the calendar, and gives them their roles there */
+  approve: boolean
+  /** the ministries whose events it invites people to; ANY_MINISTRY: every ministry */
+  invite: string[]
   /** the functions of an administrator it has */
   manage: Manage[]
 }
 
 export const READER = 'reader'
+
+/** in the ministries a role invites to: every ministry */
+export const ANY_MINISTRY = '*'
 
 export const DEFAULT_ROLES: RoleDef[] = [
   {
@@ -37,6 +44,8 @@ export const DEFAULT_ROLES: RoleDef[] = [
     sendToRoles: [],
     sendToPeople: false,
     messageDays: 1,
+    approve: false,
+    invite: [],
     manage: []
   },
   {
@@ -47,6 +56,8 @@ export const DEFAULT_ROLES: RoleDef[] = [
     sendToRoles: [],
     sendToPeople: false,
     messageDays: 1,
+    approve: false,
+    invite: [],
     manage: []
   },
   {
@@ -57,6 +68,8 @@ export const DEFAULT_ROLES: RoleDef[] = [
     sendToRoles: ['servant', 'publisher', 'admin'],
     sendToPeople: true,
     messageDays: 1,
+    approve: true,
+    invite: [ANY_MINISTRY],
     manage: []
   },
   {
@@ -67,6 +80,8 @@ export const DEFAULT_ROLES: RoleDef[] = [
     sendToRoles: ['servant', 'publisher', 'admin'],
     sendToPeople: true,
     messageDays: 1,
+    approve: true,
+    invite: [ANY_MINISTRY],
     manage: [...MANAGE]
   }
 ]
@@ -77,8 +92,15 @@ export const OWNER_ROLE: RoleDef = { ...DEFAULT_ROLES[3]!, id: 'owner', name: 'Ð
 const ROLES_KEY = 'settings:roles'
 
 export async function getRoles(store: UsersStore): Promise<RoleDef[]> {
-  const saved = await store.get<RoleDef[]>(ROLES_KEY, 'json')
-  if (!saved) return DEFAULT_ROLES
+  const kept = await store.get<RoleDef[]>(ROLES_KEY, 'json')
+  if (!kept) return DEFAULT_ROLES
+  // roles saved before approving was a right of its own: the planners of the schedule approve
+  const saved = kept.map((role) => ({
+    ...role,
+    approve: role.approve ?? role.manage.includes('schedule'),
+    // the publishers (pastors) and the planners invited to every ministry before it was a right
+    invite: role.invite ?? (role.publish || role.manage.includes('schedule') ? [ANY_MINISTRY] : [])
+  }))
   // the reader is always there and has no rights
   return saved.some((role) => role.id === READER) ? saved : [DEFAULT_ROLES[0]!, ...saved]
 }
@@ -107,6 +129,11 @@ const isRoleDef = (value: unknown): value is RoleDef => {
     Number.isInteger(role.messageDays) &&
     role.messageDays >= 1 &&
     role.messageDays <= 30 &&
+    (role.approve === undefined || typeof role.approve === 'boolean') &&
+    (role.invite === undefined ||
+      (Array.isArray(role.invite) &&
+        role.invite.length <= 100 &&
+        role.invite.every((item) => typeof item === 'string' && item.length <= 60))) &&
     Array.isArray(role.manage) &&
     role.manage.every((item) => MANAGE.includes(item))
   )
@@ -126,6 +153,9 @@ export function parseRoles(value: unknown): RoleDef[] | null {
     sendToRoles: [...new Set(role.sendToRoles)].filter((id) => ids.includes(id) && id !== READER),
     sendToPeople: role.sendToPeople,
     messageDays: role.messageDays,
+    approve: role.approve ?? false,
+    // every ministry, or the chosen ones
+    invite: role.invite?.includes(ANY_MINISTRY) ? [ANY_MINISTRY] : [...new Set(role.invite ?? [])],
     manage: [...new Set(role.manage)]
   }))
   const reader = roles.find((role) => role.id === READER)

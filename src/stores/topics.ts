@@ -30,6 +30,22 @@ const toVerseItems = async (refs: string[]): Promise<TopicVerseItem[]> =>
     ? (await getVersesByRefs(refs)).map((verse) => ({ ...verse, type: 'verse', html: getVerseHTML(verse) }))
     : []
 
+/** The notes and verses of any topic, in its saved order (new ones at the end): e.g. to send it */
+export async function topicItemsOf(topic: Topic): Promise<TopicItem[]> {
+  const notes = await searchNotes({ topic: topic._id })
+  const items: TopicItem[] = [
+    ...(await Promise.all(
+      notes.map(async (note) => ({ ...note, type: 'note' as const, verses: await toVerseItems(note.refs) }))
+    )),
+    ...(await toVerseItems(topic.refs))
+  ]
+  const place = (item: TopicItem) => {
+    const index = topic.order.indexOf(item._id)
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index
+  }
+  return items.sort((a, b) => place(a) - place(b))
+}
+
 export const newTopic = (title = ''): Topic => ({
   _id: Date.now().toString(),
   title,

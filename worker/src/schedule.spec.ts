@@ -4,6 +4,7 @@ import { daysOf, localDay, memorySchedule, parseEvent, type ScheduleEvent } from
 
 const event = (change: Partial<ScheduleEvent>): ScheduleEvent => ({
   id: 'e1',
+  typeId: null,
   ministry: 'Молитовне служіння',
   title: '',
   description: '',
@@ -13,6 +14,7 @@ const event = (change: Partial<ScheduleEvent>): ScheduleEvent => ({
   time: '06:45',
   until: null,
   needed: 1,
+  slots: [],
   mode: 'invite',
   responsibleUid: 'u',
   responsibleName: 'U',
@@ -87,9 +89,23 @@ describe('the store keeps no past', () => {
       backupName: null,
       backupStatus: null,
       reason: null,
+      role: null,
       updatedAt: 0
     })
+    const material = {
+      eventId: 'going',
+      role: 'Пастор',
+      uid: 'u',
+      name: 'U',
+      kind: 'note' as const,
+      title: '',
+      post: { title: '', items: [] },
+      createdAt: 0
+    }
+    await store.putMaterial({ ...material, id: 'old', day: '2026-10-05' })
+    await store.putMaterial({ ...material, id: 'coming', day: '2026-10-19' })
     await store.deletePast('2026-10-12')
+    expect((await store.materials('2026-01-01', '2026-12-31')).map((item) => item.id)).toEqual(['coming'])
     expect((await store.events('2026-10-12', '2026-12-31')).map((item) => item.id)).toEqual(['going'])
     expect(await store.participants('2026-01-01', '2026-12-31')).toEqual([])
   })

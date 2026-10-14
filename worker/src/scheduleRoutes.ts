@@ -1,9 +1,12 @@
+import type { CalendarSettings, EventType } from './eventTypes'
 import { MESSAGE_LIFE, type Message, type MessagesStore } from './messages'
-import type { RoleDef } from './roles'
+import { parsePost } from './post'
+import { ANY_MINISTRY, type RoleDef } from './roles'
 import {
   daysOf,
   localDay,
   parseEvent,
+  type Material,
   type Participant,
   type ScheduleEvent,
   type ScheduleStore
@@ -12,17 +15,26 @@ import type { UserRecord, UserView } from './users'
 
 /**
  * The schedule of ministries.
- *   GET    /schedule?from&to          the events with their days and people (at most 62 days)
+ *   GET    /schedule?from&to          the events with their days, people and materials (at most 62 days),
+ *                                     the types of events and the settings of the calendar
  *   GET    /schedule/people           the ministers to choose from
  *   POST   /schedule/events           a new event                                   schedule
  *   PUT    /schedule/events/:id       changes it                                    schedule, its responsible people
  *   DELETE /schedule/events/:id       removes it                                    schedule, its responsible person
- *   POST   /schedule/team             { eventId, day, uid, backupUid? }: invites    the managers of the event
+ *   POST   /schedule/team             { eventId, day, uid, backupUid?, role? }: invites   the inviters of the event
+ *   POST   /schedule/invitations      { eventId, days, uids }: invites people to some days   the inviters
  *   DELETE /schedule/team             { eventId, day, uid }                          the managers of the event
  *   POST   /schedule/apply            { eventId, day }: asks to serve (an open event, its ministry)
- *   POST   /schedule/approve          { eventId, day, uid }: takes an application   the managers of the event
+ *   POST   /schedule/approve          { eventId, day, uid }: takes an application   the approvers of the event
+ *   POST   /schedule/unapprove        { eventId, day, uid }: back to the applications   the approvers
+ *   POST   /schedule/role             { eventId, day, uid, role }: gives a role (null takes it)   the approvers
  *   POST   /schedule/answer           { eventId, day, uid, as: 'main' | 'backup', answer: 'confirm' | 'decline', reason? }
+ *   GET    /schedule/materials?eventId&day   the materials of one day of an event, with their posts
+ *   POST   /schedule/materials        { eventId, day, role, kind, post }   the person of the role, the approvers
+ *   DELETE /schedule/materials/:id    its author, the approvers
  * The managers of an event: the roles with the schedule function, its responsible person and the deputy.
+ * The approvers: the managers and the roles with the right to approve.
+ * The inviters: the managers and the roles that invite to the ministry of the event.
  */
 export interface ScheduleContext {
   me: UserRecord
@@ -31,6 +43,8 @@ export interface ScheduleContext {
   servants: UserView[]
   /** the people whose role plans the schedule: they get the emergencies too */
   planners: string[]
+  eventTypes: EventType[]
+  calendar: CalendarSettings
   schedule: ScheduleStore
   messages: MessagesStore
   now: number
@@ -55,7 +69,7 @@ export async function handleSchedule(
   context: ScheduleContext,
   json: (body: unknown, status?: number) => Response
 ): Promise<Response> {
-  const { me, rights, servants, planners, schedule, messages, now } = context
+  const { me, rights, servants, planners, eventTypes, calendar, schedule, messages, now } = context
   const url = new URL(request.url)
   const route = `${request.method} ${url.pathname}`
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>
@@ -63,6 +77,9 @@ export async function handleSchedule(
   const plans = rights.manage.includes('schedule')
   const manages = (event: ScheduleEvent) =>
     plans || me.uid === event.responsibleUid || me.uid === event.deputyUid
+  const approves = (event: ScheduleEvent) => manages(event) || rights.approve
+  const invites = (event: ScheduleEvent) =>
+    manages(event) || rights.invite.includes(ANY_MINISTRY) || rights.invite.includes(event.ministry)
   const servant = (uid: unknown) =>
     typeof uid === 'string' ? servants.find((user) => user.uid === uid) : undefined
 
@@ -86,9 +103,12 @@ export async function handleSchedule(
   }
 
   /** the event and one of its days, not in the past */
-  async function eventDay(): Promise<{ event: ScheduleEvent; day: string } | Response> {
-    const event = typeof body.eventId === 'string' ? await schedule.event(body.eventId) : null
-    const day = typeof body.day === 'string' ? body.day : ''
+  async function eventDay(
+    eventId: unknown = body.eventId,
+    dayOf: unknown = body.day
+  ): Promise<{ event: ScheduleEvent; day: string } | Response> {
+    const event = typeof eventId === 'string' ? await schedule.event(eventId) : null
+    const day = typeof dayOf === 'string' ? dayOf : ''
     if (!event || day < today || !daysOf(event, day, day).length) return json({ error: 'not-found' }, 404)
     return { event, day }
   }
@@ -108,7 +128,15 @@ export async function handleSchedule(
       )
       .sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time))
       .map(({ eventId, day }) => ({ eventId, day }))
-    return json({ events, days, participants: await schedule.participants(from, to), today })
+    return json({
+      events,
+      days,
+      participants: await schedule.participants(from, to),
+      materials: await schedule.materials(from, to),
+      types: eventTypes,
+      calendar,
+      today
+    })
   }
 
   // the ministers to choose from: the responsible people, the team and the backups
@@ -124,6 +152,22 @@ export async function handleSchedule(
     })
   }
 
+  if (route === 'GET /schedule/materials') {
+    const found = await eventDay(url.searchParams.get('eventId'), url.searchParams.get('day'))
+    if (found instanceof Response) return found
+    return json({ materials: await schedule.materialsOf(found.event.id, found.day) })
+  }
+
+  const materialId = url.pathname.match(/^\/schedule\/materials\/([^/]+)$/)?.[1]
+  if (materialId && request.method === 'DELETE') {
+    const material = await schedule.material(decodeURIComponent(materialId))
+    const event = material ? await schedule.event(material.eventId) : null
+    if (!material || !event) return json({ error: 'not-found' }, 404)
+    if (material.uid !== me.uid && !approves(event)) return json({ error: 'forbidden' }, 403)
+    await schedule.deleteMaterial(material.id)
+    return json({ removed: material.id })
+  }
+
   const eventId = url.pathname.match(/^\/schedule\/events\/([^/]+)$/)?.[1]
 
   if (route === 'POST /schedule/events' || (eventId && request.method === 'PUT')) {
@@ -132,12 +176,19 @@ export async function handleSchedule(
     if (old ? !manages(old) : !plans) return json({ error: 'forbidden' }, 403)
     const draft = parseEvent(body)
     if (!draft) return json({ error: 'bad-request' }, 400)
+    const type = draft.typeId ? eventTypes.find((item) => item.id === draft.typeId) : null
+    if (draft.typeId && !type) return json({ error: 'unknown-type' }, 400)
     const responsible =
       servant(draft.responsibleUid) ?? (draft.responsibleUid === me.uid ? { ...me, owner: false } : undefined)
     const deputy = draft.deputyUid ? servant(draft.deputyUid) : null
     if (!responsible || deputy === undefined) return json({ error: 'unknown-person' }, 400)
+    // the roles of a type with fixed roles are its own; a type without roles has none
+    const slots = type?.roles === 'fixed' ? type.slots : type?.roles === 'none' ? [] : draft.slots
     const event: ScheduleEvent = {
       ...draft,
+      slots,
+      // with roles, as many people as the roles take
+      needed: slots.length ? slots.reduce((sum, slot) => sum + slot.count, 0) : draft.needed,
       id: old?.id ?? crypto.randomUUID(),
       responsibleName: nameOf(responsible),
       deputyUid: deputy?.uid ?? null,
@@ -157,34 +208,100 @@ export async function handleSchedule(
     return json({ removed: event.id })
   }
 
+  // invitations to some days of an event: one message to each person, with the days
+  if (route === 'POST /schedule/invitations') {
+    const event = typeof body.eventId === 'string' ? await schedule.event(body.eventId) : null
+    if (!event) return json({ error: 'not-found' }, 404)
+    if (!invites(event)) return json({ error: 'forbidden' }, 403)
+    const days = Array.isArray(body.days) ? [...new Set(body.days)] : []
+    const uids = Array.isArray(body.uids) ? [...new Set(body.uids)] : []
+    const people = uids.map((uid) => servant(uid) ?? (uid === me.uid ? { ...me, owner: false } : undefined))
+    if (!days.length || days.length > MAX_DAYS || !uids.length || uids.length > 100) {
+      return json({ error: 'bad-request' }, 400)
+    }
+    if (days.some((day) => typeof day !== 'string' || day < today || !daysOf(event, day, day).length))
+      return json({ error: 'not-found' }, 404)
+    if (people.some((person) => !person)) return json({ error: 'unknown-person' }, 400)
+    const team = await schedule.participants(today, addDays(today, 366))
+    let invited = 0
+    for (const person of people as UserView[]) {
+      // whoever is there already keeps their place and answer
+      const free = (days as string[]).filter(
+        (day) =>
+          !team.some((item) => item.eventId === event.id && item.day === day && item.uid === person.uid)
+      )
+      const self = person.uid === me.uid
+      for (const day of free) {
+        await schedule.putParticipant({
+          eventId: event.id,
+          day,
+          uid: person.uid,
+          name: nameOf(person),
+          status: self ? 'confirmed' : 'invited',
+          backupUid: null,
+          backupName: null,
+          backupStatus: null,
+          reason: null,
+          role: null,
+          updatedAt: now
+        })
+        invited++
+      }
+      free.length &&
+        !self &&
+        (await notify(
+          [person.uid],
+          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. Підтвердіть, будь ласка, у календарі служінь.`
+        ))
+    }
+    return json({ invited })
+  }
+
   const found = await eventDay()
   if (found instanceof Response) return found
   const { event, day } = found
   const label = eventLabel(event, day)
+  const slotOf = (role: unknown) => event.slots.find((slot) => slot.name === role)
+
+  /** a role may be given: it is a role of the event and not all its places are taken by others */
+  async function roleIsFree(role: string, uid: string) {
+    const slot = slotOf(role)
+    if (!slot) return false
+    const team = (await schedule.participants(day, day)).filter(
+      (item) => item.eventId === event.id && item.uid !== uid && item.status !== 'declined'
+    )
+    return team.filter((item) => item.role === role).length < slot.count
+  }
 
   if (route === 'POST /schedule/team') {
-    if (!manages(event)) return json({ error: 'forbidden' }, 403)
-    const person = servant(body.uid)
+    if (!invites(event)) return json({ error: 'forbidden' }, 403)
+    const person = servant(body.uid) ?? (body.uid === me.uid ? { ...me, owner: false } : undefined)
     const backup = body.backupUid ? servant(body.backupUid) : null
     if (!person || backup === undefined || backup?.uid === person.uid)
       return json({ error: 'unknown-person' }, 400)
+    const role = typeof body.role === 'string' && body.role ? body.role : null
+    if (role && !(await roleIsFree(role, person.uid))) return json({ error: 'role-taken' }, 409)
+    // the manager who adds themself serves at once
+    const self = person.uid === me.uid
     const participant: Participant = {
       eventId: event.id,
       day,
       uid: person.uid,
       name: nameOf(person),
-      status: 'invited',
+      status: self ? 'confirmed' : 'invited',
       backupUid: backup?.uid ?? null,
       backupName: backup ? nameOf(backup) : null,
       backupStatus: backup ? 'invited' : null,
       reason: null,
+      role,
       updatedAt: now
     }
     await schedule.putParticipant(participant)
-    await notify(
-      [person.uid],
-      `Запрошення на служіння: ${label}. Підтвердіть, будь ласка, у календарі служінь.`
-    )
+    self ||
+      (await notify(
+        [person.uid],
+        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. Підтвердіть, будь ласка, у календарі служінь.`
+      ))
     backup &&
       (await notify(
         [backup.uid],
@@ -201,7 +318,9 @@ export async function handleSchedule(
 
   if (route === 'POST /schedule/apply') {
     const member = servant(me.uid) ?? { ...me, owner: false }
-    if (event.mode !== 'open' || !member.ministries?.includes(event.ministry))
+    // the approvers do not apply to themselves: they serve at once, at any event they approve
+    const self = approves(event)
+    if (!self && (event.mode !== 'open' || !member.ministries?.includes(event.ministry)))
       return json({ error: 'forbidden' }, 403)
     if (await schedule.participant(event.id, day, me.uid)) return json({ error: 'already' }, 409)
     const participant: Participant = {
@@ -209,26 +328,90 @@ export async function handleSchedule(
       day,
       uid: me.uid,
       name: nameOf(me),
-      status: 'applied',
+      status: self ? 'confirmed' : 'applied',
       backupUid: null,
       backupName: null,
       backupStatus: null,
       reason: null,
+      role: null,
       updatedAt: now
     }
     await schedule.putParticipant(participant)
-    await notify([event.responsibleUid, event.deputyUid], `Заявка на служіння від ${nameOf(me)}: ${label}`)
+    self ||
+      (await notify(
+        [event.responsibleUid, event.deputyUid],
+        `Заявка на служіння від ${nameOf(me)}: ${label}`
+      ))
     return json({ participant })
   }
 
-  if (route === 'POST /schedule/approve') {
-    if (!manages(event)) return json({ error: 'forbidden' }, 403)
+  if (route === 'POST /schedule/approve' || route === 'POST /schedule/unapprove') {
+    if (!approves(event)) return json({ error: 'forbidden' }, 403)
+    const approve = route === 'POST /schedule/approve'
     const participant =
       typeof body.uid === 'string' ? await schedule.participant(event.id, day, body.uid) : null
-    if (!participant || participant.status !== 'applied') return json({ error: 'not-found' }, 404)
-    await schedule.putParticipant({ ...participant, status: 'confirmed', updatedAt: now })
-    await notify([participant.uid], `Вашу заявку прийнято: ${label}`)
-    return json({ approved: participant.uid })
+    if (!participant || participant.status !== (approve ? 'applied' : 'confirmed'))
+      return json({ error: 'not-found' }, 404)
+    await schedule.putParticipant({
+      ...participant,
+      status: approve ? 'confirmed' : 'applied',
+      // back among the applications, the person has no role
+      role: approve ? participant.role : null,
+      updatedAt: now
+    })
+    approve && (await notify([participant.uid], `Вашу заявку прийнято: ${label}`))
+    return json({ [approve ? 'approved' : 'unapproved']: participant.uid })
+  }
+
+  if (route === 'POST /schedule/role') {
+    if (!approves(event)) return json({ error: 'forbidden' }, 403)
+    const participant =
+      typeof body.uid === 'string' ? await schedule.participant(event.id, day, body.uid) : null
+    if (!participant || participant.status === 'declined' || participant.status === 'applied')
+      return json({ error: 'not-found' }, 404)
+    const role = body.role === null ? null : typeof body.role === 'string' ? body.role : undefined
+    if (role === undefined || (role !== null && !slotOf(role))) return json({ error: 'bad-request' }, 400)
+    // a taken role is freed before it is given to another person
+    if (role && !(await roleIsFree(role, participant.uid))) return json({ error: 'role-taken' }, 409)
+    await schedule.putParticipant({ ...participant, role, updatedAt: now })
+    role &&
+      role !== participant.role &&
+      (await notify(
+        [participant.uid],
+        `Ваша роль — «${role}»: ${label}.${slotOf(role)?.materials ? ` Підготуйте, будь ласка: ${slotOf(role)?.hint || 'матеріали'}.` : ''}`
+      ))
+    return json({ participant: { ...participant, role } })
+  }
+
+  if (route === 'POST /schedule/materials') {
+    const slot = slotOf(body.role)
+    const kind = body.kind === 'topic' ? 'topic' : body.kind === 'note' ? 'note' : null
+    const post = parsePost(body.post)
+    if (!slot || !kind || !post) return json({ error: 'bad-request' }, 400)
+    const own = await schedule.participant(event.id, day, me.uid)
+    const ofTheRole = own && own.role === slot.name && own.status !== 'declined' && own.status !== 'applied'
+    if (!ofTheRole && !approves(event)) return json({ error: 'forbidden' }, 403)
+    // pictures stay out: they would make the schedule heavy
+    const { image: _image, ...withoutImage } = post
+    const material: Material = {
+      id: crypto.randomUUID(),
+      eventId: event.id,
+      day,
+      role: slot.name,
+      uid: me.uid,
+      name: nameOf(me),
+      kind,
+      title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : ''),
+      post: withoutImage,
+      createdAt: now
+    }
+    await schedule.putMaterial(material)
+    ofTheRole &&
+      (await notify(
+        [event.responsibleUid, event.deputyUid],
+        `${nameOf(me)} підготував(ла) матеріали («${slot.name}»): ${label}`
+      ))
+    return json({ material })
   }
 
   if (route === 'POST /schedule/answer') {
@@ -263,8 +446,8 @@ export async function handleSchedule(
       return json({ answered: true })
     }
 
-    // the main one cannot: the backup who agreed takes the place, otherwise an emergency
-    await schedule.putParticipant({ ...participant, status: 'declined', reason, updatedAt: now })
+    // the main one cannot: the role is freed, the backup who agreed takes the place, otherwise an emergency
+    await schedule.putParticipant({ ...participant, status: 'declined', reason, role: null, updatedAt: now })
     if (participant.backupUid && participant.backupStatus === 'confirmed') {
       await schedule.putParticipant({
         eventId: event.id,
@@ -276,6 +459,7 @@ export async function handleSchedule(
         backupName: null,
         backupStatus: null,
         reason: null,
+        role: participant.role,
         updatedAt: now
       })
       await notify([participant.backupUid], `Ви ведете замість ${participant.name}: ${label}. Дякуємо!`)

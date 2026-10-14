@@ -539,6 +539,169 @@ describe('the schedule of ministries', () => {
       404
     )
   })
+
+  it('the responsible person who applies serves at once; an approved person goes back to the applications', async () => {
+    const { call } = await church()
+    const event = { ministry: 'Музичне служіння', day: '2026-10-18', time: '10:00', mode: 'open' }
+    const eventId = (
+      (await call('POST', '/schedule/events', 'owner', { ...event, responsibleUid: 'pastor-uid' })).body
+        .event as { id: string }
+    ).id
+    const day = '2026-10-18'
+    expect(
+      (await call('POST', '/schedule/apply', 'pastor', { eventId, day })).body.participant
+    ).toMatchObject({
+      status: 'confirmed'
+    })
+    await call('POST', '/schedule/apply', 'musician', { eventId, day })
+    await call('POST', '/schedule/approve', 'pastor', { eventId, day, uid: 'musician-uid' })
+    expect(
+      (await call('POST', '/schedule/unapprove', 'musician', { eventId, day, uid: 'musician-uid' })).status
+    ).toBe(403)
+    await call('POST', '/schedule/unapprove', 'pastor', { eventId, day, uid: 'musician-uid' })
+    const team = (await call('GET', `/schedule?from=${day}&to=${day}`, 'pastor')).body.participants as {
+      uid: string
+      status: string
+    }[]
+    expect(team.map(({ uid, status }) => [uid, status]).sort()).toEqual([
+      ['musician-uid', 'applied'],
+      ['pastor-uid', 'confirmed']
+    ])
+  })
+
+  it('a type with fixed roles: the roles are given one by one, materials are sent for a role', async () => {
+    const { call } = await church()
+    const types = (await call('GET', '/schedule', 'owner')).body.types as { id: string; slots: unknown[] }[]
+    const communion = types.find((type) => type.id === 'communion')!
+    const created = await call('POST', '/schedule/events', 'owner', {
+      typeId: 'communion',
+      ministry: 'Пасторське служіння',
+      day: '2026-10-18',
+      time: '11:00',
+      needed: 1,
+      // a type with fixed roles keeps its own
+      slots: [{ name: 'Хтось', count: 9, materials: false, hint: '' }],
+      responsibleUid: 'pastor-uid'
+    })
+    const event = created.body.event as { id: string; slots: unknown[]; needed: number }
+    expect(event.slots).toEqual(communion.slots)
+    expect(event.needed).toBe(6)
+    const eventId = event.id
+    const day = '2026-10-18'
+
+    for (const uid of ['musician-uid', 'leader-uid']) {
+      await call('POST', '/schedule/team', 'pastor', { eventId, day, uid })
+    }
+    const role = (uid: string, name: string | null, token = 'pastor') =>
+      call('POST', '/schedule/role', token, { eventId, day, uid, role: name })
+    expect((await role('musician-uid', 'Пастор', 'leader')).status).toBe(403)
+    expect((await role('musician-uid', 'Пастор')).status).toBe(200)
+    // one pastor: taken, until it is freed
+    expect((await role('leader-uid', 'Пастор')).status).toBe(409)
+    expect((await role('leader-uid', 'Диякон')).status).toBe(400)
+    const toMusician = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
+    expect(toMusician.map((message) => message.text)).toContainEqual(
+      expect.stringContaining('Підготуйте, будь ласка: Нотатки, вірші з Біблії')
+    )
+
+    // the person of the role sends notes; another member cannot, the responsible person can
+    const post = { title: '', items: [{ kind: 'note', text: 'Хліб і вино', verses: [] }] }
+    const material = { eventId, day, role: 'Пастор', kind: 'note', post }
+    expect((await call('POST', '/schedule/materials', 'leader', material)).status).toBe(403)
+    expect((await call('POST', '/schedule/materials', 'musician', material)).body.material).toMatchObject({
+      role: 'Пастор',
+      title: 'Хліб і вино'
+    })
+    await call('POST', '/schedule/materials', 'pastor', {
+      ...material,
+      post: { ...post, title: 'Від пастора' }
+    })
+    const list = (await call('GET', `/schedule?from=${day}&to=${day}`, 'leader')).body.materials as {
+      name: string
+      post?: unknown
+    }[]
+    expect(list.map((item) => item.name)).toEqual(['Музикант', 'pastor@example.com'])
+    expect(list[0]).not.toHaveProperty('post')
+    const full = (await call('GET', `/schedule/materials?eventId=${eventId}&day=${day}`, 'leader')).body
+      .materials as { post: unknown }[]
+    expect(full[0]!.post).toEqual(post)
+
+    // the pastor is freed and given to another
+    await role('musician-uid', null)
+    expect((await role('leader-uid', 'Пастор')).status).toBe(200)
+  })
+
+  it('invitations to some days go in one message; a role invites to its own ministries only', async () => {
+    const { call } = await church()
+    const eventId = ((await call('POST', '/schedule/events', 'owner', prayer)).body.event as { id: string })
+      .id
+    const days = ['2026-10-13', '2026-10-14']
+    const invited = await call('POST', '/schedule/invitations', 'owner', {
+      eventId,
+      days,
+      uids: ['musician-uid', 'leader-uid']
+    })
+    expect(invited.body).toEqual({ invited: 4 })
+    // again: nobody twice
+    expect(
+      (await call('POST', '/schedule/invitations', 'owner', { eventId, days, uids: ['musician-uid'] })).body
+    ).toEqual({ invited: 0 })
+    const toMusician = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
+    expect(toMusician).toHaveLength(1)
+    expect(toMusician[0]!.text).toContain('2026-10-13, 2026-10-14')
+    // not a day of the event (Sunday)
+    expect(
+      (
+        await call('POST', '/schedule/invitations', 'owner', {
+          eventId,
+          days: ['2026-10-18'],
+          uids: ['leader-uid']
+        })
+      ).status
+    ).toBe(404)
+
+    // a servant whose role invites to the music ministry only
+    const roles = (await call('GET', '/admin/settings', 'owner')).body.roles as {
+      id: string
+      invite: string[]
+    }[]
+    expect(roles.find((role) => role.id === 'publisher')!.invite).toEqual(['*'])
+    await call('PUT', '/admin/roles', 'owner', {
+      roles: roles.map((role) => (role.id === 'servant' ? { ...role, invite: ['Музичне служіння'] } : role))
+    })
+    const invite = (token: string) =>
+      call('POST', '/schedule/invitations', token, { eventId, days: ['2026-10-15'], uids: ['musician-uid'] })
+    expect((await invite('leader')).status).toBe(403)
+    const music = (
+      (
+        await call('POST', '/schedule/events', 'owner', {
+          ...prayer,
+          ministry: 'Музичне служіння',
+          responsibleUid: 'owner-uid'
+        })
+      ).body.event as { id: string }
+    ).id
+    expect(
+      (
+        await call('POST', '/schedule/invitations', 'leader', {
+          eventId: music,
+          days: ['2026-10-15'],
+          uids: ['musician-uid']
+        })
+      ).body
+    ).toEqual({ invited: 1 })
+  })
+
+  it('administrators keep the types of events and the settings of the calendar', async () => {
+    const { call } = await church()
+    const calendar = { redDays: 1, orangeDays: 3, filters: ['ministry', 'mine'] }
+    expect((await call('PUT', '/admin/calendar', 'pastor', { calendar })).status).toBe(403)
+    expect((await call('PUT', '/admin/calendar', 'owner', { calendar })).body).toEqual({ calendar })
+    const eventTypes = [{ id: 'prayer', name: 'Молитва', ministry: null, roles: 'none', slots: [] }]
+    expect((await call('PUT', '/admin/event-types', 'owner', { eventTypes })).body).toEqual({ eventTypes })
+    const { body } = await call('GET', '/schedule', 'leader')
+    expect(body).toMatchObject({ calendar, types: eventTypes })
+  })
 })
 
 describe('types of notes and topics', () => {

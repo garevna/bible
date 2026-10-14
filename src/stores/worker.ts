@@ -2,6 +2,7 @@ import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { DEFAULT_TYPES, type NoteType } from '@/utils/noteTypes'
+import type { CalendarSettings, EventType } from '@/stores/schedule'
 import type { TopicPost } from '@/utils/topicPost'
 
 import { useFirebaseStore } from './firebase'
@@ -27,8 +28,15 @@ export interface RoleDef {
   sendToRoles: string[]
   sendToPeople: boolean
   messageDays: number
+  /** approves the people who applied for a ministry of the calendar and gives them roles there */
+  approve: boolean
+  /** the ministries whose events it invites people to; ANY_MINISTRY: every ministry */
+  invite: string[]
   manage: Manage[]
 }
+
+/** in the ministries a role invites to: every ministry */
+export const ANY_MINISTRY = '*'
 
 /** the reader: everyone who signed in, no rights; it cannot be removed */
 export const READER = 'reader'
@@ -38,10 +46,20 @@ export interface Rights {
   send: boolean
   sendToPeople: boolean
   sendToRoles: string[]
+  approve: boolean
+  invite: string[]
   manage: Manage[]
 }
 
-const NO_RIGHTS: Rights = { publish: false, send: false, sendToPeople: false, sendToRoles: [], manage: [] }
+const NO_RIGHTS: Rights = {
+  publish: false,
+  send: false,
+  sendToPeople: false,
+  sendToRoles: [],
+  approve: false,
+  invite: [],
+  manage: []
+}
 
 /** A user who signed in to the app, as the dashboard shows it (see worker/src/users.ts) */
 export interface UserView {
@@ -173,7 +191,7 @@ export const useWorkerStore = defineStore('worker', () => {
       }>('GET', '/me')
       role.value = me.role
       roleName.value = me.roleName ?? ''
-      rights.value = me.rights ?? NO_RIGHTS
+      rights.value = { ...NO_RIGHTS, ...me.rights }
       telegram.value = me.telegram
       ministries.value = me.ministries ?? []
       canSend.value = Boolean(me.canSend)
@@ -247,10 +265,20 @@ export const useWorkerStore = defineStore('worker', () => {
 
   /** the roles, types, ministries and locations, for the dashboard */
   const getSettings = () =>
-    call<{ roles: RoleDef[]; types: NoteType[]; ministries: string[]; locations: string[] }>(
-      'GET',
-      '/admin/settings'
-    )
+    call<{
+      roles: RoleDef[]
+      types: NoteType[]
+      ministries: string[]
+      locations: string[]
+      eventTypes: EventType[]
+      calendar: CalendarSettings
+    }>('GET', '/admin/settings')
+
+  const setEventTypes = async (list: EventType[]) =>
+    (await call<{ eventTypes: EventType[] }>('PUT', '/admin/event-types', { eventTypes: list })).eventTypes
+
+  const setCalendar = async (settings: CalendarSettings) =>
+    (await call<{ calendar: CalendarSettings }>('PUT', '/admin/calendar', { calendar: settings })).calendar
 
   const setRoles = async (list: RoleDef[]) =>
     (await call<{ roles: RoleDef[] }>('PUT', '/admin/roles', { roles: list })).roles
@@ -306,6 +334,8 @@ export const useWorkerStore = defineStore('worker', () => {
     setUserRole,
     removeUser,
     getSettings,
+    setEventTypes,
+    setCalendar,
     setRoles,
     setDirectory,
     loadMessages,

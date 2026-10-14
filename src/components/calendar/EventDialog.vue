@@ -3,10 +3,19 @@
     v-model="open"
     :title="event ? text.editEvent : text.addEvent"
     icon="mdi-calendar-plus"
-    max-width="640"
+    max-width="680"
   >
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-4">{{ error }}</v-alert>
 
+    <!-- the type gives the ministry and the roles of the people -->
+    <v-select
+      v-model="draft.typeId"
+      :items="typeItems"
+      :label="text.eventType"
+      density="compact"
+      class="mb-2"
+      @update:model-value="chooseType"
+    />
     <v-select
       v-model="draft.ministry"
       :items="schedule.ministries"
@@ -14,7 +23,13 @@
       density="compact"
       class="mb-2"
     />
-    <v-text-field v-model="draft.title" :label="text.eventTitle" density="compact" class="mb-2" />
+    <v-text-field
+      v-model="draft.title"
+      :label="text.eventTitle"
+      :placeholder="type?.name"
+      density="compact"
+      class="mb-2"
+    />
 
     <!-- once on a date, or on days of the week (e.g. the morning prayer: every day but Sunday) -->
     <v-btn-toggle
@@ -74,7 +89,23 @@
       density="compact"
       class="mb-2"
     />
+
+    <!-- the roles: the type's own, the event's own, or just how many people -->
+    <template v-if="type?.roles === 'fixed'">
+      <p class="label">{{ text.eventSlots }}</p>
+      <div class="d-flex flex-wrap ga-1 mb-4">
+        <v-chip v-for="slot of type.slots" :key="slot.name" size="small" variant="tonal" color="secondary">
+          {{ slot.count > 1 ? `${slot.name} ×${slot.count}` : slot.name }}
+          <v-icon v-if="slot.materials" icon="mdi-file-document-edit-outline" size="small" class="ml-1" />
+        </v-chip>
+      </div>
+    </template>
+    <template v-else-if="type?.roles === 'dynamic' || (!type && draft.slots.length)">
+      <p class="label">{{ text.eventSlots }}</p>
+      <SlotsEditor v-model="draft.slots" class="mb-4" />
+    </template>
     <v-text-field
+      v-else
       v-model.number="draft.needed"
       :label="text.needed"
       type="number"
@@ -127,21 +158,24 @@ import { storeToRefs } from 'pinia'
 import AppDialog from '@/components/AppDialog.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
+import SlotsEditor from '@/components/calendar/SlotsEditor.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore, type EventDraft, type ScheduleEvent } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
 import { WorkerError } from '@/stores/worker'
 import { format } from '@/utils/format'
 
-/** A new event, or a change of one (event) */
+/** A new event, or a change of one (event); a new one is passed on for its invitations */
 const open = defineModel<boolean>({ default: false })
 const props = defineProps<{ event?: ScheduleEvent | null }>()
+const emit = defineEmits<{ created: [event: ScheduleEvent] }>()
 
 const schedule = useScheduleStore()
 const user = useUserStore()
 const { calendar: text, common, publish } = storeToRefs(useLanguageStore())
 
 const empty = (): EventDraft => ({
+  typeId: null,
   ministry: '',
   title: '',
   description: '',
@@ -151,6 +185,7 @@ const empty = (): EventDraft => ({
   time: '10:00',
   until: null,
   needed: 1,
+  slots: [],
   mode: 'invite',
   responsibleUid: user.uid ?? '',
   deputyUid: null
@@ -164,6 +199,19 @@ const weekdays = ref<number[]>([])
 const busy = ref(false)
 const error = ref('')
 
+const typeItems = computed(() => [
+  { title: text.value.noType, value: null },
+  ...schedule.types.map((item) => ({ title: item.name, value: item.id }))
+])
+const type = computed(() => schedule.typeOf(draft.value))
+
+/** a type gives its ministry, and a type whose roles are given to each event suggests its own */
+function chooseType() {
+  const chosen = type.value
+  if (chosen?.ministry) draft.value.ministry = chosen.ministry
+  draft.value.slots = chosen?.roles === 'dynamic' ? chosen.slots.map((slot) => ({ ...slot })) : []
+}
+
 /** Monday first, as in the calendars of the church */
 const weekdayItems = computed(() => {
   const locale = { ua: 'uk', ru: 'ru', en: 'en' }[user.lang]
@@ -175,13 +223,16 @@ const weekdayItems = computed(() => {
   }))
 })
 
+/** the day a new event is planned for: the one chosen in the calendar */
+const startDay = defineModel<string | null>('day', { default: null })
+
 watch(open, (value) => {
   if (!value) return
   error.value = ''
   const event = props.event
-  draft.value = event ? { ...event } : empty()
+  draft.value = event ? { ...event, slots: event.slots.map((slot) => ({ ...slot })) } : empty()
   kind.value = event?.weekdays ? 'repeated' : 'single'
-  day.value = event?.day ?? ''
+  day.value = event?.day ?? (event ? '' : (startDay.value ?? schedule.today))
   until.value = event?.until ?? null
   weekdays.value = event?.weekdays ? [...event.weekdays] : []
   schedule.loadChoices().catch(() => undefined)
@@ -190,7 +241,8 @@ watch(open, (value) => {
 const ready = computed(
   () =>
     Boolean(draft.value.ministry && draft.value.time && draft.value.responsibleUid) &&
-    (kind.value === 'single' ? Boolean(day.value) : weekdays.value.length > 0)
+    (kind.value === 'single' ? Boolean(day.value) : weekdays.value.length > 0) &&
+    draft.value.slots.every((slot) => slot.name.trim() && Number(slot.count) >= 1)
 )
 
 async function run(action: () => Promise<void>) {
@@ -211,19 +263,26 @@ async function run(action: () => Promise<void>) {
 }
 
 const save = () =>
-  run(() =>
-    schedule.saveEvent(
+  run(async () => {
+    const saved = await schedule.saveEvent(
       {
         ...draft.value,
         location: draft.value.location ?? '',
         day: kind.value === 'single' ? day.value : null,
         weekdays: kind.value === 'repeated' ? weekdays.value : null,
         until: kind.value === 'repeated' ? until.value || null : null,
-        needed: Number(draft.value.needed) || 1
+        needed: Number(draft.value.needed) || 1,
+        slots: draft.value.slots.map((slot) => ({
+          ...slot,
+          name: slot.name.trim(),
+          count: Math.min(50, Math.max(1, Number(slot.count) || 1)),
+          hint: slot.materials ? slot.hint.trim() : ''
+        }))
       },
       props.event?.id
     )
-  )
+    if (!props.event) emit('created', saved)
+  })
 
 const remove = () => run(() => schedule.deleteEvent(props.event!.id))
 </script>

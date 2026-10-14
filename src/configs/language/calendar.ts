@@ -223,5 +223,265 @@ export const calendar = {
     ua: 'Сьогодні',
     ru: 'Сегодня',
     en: 'Today'
+  },
+  eventType: {
+    ua: 'Тип події',
+    ru: 'Тип события',
+    en: 'Type of event'
+  },
+  noType: {
+    ua: 'Без типу',
+    ru: 'Без типа',
+    en: 'No type'
+  },
+  eventSlots: {
+    ua: 'Ролі учасників цієї події',
+    ru: 'Роли участников этого события',
+    en: 'The roles of this event'
+  },
+  filterType: {
+    ua: 'Тип події',
+    ru: 'Тип события',
+    en: 'Type of event'
+  },
+  filterMinistry: {
+    ua: 'Служіння',
+    ru: 'Служение',
+    en: 'Ministry'
+  },
+  filterEvent: {
+    ua: 'Подія',
+    ru: 'Событие',
+    en: 'Event'
+  },
+  filterPerson: {
+    ua: 'Служитель',
+    ru: 'Служитель',
+    en: 'Minister'
+  },
+  prevMonth: {
+    ua: 'Попередній місяць',
+    ru: 'Предыдущий месяц',
+    en: 'Previous month'
+  },
+  nextMonth: {
+    ua: 'Наступний місяць',
+    ru: 'Следующий месяц',
+    en: 'Next month'
+  },
+  legendReady: {
+    ua: 'Усе вирішено',
+    ru: 'Все решено',
+    en: 'All settled'
+  },
+  legendRed: {
+    ua: 'Горить',
+    ru: 'Горит',
+    en: 'Urgent'
+  },
+  legendOrange: {
+    ua: 'Незабаром',
+    ru: 'Скоро',
+    en: 'Soon'
+  },
+  legendAmber: {
+    ua: 'Є час',
+    ru: 'Есть время',
+    en: 'Time left'
+  },
+  issuePeople: {
+    ua: 'Не вистачає людей',
+    ru: 'Не хватает людей',
+    en: 'Not enough people'
+  },
+  issueRoles: {
+    ua: 'Не всі ролі визначені',
+    ru: 'Не все роли определены',
+    en: 'Roles not given'
+  },
+  issueMaterials: {
+    ua: 'Немає матеріалів',
+    ru: 'Нет материалов',
+    en: 'Materials missing'
+  },
+  dayEmpty: {
+    ua: 'У цей день подій немає',
+    ru: 'В этот день событий нет',
+    en: 'No events on this day'
+  },
+  participants: {
+    ua: 'Учасники',
+    ru: 'Участники',
+    en: 'People'
+  },
+  rolesButton: {
+    ua: 'Ролі учасників',
+    ru: 'Роли участников',
+    en: 'Roles'
+  },
+  materialsButton: {
+    ua: 'Методичні матеріали',
+    ru: 'Методические материалы',
+    en: 'Materials'
+  },
+  applicants: {
+    ua: 'Заявки',
+    ru: 'Заявки',
+    en: 'Applications'
+  },
+  approved: {
+    ua: 'Затверджені',
+    ru: 'Утвержденные',
+    en: 'Approved'
+  },
+  noApplicants: {
+    ua: 'Заявок немає',
+    ru: 'Заявок нет',
+    en: 'No applications'
+  },
+  noApproved: {
+    ua: 'Ще нікого',
+    ru: 'Пока никого',
+    en: 'Nobody yet'
+  },
+  moveRight: {
+    ua: 'Затвердити обраного',
+    ru: 'Утвердить выбранного',
+    en: 'Approve the chosen one'
+  },
+  moveLeft: {
+    ua: 'Повернути обраного до заявок',
+    ru: 'Вернуть выбранного к заявкам',
+    en: 'Back to the applications'
+  },
+  returnBack: {
+    ua: 'Повернути',
+    ru: 'Вернуть',
+    en: 'Back'
+  },
+  roleUndefined: {
+    ua: 'Роль не визначена',
+    ru: 'Роль не определена',
+    en: 'No role'
+  },
+  roleFull: {
+    ua: 'зайнято',
+    ru: 'занято',
+    en: 'taken'
+  },
+  clearRole: {
+    ua: 'Зняти роль',
+    ru: 'Снять роль',
+    en: 'Take the role off'
+  },
+  noRoles: {
+    ua: 'У цієї події немає ролей',
+    ru: 'У этого события нет ролей',
+    en: 'This event has no roles'
+  },
+  noTeamForRoles: {
+    ua: 'Спершу затвердіть учасників',
+    ru: 'Сначала утвердите участников',
+    en: 'Approve people first'
+  },
+  materialsFor: {
+    ua: '{role}: {hint}',
+    ru: '{role}: {hint}',
+    en: '{role}: {hint}'
+  },
+  addNote: {
+    ua: 'Додати нотатку',
+    ru: 'Добавить заметку',
+    en: 'Add a note'
+  },
+  addTopic: {
+    ua: 'Додати тему',
+    ru: 'Добавить тему',
+    en: 'Add a topic'
+  },
+  noMaterials: {
+    ua: 'Матеріалів ще немає',
+    ru: 'Материалов пока нет',
+    en: 'No materials yet'
+  },
+  noMaterialRoles: {
+    ua: 'Ролей із матеріалами немає',
+    ru: 'Ролей с материалами нет',
+    en: 'No role prepares materials'
+  },
+  removeMaterial: {
+    ua: 'Прибрати матеріал',
+    ru: 'Убрать материал',
+    en: 'Remove the material'
+  },
+  pickNote: {
+    ua: 'Оберіть нотатку',
+    ru: 'Выберите заметку',
+    en: 'Choose a note'
+  },
+  pickTopic: {
+    ua: 'Оберіть тему',
+    ru: 'Выберите тему',
+    en: 'Choose a topic'
+  },
+  nothingToPick: {
+    ua: 'Нічого немає',
+    ru: 'Ничего нет',
+    en: 'Nothing here'
+  },
+  byName: {
+    ua: 'від {name}',
+    ru: 'от {name}',
+    en: 'by {name}'
+  },
+  invitations: {
+    ua: 'Розсилка запрошень',
+    ru: 'Рассылка приглашений',
+    en: 'Invitations'
+  },
+  invitationsHint: {
+    ua: 'Оберіть людей і дні — кожен отримає одне повідомлення з усіма днями.',
+    ru: 'Выберите людей и дни — каждый получит одно сообщение со всеми днями.',
+    en: 'Choose the people and the days: each gets one message with all the days.'
+  },
+  people: {
+    ua: 'Люди',
+    ru: 'Люди',
+    en: 'People'
+  },
+  wholeMinistry: {
+    ua: 'Усі учасники служіння',
+    ru: 'Все участники служения',
+    en: 'The whole ministry'
+  },
+  daysLabel: {
+    ua: 'Дні',
+    ru: 'Дни',
+    en: 'Days'
+  },
+  sendInvitations: {
+    ua: 'Надіслати запрошення',
+    ru: 'Отправить приглашения',
+    en: 'Send the invitations'
+  },
+  sentInvitations: {
+    ua: 'Запрошень надіслано: {count}',
+    ru: 'Приглашений отправлено: {count}',
+    en: 'Invitations sent: {count}'
+  },
+  joinSelf: {
+    ua: 'Долучитися',
+    ru: 'Присоединиться',
+    en: 'Join'
+  },
+  filtersButton: {
+    ua: 'Фільтри',
+    ru: 'Фильтры',
+    en: 'Filters'
+  },
+  later: {
+    ua: 'Пізніше',
+    ru: 'Позже',
+    en: 'Later'
   }
 }

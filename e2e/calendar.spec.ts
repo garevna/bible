@@ -2,20 +2,24 @@ import type { Page, Route } from '@playwright/test'
 
 import { dialog, expect, openBible, signInLocally, test, withStores } from './fixtures'
 
-const TODAY = '2026-10-13'
-const TOMORROW = '2026-10-14'
+/** today of the browser: the calendar shows its month */
+const local = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+const TODAY = local(new Date())
 
 const event = (id: string, fields: Record<string, unknown>) => ({
   id,
+  typeId: null,
   ministry: 'Молитовне',
   title: '',
   description: '',
   location: 'Онлайн',
   day: null,
-  weekdays: null,
+  weekdays: [0, 1, 2, 3, 4, 5, 6],
   time: '06:45',
   until: null,
   needed: 2,
+  slots: [],
   mode: 'invite',
   responsibleUid: 'leader-uid',
   responsibleName: 'Лідер',
@@ -24,9 +28,9 @@ const event = (id: string, fields: Record<string, unknown>) => ({
   ...fields
 })
 
-const participant = (eventId: string, day: string, fields: Record<string, unknown>) => ({
+const participant = (eventId: string, fields: Record<string, unknown>) => ({
   eventId,
-  day,
+  day: TODAY,
   uid: 'e2e-uid',
   name: 'E2E',
   status: 'invited',
@@ -34,10 +38,22 @@ const participant = (eventId: string, day: string, fields: Record<string, unknow
   backupName: null,
   backupStatus: null,
   reason: null,
+  role: null,
   ...fields
 })
 
-/** The worker (see playwright.config.ts): the schedule of a minister of the prayer ministry, or of a planner */
+const communion = {
+  id: 'communion',
+  name: 'Причастя',
+  ministry: 'Пасторське',
+  roles: 'fixed',
+  slots: [
+    { name: 'Пастор', count: 1, materials: true, hint: 'Нотатки, вірші' },
+    { name: 'Учасник', count: 2, materials: false, hint: '' }
+  ]
+}
+
+/** The worker (see playwright.config.ts): a minister of the prayer ministry, or a planner of the schedule */
 async function fakeWorker(page: Page, planner = false) {
   const posted: { path: string; body: unknown }[] = []
   await page.route('**/worker-test/**', async (route: Route) => {
@@ -53,6 +69,8 @@ async function fakeWorker(page: Page, planner = false) {
             send: false,
             sendToPeople: false,
             sendToRoles: [],
+            approve: planner,
+            invite: planner ? ['*'] : [],
             manage: planner ? ['schedule'] : []
           },
           ministries: ['Молитовне'],
@@ -72,44 +90,67 @@ async function fakeWorker(page: Page, planner = false) {
     }
     if (path === '/schedule/people') {
       return route.fulfill({
-        json: { people: [{ uid: 'e2e-uid', name: 'E2E', ministries: ['Молитовне'], phone: null }] }
+        json: {
+          people: [
+            { uid: 'e2e-uid', name: 'E2E', ministries: ['Молитовне'], phone: null },
+            { uid: 'pastor-uid', name: 'Пастор Іван', ministries: ['Пасторське'], phone: null },
+            { uid: 'singer-uid', name: 'Співачка', ministries: ['Пасторське'], phone: null }
+          ]
+        }
       })
+    }
+    if (path === '/schedule/materials' && request.method() === 'GET') {
+      return route.fulfill({ json: { materials: [] } })
     }
     if (path === '/schedule') {
       return route.fulfill({
         json: {
           events: [
-            event('morning', { title: 'Ранкова молитва', weekdays: [1, 2, 3, 4, 5, 6] }),
-            event('evening', {
-              title: 'Вечірня молитва',
-              time: '19:00',
-              mode: 'open',
-              weekdays: [0, 1, 2, 3, 4, 5, 6]
-            }),
-            event('service', { ministry: 'Пасторське', location: 'Церква', time: '10:00', day: TOMORROW })
+            event('morning', { title: 'Ранкова молитва' }),
+            event('evening', { title: 'Вечірня молитва', time: '19:00', mode: 'open' }),
+            event('communion', {
+              typeId: 'communion',
+              ministry: 'Пасторське',
+              location: 'Церква',
+              time: '11:00',
+              needed: 3,
+              slots: communion.slots,
+              responsibleUid: 'pastor-uid',
+              responsibleName: 'Пастор Іван'
+            })
           ],
           days: [
             { eventId: 'morning', day: TODAY },
-            { eventId: 'evening', day: TODAY },
-            { eventId: 'morning', day: TOMORROW },
-            { eventId: 'service', day: TOMORROW }
+            { eventId: 'communion', day: TODAY },
+            { eventId: 'evening', day: TODAY }
           ],
           participants: [
-            participant('morning', TODAY, {}),
-            participant('morning', TOMORROW, {
+            participant('morning', {}),
+            participant('morning', {
               uid: 'other-uid',
               name: 'Інший',
               status: 'confirmed',
               backupUid: 'e2e-uid',
               backupName: 'E2E',
               backupStatus: 'invited'
-            })
+            }),
+            participant('communion', { uid: 'pastor-uid', name: 'Пастор Іван', status: 'confirmed' }),
+            participant('communion', { uid: 'singer-uid', name: 'Співачка', status: 'applied' })
           ],
+          materials: [],
+          types: [communion],
+          calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] },
           today: TODAY
         }
       })
     }
     posted.push({ path, body: request.postDataJSON() })
+    if (path === '/schedule/events') {
+      return route.fulfill({
+        json: { event: event('new', { day: TODAY, ministry: 'Пасторське', typeId: 'communion' }) }
+      })
+    }
+    if (path === '/schedule/invitations') return route.fulfill({ json: { invited: 1 } })
     return route.fulfill({ json: { ok: true } })
   })
   return posted
@@ -124,25 +165,27 @@ async function signIn(page: Page) {
   })
 }
 
-const occurrence = (page: Page, day: string, name: string) =>
-  page
-    .locator('section', { has: page.locator('.day-title', { hasText: day }) })
-    .locator('.occurrence', { hasText: name })
+const card = (page: Page, name: string) => page.locator('.occurrence', { hasText: name })
 
-test('a minister lands on the calendar and answers the invitations', async ({ page }) => {
+test('a minister lands on the calendar: the day is red until settled; answers and applications', async ({
+  page
+}) => {
   // after the init script of the fixtures
   await page.addInitScript(() => sessionStorage.removeItem('bible:calendar-landed'))
   const posted = await fakeWorker(page)
   await signIn(page)
 
   await expect(page.locator('.view-title', { hasText: 'Календар служінь' })).toBeVisible()
-  await expect(page.locator('.day-title').first()).toContainText('Сьогодні')
+  // nothing is settled today: red; today is chosen and its events are below
+  const today = page.locator(`.cell[data-day="${TODAY}"]`)
+  await expect(today).toHaveClass(/cell--red/)
+  await expect(today).toHaveClass(/cell--selected/)
+  await expect(page.locator('.day-title')).toContainText('Сьогодні')
 
-  // invited to the morning prayer of today: confirm
-  const morning = occurrence(page, 'Сьогодні', 'Ранкова молитва')
+  const morning = card(page, 'Ранкова молитва')
   await expect(morning).toHaveClass(/occurrence--mine/)
-  await expect(morning).toContainText('E2E · запрошено')
-  await morning.getByRole('button', { name: 'Підтвердити' }).click()
+  await expect(morning).toContainText('Не вистачає людей')
+  await morning.getByRole('button', { name: 'Підтвердити', exact: true }).click()
   await expect
     .poll(() => posted.at(-1))
     .toEqual({
@@ -150,9 +193,8 @@ test('a minister lands on the calendar and answers the invitations', async ({ pa
       body: { eventId: 'morning', day: TODAY, uid: 'e2e-uid', as: 'main', answer: 'confirm' }
     })
 
-  // the backup of tomorrow: "I can't", with the usual words
-  const tomorrow = page.locator('.occurrence', { hasText: 'Ви — дублер (Інший)' })
-  await tomorrow.getByRole('button', { name: 'Не можу' }).click()
+  // the backup: "I can't", with the usual words
+  await morning.locator('button', { hasText: 'Не можу' }).last().click()
   const decline = dialog(page)
   await expect(decline.getByLabel('Причина')).toHaveValue(
     'На жаль, я не маю можливості взяти участь у цьому служінні.'
@@ -165,7 +207,7 @@ test('a minister lands on the calendar and answers the invitations', async ({ pa
       path: '/schedule/answer',
       body: {
         eventId: 'morning',
-        day: TOMORROW,
+        day: TODAY,
         uid: 'other-uid',
         as: 'backup',
         answer: 'decline',
@@ -174,52 +216,93 @@ test('a minister lands on the calendar and answers the invitations', async ({ pa
     })
 
   // the evening prayer is open to the prayer ministry
-  await occurrence(page, 'Сьогодні', 'Вечірня молитва').getByRole('button', { name: 'Подати заявку' }).click()
-  await expect
-    .poll(() => posted.at(-1))
-    .toEqual({ path: '/schedule/apply', body: { eventId: 'evening', day: TODAY } })
-
-  // the pastoral service is not the user's: no buttons, and gone with "mine only"
-  await expect(page.locator('.occurrence', { hasText: 'Пасторське' }).getByRole('button')).toHaveCount(0)
-  await page.getByLabel('Лише мої').check()
-  await expect(page.locator('.occurrence', { hasText: 'Пасторське' })).toHaveCount(0)
-  await expect(page.locator('.occurrence', { hasText: 'Вечірня молитва' })).toHaveCount(0)
-})
-
-test('a planner adds an event', async ({ page }) => {
-  const posted = await fakeWorker(page, true)
-  await signIn(page)
-  // the fixtures already "landed": the calendar is opened from the header
-  await page.getByRole('button', { name: 'Календар служінь' }).click()
-
-  await page.getByRole('button', { name: 'Додати подію' }).click()
-  const form = dialog(page)
-  await form.locator('.v-select', { hasText: 'Служіння' }).click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Пасторське' }).click()
-  await form.getByLabel('Назва (необов’язково)').fill('Причастя')
-  await form.getByLabel('Дата', { exact: true }).fill('2026-10-18')
-  await form.getByLabel('Час', { exact: true }).fill('11:00')
-  await form.getByLabel('Локація').fill('Церква')
-  await form.getByRole('button', { name: 'Зберегти' }).click()
-
+  await card(page, 'Вечірня молитва').getByRole('button', { name: 'Подати заявку' }).click()
   await expect
     .poll(() => posted.at(-1))
     .toEqual({
-      path: '/schedule/events',
-      body: {
-        ministry: 'Пасторське',
-        title: 'Причастя',
-        description: '',
-        location: 'Церква',
-        day: '2026-10-18',
-        weekdays: null,
-        time: '11:00',
-        until: null,
-        needed: 1,
-        mode: 'invite',
-        responsibleUid: 'e2e-uid',
-        deputyUid: null
-      }
+      path: '/schedule/apply',
+      body: { eventId: 'evening', day: TODAY }
     })
-  await expect(form).toBeHidden()
+
+  // the communion is not the user's: nothing to approve; the filters narrow the day
+  await card(page, 'Причастя').getByRole('button', { name: 'Учасники' }).click()
+  await expect(card(page, 'Причастя').getByRole('button', { name: 'Затвердити обраного' })).toHaveCount(0)
+  await page.getByLabel('Лише мої').check()
+  await expect(card(page, 'Причастя')).toHaveCount(0)
+  await expect(page.locator(`.cell[data-day="${TODAY}"] .count`)).toHaveText('1')
+})
+
+test('a planner approves, gives roles, adds materials, and invites after creating an event', async ({
+  page
+}) => {
+  const posted = await fakeWorker(page, true)
+  await signIn(page)
+  await withStores(page, async (stores) => {
+    await stores.notes.startNewNote({ lineRef: '1.000.000.000' })
+    stores.notes.updateCurrentNoteText('Хліб і вино')
+    await stores.notes.saveCurrentNote()
+  })
+  await page.getByRole('button', { name: 'Календар служінь' }).click()
+
+  // the applications on the left: the chosen one goes right by the arrow
+  const communionCard = card(page, 'Причастя')
+  await communionCard.getByRole('button', { name: 'Учасники' }).click()
+  const arrow = communionCard.getByRole('button', { name: 'Затвердити обраного' })
+  await expect(arrow).toBeDisabled()
+  await communionCard.locator('.v-list-item', { hasText: 'Співачка' }).click()
+  await arrow.click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/approve',
+      body: { eventId: 'communion', day: TODAY, uid: 'singer-uid' }
+    })
+
+  // the roles: the pastor has none yet
+  await communionCard.getByRole('button', { name: 'Ролі учасників' }).click()
+  await communionCard.locator('[data-role-of="pastor-uid"]').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Пастор' }).first().click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/role',
+      body: { eventId: 'communion', day: TODAY, uid: 'pastor-uid', role: 'Пастор' }
+    })
+
+  // the materials of the pastor: a note of the planner
+  await communionCard.getByRole('button', { name: 'Методичні матеріали' }).click()
+  await expect(communionCard).toContainText('Пастор: Нотатки, вірші')
+  await communionCard.getByRole('button', { name: 'Додати нотатку' }).click()
+  await dialog(page).locator('.v-list-item', { hasText: 'Хліб і вино' }).click()
+  await expect.poll(() => posted.at(-1)?.path).toBe('/schedule/materials')
+  expect(posted.at(-1)!.body).toMatchObject({
+    eventId: 'communion',
+    day: TODAY,
+    role: 'Пастор',
+    kind: 'note',
+    post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино' }] }
+  })
+
+  // a new event of a type: then its invitations
+  await page.getByRole('button', { name: 'Додати подію' }).click()
+  const form = dialog(page)
+  await form.locator('.v-select', { hasText: 'Тип події' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Причастя' }).click()
+  await form.getByLabel('Час', { exact: true }).fill('11:00')
+  await form.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => posted.find((item) => item.path === '/schedule/events')?.body)
+    .toMatchObject({ typeId: 'communion', ministry: 'Пасторське', day: TODAY, time: '11:00' })
+
+  const invitations = dialog(page)
+  await expect(invitations).toContainText('Розсилка запрошень')
+  await invitations.getByRole('button', { name: 'Усі учасники служіння' }).click()
+  await invitations.getByRole('button', { name: 'Надіслати запрошення' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/invitations',
+      body: { eventId: 'new', days: [TODAY], uids: ['pastor-uid', 'singer-uid'] }
+    })
+  await expect(page.getByText('Запрошень надіслано: 1')).toBeVisible()
 })

@@ -49,7 +49,12 @@
         <div class="admin-section">
           <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
           <template v-if="settings">
-            <AdminRoles v-if="section === 'roles'" v-model="settings.roles" @error="fail" />
+            <AdminRoles
+              v-if="section === 'roles'"
+              v-model="settings.roles"
+              :ministries="settings.ministries"
+              @error="fail"
+            />
             <AdminUsers
               v-else-if="section === 'users'"
               :roles="settings.roles"
@@ -70,6 +75,13 @@
               :title="text.sectionLocations"
               @error="fail"
             />
+            <AdminEvents
+              v-else-if="section === 'events'"
+              v-model:event-types="settings.eventTypes"
+              v-model:calendar="settings.calendar"
+              :ministries="settings.ministries"
+              @error="fail"
+            />
           </template>
         </div>
       </div>
@@ -83,9 +95,11 @@ import { storeToRefs } from 'pinia'
 import { useDisplay } from 'vuetify'
 
 import AdminDirectory from '@/components/admin/AdminDirectory.vue'
+import AdminEvents from '@/components/admin/AdminEvents.vue'
 import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
 import { useLanguageStore } from '@/stores/language'
+import type { CalendarSettings, EventType } from '@/stores/schedule'
 import { useWorkerStore, WorkerError, type Manage, type RoleDef } from '@/stores/worker'
 import { format } from '@/utils/format'
 import type { NoteType } from '@/utils/noteTypes'
@@ -95,13 +109,14 @@ const worker = useWorkerStore()
 const { admin: text, publish } = storeToRefs(useLanguageStore())
 const { smAndDown: compact } = useDisplay()
 
-type Section = 'roles' | 'users' | 'ministries' | 'locations'
+type Section = 'roles' | 'users' | 'ministries' | 'locations' | 'events'
 
 const all: { value: Section; icon: string; manage: Manage; label: keyof typeof text.value }[] = [
   { value: 'roles', icon: 'mdi-shield-key-outline', manage: 'roles', label: 'sectionRoles' },
   { value: 'users', icon: 'mdi-account-group-outline', manage: 'users', label: 'sectionUsers' },
   { value: 'ministries', icon: 'mdi-hand-heart-outline', manage: 'directories', label: 'sectionMinistries' },
-  { value: 'locations', icon: 'mdi-map-marker-outline', manage: 'directories', label: 'sectionLocations' }
+  { value: 'locations', icon: 'mdi-map-marker-outline', manage: 'directories', label: 'sectionLocations' },
+  { value: 'events', icon: 'mdi-calendar-cog-outline', manage: 'schedule', label: 'sectionEvents' }
 ]
 
 const sections = computed(() =>
@@ -129,6 +144,8 @@ const settings = ref<{
   types: NoteType[]
   ministries: string[]
   locations: string[]
+  eventTypes: EventType[]
+  calendar: CalendarSettings
 } | null>(null)
 const busy = ref(false)
 const error = ref('')

@@ -1,4 +1,12 @@
 import { verifyIdToken, type AuthUser } from './auth'
+import {
+  getCalendar,
+  getEventTypes,
+  parseCalendar,
+  parseEventTypes,
+  setCalendar,
+  setEventTypes
+} from './eventTypes'
 import { d1Store, HOURLY_LIMIT, parseDraft, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
 import {
@@ -103,13 +111,16 @@ const ROUTES = [
   /^POST \/messages$/,
   /^POST \/messages\/[^/]+\/read$/,
   /^GET \/admin\/(settings|users)$/,
-  /^PUT \/admin\/(roles|types)$/,
+  /^PUT \/admin\/(roles|types|event-types|calendar)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
-  /^GET \/schedule(\/people)?$/,
+  /^GET \/schedule(\/people|\/materials)?$/,
+  /^POST \/schedule\/materials$/,
+  /^DELETE \/schedule\/materials\/[^/]+$/,
   /^(POST|PUT|DELETE) \/schedule\/events(\/[^/]+)?$/,
   /^(POST|DELETE) \/schedule\/team$/,
-  /^POST \/schedule\/(apply|approve|answer)$/
+  /^POST \/schedule\/invitations$/,
+  /^POST \/schedule\/(apply|approve|unapprove|role|answer)$/
 ]
 
 const DAY = 24 * 60 * 60 * 1000
@@ -163,6 +174,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         send: rights.send,
         sendToPeople: rights.sendToPeople,
         sendToRoles: rights.sendToRoles,
+        approve: rights.approve,
+        invite: rights.invite,
         manage: rights.manage
       },
       canSend: rights.send,
@@ -214,6 +227,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         planners: users
           .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
           .map((user) => user.uid),
+        eventTypes: await getEventTypes(env.USERS),
+        calendar: await getCalendar(env.USERS),
         schedule: deps.schedule ?? d1Schedule(env.DB),
         messages: deps.messages ?? d1Store(env.DB),
         now: deps.now?.() ?? Date.now()
@@ -241,8 +256,27 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       roles,
       types: await getTypes(env.USERS),
       ministries: await getDirectory(env.USERS, 'ministries'),
-      locations: await getDirectory(env.USERS, 'locations')
+      locations: await getDirectory(env.USERS, 'locations'),
+      eventTypes: await getEventTypes(env.USERS),
+      calendar: await getCalendar(env.USERS)
     })
+  }
+
+  // the types of events and the settings of the calendar: the ones who plan the schedule
+  if (route === 'PUT /admin/event-types') {
+    if (!can('schedule')) return json({ error: 'forbidden' }, 403)
+    const eventTypes = parseEventTypes(((await body()) as { eventTypes?: unknown } | null)?.eventTypes)
+    if (!eventTypes) return json({ error: 'bad-request' }, 400)
+    await setEventTypes(env.USERS, eventTypes)
+    return json({ eventTypes })
+  }
+
+  if (route === 'PUT /admin/calendar') {
+    if (!can('schedule')) return json({ error: 'forbidden' }, 403)
+    const calendar = parseCalendar(((await body()) as { calendar?: unknown } | null)?.calendar)
+    if (!calendar) return json({ error: 'bad-request' }, 400)
+    await setCalendar(env.USERS, calendar)
+    return json({ calendar })
   }
 
   if (route === 'PUT /admin/roles') {

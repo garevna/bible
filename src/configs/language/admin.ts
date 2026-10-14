@@ -244,6 +244,171 @@ export const admin = {
     ru: 'Никого не найдено',
     en: 'Nobody found'
   },
+  rightApprove: {
+    ua: 'Затверджувати учасників служінь і давати їм ролі',
+    ru: 'Утверждать участников служений и давать им роли',
+    en: 'Approves the people of ministries and gives them roles'
+  },
+  rightInvite: {
+    ua: 'Розсилка запрошень на служіння',
+    ru: 'Рассылка приглашений на служения',
+    en: 'Invites people to ministries'
+  },
+  inviteAny: {
+    ua: 'На будь-яке служіння',
+    ru: 'На любое служение',
+    en: 'To any ministry'
+  },
+  sectionEvents: {
+    ua: 'Події календаря',
+    ru: 'События календаря',
+    en: 'Events of the calendar'
+  },
+  calendarSettings: {
+    ua: 'Календар',
+    ru: 'Календарь',
+    en: 'The calendar'
+  },
+  calendarHint: {
+    ua: 'День, де все вирішено (люди, ролі, матеріали), — зелений. Інакше: спочатку червоний, потім помаранчевий, далі жовтогарячий.',
+    ru: 'День, где все решено (люди, роли, материалы), — зеленый. Иначе: сначала красный, потом оранжевый, дальше желто-оранжевый.',
+    en: 'A day where everything is settled (people, roles, materials) is green. Otherwise red first, then orange, then amber.'
+  },
+  redDays: {
+    ua: 'Червоних днів (сьогодні — перший)',
+    ru: 'Красных дней (сегодня — первый)',
+    en: 'Red days (today is the first)'
+  },
+  orangeDays: {
+    ua: 'Помаранчевих днів після них',
+    ru: 'Оранжевых дней после них',
+    en: 'Orange days after them'
+  },
+  filters: {
+    ua: 'Фільтри над календарем',
+    ru: 'Фильтры над календарем',
+    en: 'The filters above the calendar'
+  },
+  filterType: {
+    ua: 'Тип події',
+    ru: 'Тип события',
+    en: 'Type of event'
+  },
+  filterMinistry: {
+    ua: 'Служіння',
+    ru: 'Служение',
+    en: 'Ministry'
+  },
+  filterEvent: {
+    ua: 'Конкретна подія',
+    ru: 'Конкретное событие',
+    en: 'One event'
+  },
+  filterPerson: {
+    ua: 'Служитель',
+    ru: 'Служитель',
+    en: 'Minister'
+  },
+  filterMine: {
+    ua: 'Лише мої',
+    ru: 'Только мои',
+    en: 'Mine only'
+  },
+  saveCalendar: {
+    ua: 'Зберегти налаштування календаря',
+    ru: 'Сохранить настройки календаря',
+    en: 'Save the settings of the calendar'
+  },
+  eventTypes: {
+    ua: 'Типи подій',
+    ru: 'Типы событий',
+    en: 'Types of events'
+  },
+  eventTypesHint: {
+    ua: 'Тип задає ролі учасників і те, хто з них готує методичні матеріали (нотатки, вірші, перелік пісень).',
+    ru: 'Тип задает роли участников и то, кто из них готовит методические материалы (заметки, стихи, список песен).',
+    en: 'A type gives the roles of the people and which of them prepare materials (notes, verses, a list of songs).'
+  },
+  typeName: {
+    ua: 'Назва типу',
+    ru: 'Название типа',
+    en: 'Name of the type'
+  },
+  typeMinistry: {
+    ua: 'Служіння (якщо завжди те саме)',
+    ru: 'Служение (если всегда одно и то же)',
+    en: 'Ministry (when always the same)'
+  },
+  rolesNone: {
+    ua: 'Без ролей',
+    ru: 'Без ролей',
+    en: 'No roles'
+  },
+  rolesFixed: {
+    ua: 'Ролі однакові для всіх подій типу',
+    ru: 'Роли одинаковые для всех событий типа',
+    en: 'The same roles for every event of the type'
+  },
+  rolesDynamic: {
+    ua: 'Ролі визначаються для кожного служіння',
+    ru: 'Роли определяются для каждого служения',
+    en: 'The roles are given to each event'
+  },
+  slotName: {
+    ua: 'Роль',
+    ru: 'Роль',
+    en: 'Role'
+  },
+  slotCount: {
+    ua: 'Людей',
+    ru: 'Людей',
+    en: 'People'
+  },
+  slotMaterials: {
+    ua: 'Готує матеріали',
+    ru: 'Готовит материалы',
+    en: 'Prepares materials'
+  },
+  slotHint: {
+    ua: 'Що підготувати, напр. «Перелік пісень хвали»',
+    ru: 'Что подготовить, напр. «Список песен хвалы»',
+    en: 'What to prepare, e.g. "A list of songs"'
+  },
+  addSlot: {
+    ua: 'Додати роль',
+    ru: 'Добавить роль',
+    en: 'Add a role'
+  },
+  removeSlot: {
+    ua: 'Прибрати роль',
+    ru: 'Убрать роль',
+    en: 'Remove the role'
+  },
+  addEventType: {
+    ua: 'Додати тип',
+    ru: 'Добавить тип',
+    en: 'Add a type'
+  },
+  newEventType: {
+    ua: 'Новий тип',
+    ru: 'Новый тип',
+    en: 'New type'
+  },
+  removeEventType: {
+    ua: 'Видалити тип',
+    ru: 'Удалить тип',
+    en: 'Remove the type'
+  },
+  saveEventTypes: {
+    ua: 'Зберегти типи подій',
+    ru: 'Сохранить типы событий',
+    en: 'Save the types of events'
+  },
+  noSlots: {
+    ua: 'Додайте хоча б одну роль',
+    ru: 'Добавьте хотя бы одну роль',
+    en: 'Add a role at least'
+  },
   failed: {
     ua: 'Не вдалося: {name}',
     ru: 'Не удалось: {name}',

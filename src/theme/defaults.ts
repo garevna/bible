@@ -33,6 +33,14 @@ export const defaultTheme = {
     'available-date': '#E3F2E5',
     /** calendar: the days of an interval */
     'selected-dates': '#CCE9F0',
+    /** the calendar of ministries: a day where everything is settled */
+    'calendar-ready': '#4CAF50',
+    /** the calendar of ministries: a day not settled, today and the next days */
+    'calendar-red': '#E00000',
+    /** then a few days orange */
+    'calendar-orange': '#FF5500',
+    /** then amber */
+    'calendar-amber': '#FFAA00',
     /** search: found words */
     mark: '#FFFF0077',
     /** tooltips */
