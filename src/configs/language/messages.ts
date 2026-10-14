@@ -118,5 +118,15 @@ export const messages = {
     ua: 'забагато повідомлень за годину',
     ru: 'слишком много сообщений за час',
     en: 'too many messages in an hour'
+  },
+  answered: {
+    ua: 'Ви відповіли',
+    ru: 'Вы ответили',
+    en: 'You answered'
+  },
+  notAnswered: {
+    ua: 'Чекає на відповідь',
+    ru: 'Ждет ответа',
+    en: 'Waiting for an answer'
   }
 }

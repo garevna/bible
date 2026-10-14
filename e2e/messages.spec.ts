@@ -177,6 +177,50 @@ test('a member of a ministry reads the message, saves the note and answers', asy
   await expect.poll(() => sent).toEqual([{ replyTo: 'm1', text: 'Добре, підготуємо', attachment: null }])
 })
 
+test('an answer is shown inside the message it answers; answered and waiting messages are marked', async ({
+  page
+}) => {
+  const now = Date.now()
+  const message = (id: string, fields: Record<string, unknown>) => ({
+    id,
+    fromUid: 'pastor-uid',
+    fromName: 'Пастор',
+    toUid: 'e2e-uid',
+    toName: 'E2E',
+    text: '',
+    attachment: null,
+    replyTo: null,
+    createdAt: now,
+    expiresAt: now + 86_400_000,
+    readAt: now,
+    ...fields
+  })
+  const inbox = [
+    message('waiting', { text: 'Хто веде в суботу?', createdAt: now - 1000 }),
+    message('asked', { text: 'Пісні на неділю', createdAt: now - 3000 }),
+    message('answer', {
+      fromUid: 'e2e-uid',
+      fromName: 'E2E',
+      toUid: 'pastor-uid',
+      toName: 'Пастор',
+      text: 'Добре, підготуємо',
+      replyTo: 'asked',
+      createdAt: now - 2000
+    })
+  ]
+  await fakeWorker(page, 'member', inbox)
+  await signIn(page)
+  await page.getByRole('button', { name: 'Повідомлення' }).click()
+
+  // two threads: the answer is inside the message it answers
+  await expect(page.locator('.message')).toHaveCount(2)
+  const asked = page.locator('.message', { hasText: 'Пісні на неділю' })
+  await expect(asked.locator('.reply')).toContainText('Добре, підготуємо')
+  await expect(asked.getByLabel('Ви відповіли')).toBeVisible()
+  const waiting = page.locator('.message', { hasText: 'Хто веде в суботу?' })
+  await expect(waiting.getByLabel('Чекає на відповідь')).toBeVisible()
+})
+
 test('a minister without a mobile number is asked for it; an empty group cannot be chosen', async ({
   page
 }) => {

@@ -15,55 +15,70 @@
 
       <p v-if="!busy && !worker.messages.length" class="text-medium-emphasis">{{ text.noMessages }}</p>
 
+      <!-- a thread: a message, and the answers to it inside, so it is clear what they answer -->
       <article
-        v-for="message of worker.messages"
-        :key="message.id"
+        v-for="thread of threads"
+        :key="thread.root.id"
         class="message"
         :class="{
-          'message--incoming': incoming(message),
-          'message--unread': incoming(message) && !message.readAt
+          'message--incoming': incoming(thread.root),
+          'message--unread': incoming(thread.root) && !thread.root.readAt
         }"
       >
-        <header class="d-flex align-center ga-2 mb-1">
-          <v-icon
-            :icon="incoming(message) ? 'mdi-message-arrow-left-outline' : 'mdi-message-arrow-right'"
-            size="small"
-            color="secondary"
-          />
-          <span class="message__who">
-            {{
-              incoming(message)
-                ? format(text.from, { name: message.fromName })
-                : format(text.to, { name: message.toName })
-            }}
-          </span>
-          <v-spacer />
-          <small class="text-medium-emphasis">{{ time(message.createdAt) }}</small>
-        </header>
+        <div
+          v-for="message of [thread.root, ...thread.replies]"
+          :key="message.id"
+          :class="{ reply: message !== thread.root }"
+        >
+          <header class="d-flex align-center ga-2 mb-1">
+            <v-icon
+              :icon="incoming(message) ? 'mdi-message-arrow-right' : 'mdi-message-arrow-left-outline'"
+              size="small"
+              color="secondary"
+            />
+            <span class="message__who">
+              {{
+                incoming(message)
+                  ? format(text.from, { name: message.fromName })
+                  : format(text.to, { name: message.toName })
+              }}
+            </span>
+            <v-spacer />
+            <small class="text-medium-emphasis">{{ time(message.createdAt) }}</small>
+            <!-- an incoming message: answered, or waiting for an answer -->
+            <v-icon
+              v-if="incoming(message)"
+              :icon="answered(message) ? 'mdi-check-circle' : 'mdi-bell-alert'"
+              :color="answered(message) ? 'primary' : 'calendar-orange'"
+              :aria-label="answered(message) ? text.answered : text.notAnswered"
+              size="small"
+            />
+          </header>
 
-        <p v-if="message.text" class="message__text">{{ message.text }}</p>
-        <AttachmentView v-if="message.attachment" :attachment="message.attachment" class="mb-2" />
+          <p v-if="message.text" class="message__text">{{ message.text }}</p>
+          <AttachmentView v-if="message.attachment" :attachment="message.attachment" class="mb-2" />
 
-        <div v-if="incoming(message)" class="d-flex flex-wrap ga-2">
-          <SendMessage :reply-to="message" />
-          <v-btn
-            v-if="message.attachment"
-            variant="text"
-            color="buttons"
-            size="small"
-            class="text-none"
-            prepend-icon="mdi-content-save-outline"
-            :disabled="savedIds.includes(message.id)"
-            @click="save(message)"
-          >
-            {{
-              savedIds.includes(message.id)
-                ? text.saved
-                : message.attachment.kind === 'topic'
-                  ? text.saveTopic
-                  : text.saveNote
-            }}
-          </v-btn>
+          <div v-if="incoming(message)" class="d-flex flex-wrap ga-2">
+            <SendMessage :reply-to="message" />
+            <v-btn
+              v-if="message.attachment"
+              variant="text"
+              color="buttons"
+              size="small"
+              class="text-none"
+              prepend-icon="mdi-content-save-outline"
+              :disabled="savedIds.includes(message.id)"
+              @click="save(message)"
+            >
+              {{
+                savedIds.includes(message.id)
+                  ? text.saved
+                  : message.attachment.kind === 'topic'
+                    ? text.saveTopic
+                    : text.saveNote
+              }}
+            </v-btn>
+          </div>
         </div>
       </article>
     </template>
@@ -71,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
@@ -93,6 +108,39 @@ const error = ref('')
 const savedIds = ref<string[]>([])
 
 const incoming = (message: Message) => message.toUid === user.uid
+
+/** the user answered the message */
+const answered = (message: Message) =>
+  worker.messages.some((item) => item.replyTo === message.id && item.fromUid === user.uid)
+
+/**
+ * Threads: a message that answers none (or whose message is gone) with all the answers of its chain
+ * inside, in the order they were written; the threads with the latest messages first
+ */
+const threads = computed(() => {
+  const byId = new Map(worker.messages.map((message) => [message.id, message]))
+  const rootOf = (message: Message) => {
+    let root = message
+    const seen = new Set<string>()
+    while (root.replyTo && byId.has(root.replyTo) && !seen.has(root.id)) {
+      seen.add(root.id)
+      root = byId.get(root.replyTo)!
+    }
+    return root
+  }
+  const groups = new Map<string, { root: Message; replies: Message[] }>()
+  for (const message of worker.messages) {
+    const root = rootOf(message)
+    const group = groups.get(root.id) ?? { root, replies: [] }
+    if (message !== root) group.replies.push(message)
+    groups.set(root.id, group)
+  }
+  const latest = (group: { root: Message; replies: Message[] }) =>
+    Math.max(group.root.createdAt, ...group.replies.map((item) => item.createdAt))
+  return [...groups.values()]
+    .map((group) => ({ ...group, replies: group.replies.sort((a, b) => a.createdAt - b.createdAt) }))
+    .sort((a, b) => latest(b) - latest(a))
+})
 
 const time = (ms: number) =>
   new Date(ms).toLocaleString(undefined, {
@@ -165,6 +213,12 @@ watch(() => worker.canReceive, load)
 
 .message--unread {
   border-color: rgb(var(--v-theme-secondary));
+}
+
+.reply {
+  margin: 10px 0 0 16px;
+  padding-left: 12px;
+  border-left: solid 3px rgb(var(--v-theme-secondary) / 40%);
 }
 
 .message__who {

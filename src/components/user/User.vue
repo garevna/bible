@@ -105,7 +105,7 @@
           @click="app.setPage('messages')"
         >
           <v-badge :model-value="worker.unread > 0" :content="worker.unread" color="warning" floating>
-            <v-icon icon="mdi-message-arrow-left-outline" />
+            <v-icon icon="mdi-message-arrow-right" />
           </v-badge>
         </v-btn>
       </template>
