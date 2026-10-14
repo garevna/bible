@@ -1,5 +1,10 @@
 html {
   overflow-y: auto;
+  /* nothing may make the page wider than the screen: a phone turned on its side would zoom and shift it */
+  overflow-x: hidden;
+  /* and the phone does not enlarge the text when it is turned */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .v-application {

@@ -1,7 +1,7 @@
 <template>
-  <v-app-bar flat color="primary" class="bottom-border">
+  <v-app-bar flat color="primary" class="bottom-border" :density="low ? 'compact' : 'default'">
     <div class="d-flex align-center ml-4">
-      <img :src="logo" alt="" class="logo mr-3" width="40" height="48" />
+      <img :src="logo" alt="" class="logo mr-3" :width="low ? 32 : 40" :height="low ? 38 : 48" />
 
       <span v-if="!short" class="font-weight-bold">{{ header.chirchTitle }}</span>
       <v-tooltip v-else :text="header.chirchTitle">
@@ -180,7 +180,7 @@
 
     <v-progress-linear :active="app.progress" indeterminate absolute location="bottom" color="warning" />
 
-    <h4 class="view-title bg-primary">{{ title }}</h4>
+    <h4 class="view-title bg-primary" :class="{ 'view-title--low': low }">{{ title }}</h4>
   </v-app-bar>
 </template>
 
@@ -218,7 +218,9 @@ const {
 } = storeToRefs(useLanguageStore())
 
 /** a phone with a signed in user: one menu instead of a row of buttons */
-const { smAndDown } = useDisplay()
+const { smAndDown, height } = useDisplay()
+/** a phone on its side: the header is lower, to leave room for the page */
+const low = computed(() => height.value < 500)
 const compact = computed(() => user.signed && smAndDown.value)
 
 /** the page the user is on: marked, and not opened again */
@@ -263,6 +265,14 @@ const langIcon = computed(
     border-radius: 0 0 8px 8px;
     font-size: 14px;
   }
+}
+
+/* the lower header of a phone on its side (48px instead of 64px) */
+.view-title.view-title--low {
+  top: 48px;
+  padding: 2px 16px 4px;
+  border-radius: 0 0 8px 8px;
+  font-size: 13px;
 }
 
 .bottom-border {
