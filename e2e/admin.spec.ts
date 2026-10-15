@@ -123,20 +123,41 @@ test('the sections on the left; ministers get roles, the readers are shown on re
   await expect(nav.locator('.v-list-item')).toHaveText(['Ролі і права', 'Служителі', 'Служіння', 'Локації'])
 
   await nav.getByText('Служителі').click()
-  const rows = page.locator('.user-row')
+  const rows = page.locator('.users-table tbody tr:not(.details-row)')
   // the reader is hidden until asked for
   await expect(rows).toHaveCount(2)
   await page.getByLabel('Показати читачів').check()
   await expect(rows).toHaveCount(3)
+  // a ministry filters the table
+  await page.locator('.filters .v-select', { hasText: 'Служіння' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Музичне служіння' }).click()
+  await expect(rows).toHaveCount(1)
+  await expect(rows.first()).toContainText('Лідер')
+  await page
+    .locator('.filters .v-select', { hasText: 'Музичне служіння' })
+    .locator('.mdi-close-circle')
+    .click()
+  await expect(rows).toHaveCount(3)
 
-  const pastor = rows.filter({ hasText: 'pastor@example.com' })
-  await pastor.locator('.role-select').click()
+  // a row opens its details: the role, the name
+  await rows.filter({ hasText: 'pastor@example.com' }).click()
+  const details = page.locator('.details-row')
+  await details.locator('.v-select', { hasText: 'Роль' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Служитель' }).click()
   await expect
     .poll(() => requests)
     .toContainEqual({ method: 'PUT', path: '/admin/users/pastor-uid', body: { role: 'servant' } })
+  await details.getByLabel('Ім’я').fill('Пастор Петро')
+  await details.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => requests)
+    .toContainEqual({ method: 'PUT', path: '/admin/users/pastor-uid', body: { name: 'Пастор Петро' } })
+
   // the administrator's own role is not changed here
-  await expect(rows.filter({ hasText: 'це ви' }).locator('.role-select')).toHaveClass(/v-input--disabled/)
+  await rows.filter({ hasText: 'pastor@example.com' }).click()
+  await expect(details).toHaveCount(0)
+  await rows.filter({ hasText: 'це ви' }).click()
+  await expect(details.locator('.v-select', { hasText: 'Роль' })).toHaveClass(/v-input--disabled/)
 })
 
 test('roles: rights are changed, a role is added and the roles are saved together', async ({ page }) => {

@@ -14,6 +14,8 @@ export interface UserRecord {
   ministries?: string[]
   /** the mobile number, '+380501234567' (ministers need one) */
   phone?: string
+  /** the name was given by an administrator: signing in keeps it (not the name of the account) */
+  nameSet?: boolean
   /** the private chat with the service bot, once the user linked Telegram */
   telegramChatId?: number
   /** ms */
@@ -51,7 +53,8 @@ export async function touchUser(store: UsersStore, user: AuthUser, now = Date.no
     uid: user.uid,
     email: short(user.email),
     emailVerified: user.emailVerified,
-    name: short(user.name),
+    // the name an administrator gave stays
+    name: old?.nameSet ? old.name : short(user.name),
     lastSeen: old && now - old.lastSeen < SEEN_EVERY ? old.lastSeen : now
   }
   const changed =
@@ -123,7 +126,7 @@ export async function updateUser(
   owners: string,
   admin: UserRecord,
   uid: string,
-  change: { role?: Role; ministries?: string[]; phone?: string | null },
+  change: { role?: Role; ministries?: string[]; phone?: string | null; name?: string | null },
   now = Date.now()
 ): Promise<UserView> {
   const record =
@@ -133,6 +136,8 @@ export async function updateUser(
     ...(change.role ? { role: change.role } : {}),
     ...(change.ministries ? { ministries: change.ministries } : {}),
     ...(change.phone !== undefined ? { phone: change.phone ?? undefined } : {}),
+    // a name of the administrators, or (null) the name of the account again, from the next sign in
+    ...(change.name !== undefined ? { name: change.name ?? record.name, nameSet: Boolean(change.name) } : {}),
     updatedBy: admin.name ?? admin.email ?? admin.uid,
     updatedAt: now
   }

@@ -72,6 +72,10 @@ export interface UserView {
   ministries?: string[]
   /** the mobile number, '+380501234567' */
   phone?: string
+  /** the name was given by an administrator (signing in keeps it) */
+  nameSet?: boolean
+  /** the user linked Telegram (the service bot writes to them) */
+  telegramChatId?: number
   /** an administrator the dashboard cannot change (the worker settings, OWNERS) */
   owner: boolean
   lastSeen: number
@@ -321,7 +325,7 @@ export const useWorkerStore = defineStore('worker', () => {
 
   const updateUser = async (
     uid: string,
-    change: { role?: Role; ministries?: string[]; phone?: string | null }
+    change: { role?: Role; ministries?: string[]; phone?: string | null; name?: string | null }
   ) => (await call<{ user: UserView }>('PUT', `/admin/users/${encodeURIComponent(uid)}`, change)).user
 
   const setUserRole = (uid: string, newRole: Role) => updateUser(uid, { role: newRole })

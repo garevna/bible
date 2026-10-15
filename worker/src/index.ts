@@ -83,7 +83,7 @@ import {
  *   GET    /admin/settings          the roles, types, ministries and locations
  *   PUT    /admin/roles             { roles }                                        roles
  *   GET    /admin/users             the users who signed in                          users
- *   PUT    /admin/users/:uid        { role?, ministries?, phone? }                   users
+ *   PUT    /admin/users/:uid        { role?, ministries?, phone?, name? }            users
  *   DELETE /admin/users/:uid        takes a user off the list                        users
  *   PUT    /admin/directories/:name { items }: 'ministries' or 'locations'           directories
  *   PUT    /admin/types             { types }                                        types
@@ -627,21 +627,41 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       await removeUser(env.USERS, env.OWNERS, me, uid)
       return json({ removed: uid })
     }
-    const change = ((await body()) ?? {}) as { role?: unknown; ministries?: unknown; phone?: unknown }
+    const change = ((await body()) ?? {}) as {
+      role?: unknown
+      ministries?: unknown
+      phone?: unknown
+      name?: unknown
+    }
+    // a name: up to 80 letters; empty or null: the name of the account
+    const name =
+      change.name === undefined
+        ? undefined
+        : typeof change.name === 'string' && change.name.trim().length <= 80
+          ? change.name.trim() || null
+          : change.name === null
+            ? null
+            : false
     const role =
       typeof change.role === 'string' && roles.some((item) => item.id === change.role) ? change.role : null
     const ministries = change.ministries === undefined ? undefined : parseMinistries(change.ministries)
     const badPhone = change.phone !== undefined && change.phone !== null && !isPhone(change.phone)
-    if ((change.role !== undefined && !role) || ministries === null || badPhone) {
+    if ((change.role !== undefined && !role) || ministries === null || badPhone || name === false) {
       return json({ error: 'bad-request' }, 400)
     }
-    if (change.role === undefined && ministries === undefined && change.phone === undefined) {
+    if (
+      change.role === undefined &&
+      ministries === undefined &&
+      change.phone === undefined &&
+      name === undefined
+    ) {
       return json({ error: 'bad-request' }, 400)
     }
     const user = await updateUser(env.USERS, env.OWNERS, me, uid, {
       ...(role ? { role } : {}),
       ...(ministries ? { ministries } : {}),
-      ...(change.phone !== undefined ? { phone: change.phone as string | null } : {})
+      ...(change.phone !== undefined ? { phone: change.phone as string | null } : {}),
+      ...(name !== undefined ? { name } : {})
     })
     return json({ user })
   } catch (error) {

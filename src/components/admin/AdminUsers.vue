@@ -2,9 +2,9 @@
   <section>
     <h2 class="admin-title">{{ text.sectionUsers }}</h2>
     <p class="hint">{{ text.usersHint }}</p>
-    <p class="hint">{{ text.remove }}: {{ text.removeHint }}.</p>
 
-    <div class="d-flex flex-wrap align-center ga-4 mb-4">
+    <!-- the filters: words, a role, a ministry, the readers -->
+    <div class="filters">
       <v-text-field
         v-model="query"
         :placeholder="text.search"
@@ -12,7 +12,25 @@
         density="compact"
         clearable
         hide-details
-        class="search"
+        class="filter filter--search"
+      />
+      <v-select
+        v-model="roleFilter"
+        :items="roleItems"
+        :label="text.filterRole"
+        density="compact"
+        clearable
+        hide-details
+        class="filter"
+      />
+      <v-select
+        v-model="ministryFilter"
+        :items="ministries"
+        :label="text.filterMinistry"
+        density="compact"
+        clearable
+        hide-details
+        class="filter"
       />
       <v-switch
         v-model="readers"
@@ -20,76 +38,159 @@
         color="secondary"
         density="compact"
         hide-details
+        class="flex-grow-0"
       />
     </div>
 
-    <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
-    <p v-if="!busy && !shown.length" class="text-medium-emphasis">{{ text.noUsers }}</p>
-
-    <div v-for="item of shown" :key="item.uid" class="user-row">
-      <div class="flex-grow-1 user-info">
+    <!-- a row opens its details (and their changes) by a click; a phone shows the name and the role only -->
+    <v-data-table
+      v-model:expanded="expanded"
+      :headers="headers"
+      :items="shown"
+      :loading="busy"
+      :no-data-text="text.noUsers"
+      :items-per-page="25"
+      :items-per-page-text="text.perPage"
+      item-value="uid"
+      show-expand
+      density="comfortable"
+      hover
+      class="users-table"
+      @click:row="
+        (_event: unknown, row: { internalItem: unknown; toggleExpand: (item: unknown) => void }) =>
+          row.toggleExpand(row.internalItem)
+      "
+    >
+      <template #[`item.name`]="{ item }">
         <div class="user-name">
-          {{ item.name || item.email || item.uid }}
+          {{ nameOf(item) }}
           <v-chip v-if="item.uid === user.uid" size="x-small" variant="tonal" class="ml-1">{{
             text.you
           }}</v-chip>
         </div>
-        <div class="user-details">
-          <span v-if="item.email && item.name">{{ item.email }}</span>
-          <span v-if="item.email && !item.emailVerified" class="unverified">{{ text.unverified }}</span>
-          <a v-if="item.phone" :href="'tel:' + item.phone" class="phone">{{ item.phone }}</a>
-          <span>{{ format(text.lastSeen, { name: day(item.lastSeen) }) }}</span>
-          <span v-if="item.updatedBy">{{ format(text.changedBy, { name: item.updatedBy }) }}</span>
-        </div>
-      </div>
+        <div v-if="item.email && item.name" class="user-email">{{ item.email }}</div>
+      </template>
+      <template #[`item.role`]="{ item }">
+        <v-chip size="small" variant="tonal" :color="isReader(item) ? undefined : 'secondary'">
+          {{ roleName(item.role) }}
+        </v-chip>
+      </template>
+      <template #[`item.ministries`]="{ item }">
+        <span class="ministries">{{ ministriesOf(item).join(', ') }}</span>
+      </template>
+      <template #[`item.phone`]="{ item }">
+        <span class="nowrap">{{ item.phone ?? '' }}</span>
+      </template>
+      <template #[`item.telegram`]="{ item }">
+        <v-icon
+          v-if="item.telegramChatId"
+          icon="mdi-send-check-outline"
+          color="secondary"
+          size="small"
+          :aria-label="text.telegramLinked"
+        />
+      </template>
+      <template #[`item.lastSeen`]="{ item }">
+        <span class="nowrap">{{ day(item.lastSeen) }}</span>
+      </template>
 
-      <v-select
-        :model-value="item.role"
-        :items="roleItems"
-        :disabled="item.uid === user.uid || saving === item.uid"
-        :loading="saving === item.uid"
-        :aria-label="item.name || item.email || item.uid"
-        density="compact"
-        hide-details
-        class="role-select"
-        @update:model-value="change(item, { role: $event })"
-      />
+      <!-- the details, and their changes -->
+      <template #expanded-row="{ columns, item }">
+        <tr class="details-row">
+          <td :colspan="columns.length">
+            <div class="details">
+              <div class="d-flex flex-wrap ga-2 align-center">
+                <v-text-field
+                  :model-value="names[item.uid] ?? item.name ?? ''"
+                  :label="text.userName"
+                  :hint="item.nameSet ? text.nameSetHint : text.nameAccountHint"
+                  persistent-hint
+                  density="compact"
+                  class="field"
+                  @update:model-value="(value: string) => (names[item.uid] = value)"
+                  @keydown.enter="saveName(item)"
+                />
+                <v-btn
+                  variant="tonal"
+                  color="buttons"
+                  class="text-none"
+                  :disabled="
+                    (names[item.uid] ?? item.name ?? '') === (item.name ?? '') || saving === item.uid
+                  "
+                  @click="saveName(item)"
+                >
+                  {{ common.save }}
+                </v-btn>
+              </div>
 
-      <v-select
-        :model-value="(item.ministries ?? []).filter((ministry) => ministries.includes(ministry))"
-        :items="ministries"
-        :label="text.sectionMinistries"
-        :disabled="saving === item.uid"
-        multiple
-        chips
-        closable-chips
-        density="compact"
-        hide-details
-        class="ministries-select"
-        @update:model-value="change(item, { ministries: $event })"
-      />
+              <div class="info">
+                <span v-if="item.email">
+                  <v-icon icon="mdi-email-outline" size="x-small" /> {{ item.email }}
+                  <span v-if="!item.emailVerified" class="unverified">· {{ text.unverified }}</span>
+                </span>
+                <span>{{ format(text.lastSeen, { name: day(item.lastSeen) }) }}</span>
+                <span v-if="item.updatedBy">{{ format(text.changedBy, { name: item.updatedBy }) }}</span>
+                <span>
+                  <v-icon icon="mdi-send-outline" size="x-small" />
+                  {{ item.telegramChatId ? text.telegramLinked : text.telegramNotLinked }}
+                </span>
+              </div>
 
-      <ButtonTooltip
-        icon="mdi-cellphone-cog"
-        :text="header.myPhone"
-        color="secondary"
-        small
-        @click="phoneOf = item"
-      />
+              <div class="d-flex flex-wrap ga-2 align-center">
+                <v-select
+                  :model-value="item.role"
+                  :items="roleItems"
+                  :label="text.roleColumn"
+                  :disabled="item.uid === user.uid || saving === item.uid"
+                  :loading="saving === item.uid"
+                  density="compact"
+                  hide-details
+                  class="field"
+                  @update:model-value="change(item, { role: $event })"
+                />
+                <v-select
+                  :model-value="ministriesOf(item)"
+                  :items="ministries"
+                  :label="text.sectionMinistries"
+                  :disabled="saving === item.uid"
+                  multiple
+                  chips
+                  closable-chips
+                  density="compact"
+                  hide-details
+                  class="field field--wide"
+                  @update:model-value="change(item, { ministries: $event })"
+                />
+              </div>
 
-      <ConfirmButton
-        v-if="item.uid !== user.uid"
-        icon="mdi-account-remove-outline"
-        :text="text.remove"
-        @confirm="remove(item)"
-      />
-      <span v-else class="remove-placeholder" />
-    </div>
+              <div class="d-flex flex-wrap ga-2 align-center">
+                <v-btn
+                  variant="text"
+                  color="secondary"
+                  class="text-none"
+                  prepend-icon="mdi-cellphone-cog"
+                  @click="phoneOf = item"
+                >
+                  {{ item.phone ?? header.myPhone }}
+                </v-btn>
+                <v-spacer />
+                <ConfirmButton
+                  v-if="item.uid !== user.uid"
+                  icon="mdi-account-remove-outline"
+                  :text="`${text.remove}: ${text.removeHint}`"
+                  @confirm="remove(item)"
+                />
+              </div>
+            </div>
+          </td>
+        </tr>
+      </template>
+    </v-data-table>
 
     <PhoneDialog
       :model-value="Boolean(phoneOf)"
       :number="phoneOf?.phone ?? null"
-      :title="phoneOf ? phoneOf.name || phoneOf.email || phoneOf.uid : ''"
+      :title="phoneOf ? nameOf(phoneOf) : ''"
       :submit="(phone: string) => change(phoneOf!, { phone })"
       @update:model-value="(value: boolean) => value || (phoneOf = null)"
     />
@@ -97,10 +198,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, reactive, ref, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useDisplay } from 'vuetify'
 
-import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import PhoneDialog from '@/components/PhoneDialog.vue'
 import { useLanguageStore } from '@/stores/language'
@@ -108,23 +209,57 @@ import { useUserStore } from '@/stores/user'
 import { READER, useWorkerStore, type Role, type RoleDef, type UserView } from '@/stores/worker'
 import { format } from '@/utils/format'
 
-/** The ministers: their role, ministries and phone; the readers only on request (to make one a minister) */
+/**
+ * The people of the app as a table: the words, a role and a ministry filter it (the readers on request);
+ * a row opens the details, where the name, the role, the ministries and the phone are changed.
+ */
 const props = defineProps<{ roles: RoleDef[]; ministries: string[] }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
 const worker = useWorkerStore()
 const user = useUserStore()
-const { admin: text, header } = storeToRefs(useLanguageStore())
+const { admin: text, common, header } = storeToRefs(useLanguageStore())
+const { smAndDown: phone } = useDisplay()
 
 const users = shallowRef<UserView[]>([])
 const query = ref('')
+const roleFilter = ref<string | null>(null)
+const ministryFilter = ref<string | null>(null)
 const readers = ref(false)
+const expanded = ref<string[]>([])
 const busy = ref(false)
 const saving = ref<string | null>(null)
+/** the names being written, by user */
+const names = reactive<Record<string, string>>({})
 /** the user whose mobile number is being entered */
 const phoneOf = shallowRef<UserView | null>(null)
 
+/** a phone: the name and the role only, the rest is in the details */
+const headers = computed(() => {
+  const all = [
+    { key: 'name', title: text.value.userName, sortable: true, value: (item: UserView) => nameOf(item) },
+    {
+      key: 'role',
+      title: text.value.roleColumn,
+      sortable: true,
+      value: (item: UserView) => roleName(item.role)
+    },
+    { key: 'ministries', title: text.value.sectionMinistries, sortable: false },
+    { key: 'phone', title: header.value.myPhone, sortable: false },
+    { key: 'telegram', title: 'Telegram', sortable: false, align: 'center' as const },
+    { key: 'lastSeen', title: text.value.lastSeenColumn, sortable: true },
+    { key: 'data-table-expand', title: '' }
+  ]
+  return phone.value ? all.filter((item) => ['name', 'role', 'data-table-expand'].includes(item.key)) : all
+})
+
 const roleItems = computed(() => props.roles.map((role) => ({ value: role.id, title: role.name })))
+const roleName = (id: Role) =>
+  props.roles.find((role) => role.id === id)?.name ?? (id === 'owner' ? text.value.owner : id)
+
+const nameOf = (item: UserView) => item.name || item.email || item.uid
+const ministriesOf = (item: UserView) =>
+  (item.ministries ?? []).filter((ministry) => props.ministries.includes(ministry))
 
 /** a removed role counts as the reader */
 const isReader = (item: UserView) =>
@@ -133,8 +268,13 @@ const isReader = (item: UserView) =>
 const shown = computed(() => {
   const words = (query.value ?? '').trim().toLowerCase()
   return users.value
-    .filter((item) => readers.value || !isReader(item))
-    .filter((item) => !words || `${item.name ?? ''} ${item.email ?? ''}`.toLowerCase().includes(words))
+    .filter((item) => readers.value || roleFilter.value === READER || !isReader(item))
+    .filter((item) => !roleFilter.value || item.role === roleFilter.value)
+    .filter((item) => !ministryFilter.value || ministriesOf(item).includes(ministryFilter.value))
+    .filter(
+      (item) =>
+        !words || `${item.name ?? ''} ${item.email ?? ''} ${item.phone ?? ''}`.toLowerCase().includes(words)
+    )
 })
 
 const day = (ms: number) => new Date(ms).toLocaleDateString()
@@ -155,13 +295,23 @@ async function load() {
   busy.value = false
 }
 
-async function change(item: UserView, update: { role?: Role; ministries?: string[]; phone?: string | null }) {
+async function change(
+  item: UserView,
+  update: { role?: Role; ministries?: string[]; phone?: string | null; name?: string | null }
+) {
   saving.value = item.uid
   await run(async () => {
     const updated = await worker.updateUser(item.uid, update)
     users.value = users.value.map((entry) => (entry.uid === updated.uid ? updated : entry))
   })
   saving.value = null
+}
+
+/** the name of the administrators; empty: the name of the account, from the next sign in */
+async function saveName(item: UserView) {
+  const name = (names[item.uid] ?? item.name ?? '').trim()
+  await change(item, { name: name || null })
+  delete names[item.uid]
 }
 
 const remove = (item: UserView) =>
@@ -175,58 +325,70 @@ defineExpose({ load })
 </script>
 
 <style scoped>
-.search {
-  flex: 1 1 240px;
-  max-width: 420px;
-}
-
-.user-row {
+.filters {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px 12px;
-  padding: 10px 0;
+  margin-bottom: 12px;
 }
 
-.user-row + .user-row {
-  border-top: solid 1px var(--app-border-light);
+.filter {
+  flex: 1 1 180px;
+  max-width: 260px;
 }
 
-.user-info {
-  min-width: 200px;
+.filter--search {
+  max-width: 360px;
+}
+
+.users-table :deep(tbody tr:not(.details-row)) {
+  cursor: pointer;
 }
 
 .user-name {
   font-weight: 600;
 }
 
-.user-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
+.user-email,
+.ministries {
   color: var(--app-text-muted);
   font-size: 13px;
 }
 
-.phone {
-  color: rgb(var(--v-theme-secondary));
-  text-decoration: none;
+.nowrap {
+  white-space: nowrap;
+}
+
+.details-row {
+  background: var(--app-light-blue);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 4px;
+}
+
+.info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
 .unverified {
   color: rgb(var(--v-theme-warning));
 }
 
-.role-select {
-  flex: 0 0 200px;
+.field {
+  flex: 1 1 220px;
+  max-width: 320px;
 }
 
-.ministries-select {
-  flex: 1 1 240px;
-  max-width: 360px;
-}
-
-.remove-placeholder {
-  width: 40px;
+.field--wide {
+  max-width: 480px;
 }
 </style>

@@ -126,6 +126,25 @@ describe('worker', () => {
     expect((await call('GET', '/me', 'impostor')).body).toMatchObject({ role: 'reader' })
   })
 
+  it('an administrator names a user; signing in keeps that name; empty gives the account name back', async () => {
+    const { call } = setup()
+    await call('GET', '/me', 'owner')
+    await call('GET', '/me', 'pastor')
+    const named = await call('PUT', '/admin/users/pastor-uid', 'owner', { name: 'Пастор Петро' })
+    expect(named.body.user).toMatchObject({ name: 'Пастор Петро', nameSet: true })
+    // the next request of the pastor does not take it back
+    await call('GET', '/me', 'pastor')
+    const users = (await call('GET', '/admin/users', 'owner')).body.users
+    expect(users.find((item) => item.uid === 'pastor-uid')).toMatchObject({ name: 'Пастор Петро' })
+    expect((await call('PUT', '/admin/users/pastor-uid', 'owner', { name: 'x'.repeat(81) })).status).toBe(400)
+
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { name: '' })
+    await call('GET', '/me', 'pastor')
+    const again = (await call('GET', '/admin/users', 'owner')).body.users
+    // the account of the pastor has no name: the email is shown
+    expect(again.find((item) => item.uid === 'pastor-uid')).toMatchObject({ name: null, nameSet: false })
+  })
+
   it('an admin gives roles to the users who signed in; the new admin can give roles too', async () => {
     const { call } = setup()
     await call('GET', '/me', 'owner')

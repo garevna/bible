@@ -264,6 +264,51 @@ export const admin = {
     ru: 'Руководители служения',
     en: 'Leaders of the ministry'
   },
+  filterRole: {
+    ua: 'Роль',
+    ru: 'Роль',
+    en: 'Role'
+  },
+  roleColumn: {
+    ua: 'Роль',
+    ru: 'Роль',
+    en: 'Role'
+  },
+  userName: {
+    ua: 'Ім’я',
+    ru: 'Имя',
+    en: 'Name'
+  },
+  nameSetHint: {
+    ua: 'Ім’я дав адміністратор; порожнє — ім’я з акаунта',
+    ru: 'Имя дал администратор; пустое — имя из аккаунта',
+    en: 'Given by an administrator; empty: the name of the account'
+  },
+  nameAccountHint: {
+    ua: 'Ім’я з акаунта (Google чи реєстрації); можна змінити',
+    ru: 'Имя из аккаунта (Google или регистрации); можно изменить',
+    en: 'The name of the account (Google or sign up); may be changed'
+  },
+  telegramLinked: {
+    ua: 'Telegram підключено',
+    ru: 'Telegram подключен',
+    en: 'Telegram is linked'
+  },
+  telegramNotLinked: {
+    ua: 'Telegram не підключено',
+    ru: 'Telegram не подключен',
+    en: 'Telegram is not linked'
+  },
+  lastSeenColumn: {
+    ua: 'Востаннє',
+    ru: 'Последний раз',
+    en: 'Last seen'
+  },
+  perPage: {
+    ua: 'Рядків на сторінці:',
+    ru: 'Строк на странице:',
+    en: 'Rows per page:'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',
