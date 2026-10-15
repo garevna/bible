@@ -731,15 +731,25 @@ describe('the schedule of ministries', () => {
       (await call('PUT', '/admin/addresses', 'owner', { addresses: { Невідома: 'Харків' } })).status
     ).toBe(400)
     const saved = await call('PUT', '/admin/addresses', 'owner', {
-      addresses: { Церква: ' Харків, вул. Сумська, 1 ', Онлайн: '' }
+      addresses: { Церква: { address: ' Харків, вул. Сумська, 1 ', lat: 49.99, lng: 36.23 }, Онлайн: '' }
     })
-    expect(saved.body).toEqual({ addresses: { Церква: 'Харків, вул. Сумська, 1' } })
-    expect((await call('GET', '/schedule', 'leader')).body.addresses).toEqual({
-      Церква: 'Харків, вул. Сумська, 1'
+    const place = { address: 'Харків, вул. Сумська, 1', lat: 49.99, lng: 36.23 }
+    expect(saved.body).toEqual({ addresses: { Церква: place } })
+    expect((await call('GET', '/schedule', 'leader')).body.addresses).toEqual({ Церква: place })
+    expect((await call('GET', '/ministries', 'leader')).body.addresses).toEqual({ Церква: place })
+    // a plain text is an address; a point is both coordinates
+    expect(
+      (await call('PUT', '/admin/addresses', 'owner', { addresses: { Церква: 'Харків' } })).body
+    ).toEqual({
+      addresses: { Церква: { address: 'Харків' } }
     })
-    expect((await call('GET', '/ministries', 'leader')).body.addresses).toEqual({
-      Церква: 'Харків, вул. Сумська, 1'
-    })
+    expect(
+      (
+        await call('PUT', '/admin/addresses', 'owner', {
+          addresses: { Церква: { address: 'Харків', lat: 50 } }
+        })
+      ).status
+    ).toBe(400)
   })
 
   it('a leader of a ministry plans its events, not the events of another ministry', async () => {

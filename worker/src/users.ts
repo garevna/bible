@@ -193,24 +193,58 @@ export function parseLeaders(value: unknown, ministries: string[]): Leaders | nu
   return leaders
 }
 
-/** The addresses of the locations: { 'Церква': 'Харків, вул. …' }; a map opens them (none: online) */
-export type Addresses = Record<string, string>
+/** The place of a location: its address, and the point on the map when it was chosen there */
+export interface Place {
+  address: string
+  lat?: number
+  lng?: number
+}
+
+/** The places of the locations: { 'Церква': { address: 'Харків, вул. …', lat, lng } }; none: online */
+export type Addresses = Record<string, Place>
 
 const ADDRESSES_KEY = 'settings:addresses'
 
-export const getAddresses = async (store: UsersStore) =>
-  (await store.get<Addresses>(ADDRESSES_KEY, 'json')) ?? {}
+/** the places; an address kept as a plain text (before the points on the map) is a place too */
+export async function getAddresses(store: UsersStore): Promise<Addresses> {
+  const kept = (await store.get<Record<string, Place | string>>(ADDRESSES_KEY, 'json')) ?? {}
+  return Object.fromEntries(
+    Object.entries(kept).map(([location, place]) => [
+      location,
+      typeof place === 'string' ? { address: place } : place
+    ])
+  )
+}
 
 export const setAddresses = (store: UsersStore, addresses: Addresses) =>
   store.put(ADDRESSES_KEY, JSON.stringify(addresses))
 
-/** { location: address } of known locations, up to 200 letters each (empty: none); null when it is not that */
+const isCoordinate = (value: unknown, limit: number) =>
+  typeof value === 'number' && Number.isFinite(value) && Math.abs(value) <= limit
+
+/**
+ * { location: place } of known locations: an address of up to 200 letters (empty: none) and the point
+ * on the map, both coordinates or none; a plain text is an address. Null when it is not that
+ */
 export function parseAddresses(value: unknown, locations: string[]): Addresses | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const addresses: Addresses = {}
-  for (const [location, address] of Object.entries(value as Record<string, unknown>)) {
-    if (!locations.includes(location) || typeof address !== 'string' || address.length > 200) return null
-    if (address.trim()) addresses[location] = address.trim()
+  for (const [location, item] of Object.entries(value as Record<string, unknown>)) {
+    const place = (typeof item === 'string' ? { address: item } : item) as Record<string, unknown> | null
+    if (
+      !locations.includes(location) ||
+      !place ||
+      typeof place.address !== 'string' ||
+      place.address.length > 200
+    )
+      return null
+    const point = place.lat !== undefined || place.lng !== undefined
+    if (point && (!isCoordinate(place.lat, 90) || !isCoordinate(place.lng, 180))) return null
+    const address = place.address.trim()
+    if (address)
+      addresses[location] = point
+        ? { address, lat: place.lat as number, lng: place.lng as number }
+        : { address }
   }
   return addresses
 }

@@ -17,7 +17,7 @@ import {
   type ScheduleEvent,
   type ScheduleStore
 } from './schedule'
-import type { UserRecord, UserView } from './users'
+import type { Addresses, UserRecord, UserView } from './users'
 
 /**
  * The schedule of ministries.
@@ -63,8 +63,8 @@ export interface ScheduleContext {
   bot: ServiceBot
   /** the leaders of the ministries: they plan the events of their own ministry */
   leaders: Record<string, string[]>
-  /** the addresses of the locations: a map opens them */
-  addresses?: Record<string, string>
+  /** the places of the locations: a map opens them */
+  addresses?: Addresses
   /** a reader (not a minister): sees and applies to the open events for everyone only */
   reader?: boolean
   now: number

@@ -364,6 +364,31 @@ export const admin = {
     ru: 'Адрес (для карты; онлайн — пусто)',
     en: 'Address (for the map; online: empty)'
   },
+  findOnMap: {
+    ua: 'Знайти на карті',
+    ru: 'Найти на карте',
+    en: 'Find on the map'
+  },
+  searchAddress: {
+    ua: 'Пошук адреси (вулиця, будинок, місто)',
+    ru: 'Поиск адреса (улица, дом, город)',
+    en: 'Look for the address (street, house, city)'
+  },
+  nothingFound: {
+    ua: 'Нічого не знайдено — уточніть адресу або поставте маркер на карті',
+    ru: 'Ничего не найдено — уточните адрес или поставьте маркер на карте',
+    en: 'Nothing found: say more, or put the marker on the map'
+  },
+  moveMarker: {
+    ua: 'Перетягніть маркер або натисніть на карту, щоб уточнити місце',
+    ru: 'Перетащите маркер или нажмите на карту, чтобы уточнить место',
+    en: 'Drag the marker or click the map to put the place right'
+  },
+  noMap: {
+    ua: 'Карта недоступна в цьому браузері; адресу можна знайти пошуком',
+    ru: 'Карта недоступна в этом браузере; адрес можно найти поиском',
+    en: 'The map does not work in this browser; the search does'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',

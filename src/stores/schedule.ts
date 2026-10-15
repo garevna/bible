@@ -36,6 +36,19 @@ export interface CalendarSettings {
 
 export const DEFAULT_CALENDAR: CalendarSettings = { redDays: 2, orangeDays: 5, filters: [...FILTERS] }
 
+/** The place of a location: its address, and the point on the map when it was chosen there */
+export interface Place {
+  address: string
+  lat?: number
+  lng?: number
+}
+
+/** Google Maps in a tab of its own: at the point, or found by the address */
+export const mapUrl = (place: Place) =>
+  `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    place.lat !== undefined && place.lng !== undefined ? `${place.lat},${place.lng}` : place.address
+  )}`
+
 export const APPLICANTS = ['ministry', 'servants', 'everyone'] as const
 export type Applicants = (typeof APPLICANTS)[number]
 
@@ -302,7 +315,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const ministries = shallowRef<string[]>([])
   const locations = shallowRef<string[]>([])
   /** the addresses of the locations: a map opens them */
-  const addresses = shallowRef<Record<string, string>>({})
+  const addresses = shallowRef<Record<string, Place>>({})
   const today = ref('')
   /** the month shown, 'YYYY-MM' */
   const month = ref(isoDay(new Date()).slice(0, 7))
@@ -414,7 +427,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       types?: EventType[]
       calendar?: CalendarSettings
       changes?: DayChange[]
-      addresses?: Record<string, string>
+      addresses?: Record<string, Place>
       today: string
     }>('GET', `/schedule${query}`)
     events.value = answer.events.map((event) => ({
@@ -451,7 +464,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   async function loadChoices() {
     const [answer, lists] = await Promise.all([
       worker.request<{ people: Person[] }>('GET', '/schedule/people'),
-      worker.request<{ ministries: string[]; locations?: string[]; addresses?: Record<string, string> }>(
+      worker.request<{ ministries: string[]; locations?: string[]; addresses?: Record<string, Place> }>(
         'GET',
         '/ministries'
       )

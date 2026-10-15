@@ -47,6 +47,8 @@ export default defineConfig(({ command }) => ({
       workbox: {
         // bible-*.json are 4-8 MB each and are stored in IndexedDB after the first load
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}', 'theme.json'],
+        // the map (MapLibre, ~0.9 MB) only opens for the administrators choosing a place: not for every visitor
+        globIgnores: ['**/maplibre-gl-*'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024
       }
     })

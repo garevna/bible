@@ -1,6 +1,6 @@
 import type { Page, Route } from '@playwright/test'
 
-import { expect, openBible, signInLocally, test, withStores } from './fixtures'
+import { dialog, expect, openBible, signInLocally, test, withStores } from './fixtures'
 
 const role = (id: string, name: string, change: Record<string, unknown> = {}) => ({
   id,
@@ -378,7 +378,34 @@ test('the lists of ministries and locations', async ({ page }) => {
     .toContainEqual({
       method: 'PUT',
       path: '/admin/addresses',
-      body: { addresses: { Церква: 'Харків, вул. Сумська, 1' } }
+      body: { addresses: { Церква: { address: 'Харків, вул. Сумська, 1' } } }
+    })
+
+  // or found on the map (the search of OpenStreetMap, here without the internet)
+  await page.route('https://nominatim.openstreetmap.org/search**', (route) =>
+    route.fulfill({
+      json: [
+        {
+          place_id: 1,
+          display_name: 'Сумська вулиця, 1, Харків, Україна',
+          lat: '49.9935',
+          lon: '36.2304',
+          address: { road: 'Сумська вулиця', house_number: '1', city: 'Харків' }
+        }
+      ]
+    })
+  )
+  await church.locator('[aria-label="Знайти на карті"]').click()
+  const picker = dialog(page)
+  await picker.getByRole('textbox', { name: 'Пошук адреси (вулиця, будинок, місто)' }).fill('Сумська 1')
+  await picker.locator('.found .v-list-item', { hasText: 'Сумська вулиця, 1, Харків' }).click()
+  await picker.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => requests.at(-1))
+    .toEqual({
+      method: 'PUT',
+      path: '/admin/addresses',
+      body: { addresses: { Церква: { address: 'Сумська вулиця, 1, Харків', lat: 49.9935, lng: 36.2304 } } }
     })
 })
 

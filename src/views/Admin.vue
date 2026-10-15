@@ -100,7 +100,7 @@ import AdminMinistries from '@/components/admin/AdminMinistries.vue'
 import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
 import { useLanguageStore } from '@/stores/language'
-import type { CalendarSettings, EventType } from '@/stores/schedule'
+import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
 import { useWorkerStore, WorkerError, type Manage, type RoleDef } from '@/stores/worker'
 import { format } from '@/utils/format'
 import type { NoteType } from '@/utils/noteTypes'
@@ -148,7 +148,7 @@ const settings = ref<{
   eventTypes: EventType[]
   calendar: CalendarSettings
   leaders: Record<string, string[]>
-  addresses: Record<string, string>
+  addresses: Record<string, Place>
 } | null>(null)
 const busy = ref(false)
 const error = ref('')

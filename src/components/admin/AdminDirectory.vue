@@ -9,7 +9,7 @@
       <!-- a location: its address opens on the map (none: online) -->
       <v-text-field
         v-if="addresses"
-        :model-value="draftAddresses[item] ?? addresses[item] ?? ''"
+        :model-value="draftAddresses[item] ?? addresses[item]?.address ?? ''"
         :placeholder="text.address"
         :disabled="busy"
         density="compact"
@@ -18,6 +18,18 @@
         @update:model-value="(value: string) => (draftAddresses[item] = value)"
         @blur="saveAddress(item)"
         @keydown.enter="saveAddress(item)"
+      >
+        <!-- the point on the map was chosen -->
+        <template v-if="addresses[item]?.lat !== undefined" #prepend-inner>
+          <v-icon icon="mdi-map-marker-check" size="small" color="secondary" />
+        </template>
+      </v-text-field>
+      <ButtonTooltip
+        v-if="addresses"
+        icon="mdi-map-search-outline"
+        :text="text.findOnMap"
+        color="secondary"
+        @click="picking = item"
       />
       <ButtonTooltip
         icon="$unlink"
@@ -37,6 +49,14 @@
       class="mt-3 new-item"
       @keydown.enter="add"
     />
+
+    <PlacePicker
+      :model-value="Boolean(picking)"
+      :location="picking ?? ''"
+      :place="picking ? (addresses?.[picking] ?? null) : null"
+      @update:model-value="(value: boolean) => value || (picking = null)"
+      @picked="(place: Place) => savePlace(picking!, place)"
+    />
   </section>
 </template>
 
@@ -45,12 +65,14 @@ import { reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import PlacePicker from '@/components/admin/PlacePicker.vue'
 import { useLanguageStore } from '@/stores/language'
+import type { Place } from '@/stores/schedule'
 import { useWorkerStore } from '@/stores/worker'
 
 const items = defineModel<string[]>({ required: true })
 /** the addresses of the locations, by location (the list of the locations only) */
-const addresses = defineModel<Record<string, string> | null>('addresses', { default: null })
+const addresses = defineModel<Record<string, Place> | null>('addresses', { default: null })
 const props = defineProps<{ name: 'ministries' | 'locations'; title: string }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
@@ -61,13 +83,10 @@ const newItem = ref('')
 /** the addresses being written, by location */
 const draftAddresses = reactive<Record<string, string>>({})
 
-/** an address is saved when it is left (or by Enter) */
-async function saveAddress(location: string) {
-  const address = draftAddresses[location]
-  if (address === undefined || address === (addresses.value?.[location] ?? '')) return
+async function savePlace(location: string, place: Place) {
   busy.value = true
   try {
-    addresses.value = await worker.setAddresses({ ...addresses.value, [location]: address })
+    addresses.value = await worker.setAddresses({ ...addresses.value, [location]: place })
     delete draftAddresses[location]
   } catch (cause) {
     emit('error', cause)
@@ -75,6 +94,16 @@ async function saveAddress(location: string) {
     busy.value = false
   }
 }
+
+/** an address written by hand is saved when it is left (or by Enter); a point of other words goes */
+function saveAddress(location: string) {
+  const address = draftAddresses[location]
+  if (address === undefined || address === (addresses.value?.[location]?.address ?? '')) return
+  savePlace(location, { address })
+}
+
+/** the location whose place is chosen on the map */
+const picking = ref<string | null>(null)
 const busy = ref(false)
 
 /** every change is saved at once */

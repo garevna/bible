@@ -140,7 +140,7 @@ async function fakeWorker(page: Page, planner = false) {
             participant('communion', { uid: 'singer-uid', name: 'Співачка', status: 'applied' })
           ],
           materials: [],
-          addresses: { Церква: 'Харків, вул. Сумська, 1' },
+          addresses: { Церква: { address: 'Харків, вул. Сумська, 1', lat: 49.99, lng: 36.23 } },
           types: [communion],
           calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] },
           today: TODAY
@@ -233,7 +233,8 @@ test('a minister lands on the calendar: the day is red until settled; answers an
   await expect(map).toHaveAttribute('target', '_blank')
   await expect(map).toHaveAttribute(
     'href',
-    'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Харків, вул. Сумська, 1')
+    // at the point chosen on the map
+    'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('49.99,36.23')
   )
   await expect(card(page, 'Ранкова молитва').locator('.map-link')).toHaveCount(0)
 
