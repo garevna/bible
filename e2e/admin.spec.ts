@@ -35,6 +35,8 @@ async function fakeWorker(page: Page, manage: string[]) {
       emailVerified: true,
       name: 'E2E',
       role: 'admin',
+      phone: '+380501234567',
+      telegramChatId: 555,
       owner: false,
       lastSeen: Date.now()
     },
@@ -128,6 +130,14 @@ test('the sections on the left; ministers get roles, the readers are shown on re
   await expect(rows).toHaveCount(2)
   await page.getByLabel('Показати читачів').check()
   await expect(rows).toHaveCount(3)
+  // who finished signing up: a mobile number and Telegram (the readers need neither)
+  await expect(
+    rows.filter({ hasText: 'це ви' }).getByLabel('Усе заповнено, Telegram підключено')
+  ).toBeVisible()
+  await expect(
+    rows.filter({ hasText: 'Лідер' }).getByLabel('немає номера мобільного, Telegram не підключено')
+  ).toBeVisible()
+  await expect(rows.filter({ hasText: 'pastor@example.com' }).locator('.readiness')).toHaveCount(0)
   // a ministry filters the table
   await page.locator('.filters .v-select', { hasText: 'Служіння' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Музичне служіння' }).click()

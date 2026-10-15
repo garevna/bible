@@ -62,33 +62,34 @@
       "
     >
       <template #[`item.name`]="{ item }">
-        <div class="user-name">
-          {{ nameOf(item) }}
-          <v-chip v-if="item.uid === user.uid" size="x-small" variant="tonal" class="ml-1">{{
-            text.you
-          }}</v-chip>
+        <div class="d-flex align-center ga-2">
+          <!-- a minister: the mobile number given and Telegram linked, or what is missing -->
+          <v-tooltip v-if="!isReader(item)" :text="readiness(item)" location="top">
+            <template #activator="{ props: tooltip }">
+              <v-icon
+                v-bind="tooltip"
+                :icon="ready(item) ? 'mdi-account-check' : 'mdi-account-alert'"
+                :color="ready(item) ? 'primary' : 'error'"
+                :aria-label="readiness(item)"
+                class="readiness"
+              />
+            </template>
+          </v-tooltip>
+          <div>
+            <div class="user-name">
+              {{ nameOf(item) }}
+              <v-chip v-if="item.uid === user.uid" size="x-small" variant="tonal" class="ml-1">{{
+                text.you
+              }}</v-chip>
+            </div>
+            <div v-if="item.email && item.name" class="user-email">{{ item.email }}</div>
+          </div>
         </div>
-        <div v-if="item.email && item.name" class="user-email">{{ item.email }}</div>
       </template>
       <template #[`item.role`]="{ item }">
         <v-chip size="small" variant="tonal" :color="isReader(item) ? undefined : 'secondary'">
           {{ roleName(item.role) }}
         </v-chip>
-      </template>
-      <template #[`item.ministries`]="{ item }">
-        <span class="ministries">{{ ministriesOf(item).join(', ') }}</span>
-      </template>
-      <template #[`item.phone`]="{ item }">
-        <span class="nowrap">{{ item.phone ?? '' }}</span>
-      </template>
-      <template #[`item.telegram`]="{ item }">
-        <v-icon
-          v-if="item.telegramChatId"
-          icon="mdi-send-check-outline"
-          color="secondary"
-          size="small"
-          :aria-label="text.telegramLinked"
-        />
       </template>
       <template #[`item.lastSeen`]="{ item }">
         <span class="nowrap">{{ day(item.lastSeen) }}</span>
@@ -234,7 +235,7 @@ const names = reactive<Record<string, string>>({})
 /** the user whose mobile number is being entered */
 const phoneOf = shallowRef<UserView | null>(null)
 
-/** a phone: the name and the role only, the rest is in the details */
+/** the name, the role and the last visit (a phone: the name and the role); the rest is in the details */
 const headers = computed(() => {
   const all = [
     { key: 'name', title: text.value.userName, sortable: true, value: (item: UserView) => nameOf(item) },
@@ -244,9 +245,6 @@ const headers = computed(() => {
       sortable: true,
       value: (item: UserView) => roleName(item.role)
     },
-    { key: 'ministries', title: text.value.sectionMinistries, sortable: false },
-    { key: 'phone', title: header.value.myPhone, sortable: false },
-    { key: 'telegram', title: 'Telegram', sortable: false, align: 'center' as const },
     { key: 'lastSeen', title: text.value.lastSeenColumn, sortable: true },
     { key: 'data-table-expand', title: '' }
   ]
@@ -256,6 +254,15 @@ const headers = computed(() => {
 const roleItems = computed(() => props.roles.map((role) => ({ value: role.id, title: role.name })))
 const roleName = (id: Role) =>
   props.roles.find((role) => role.id === id)?.name ?? (id === 'owner' ? text.value.owner : id)
+
+/** a minister finished signing up: the mobile number given and Telegram linked */
+const ready = (item: UserView) => Boolean(item.phone && item.telegramChatId)
+const readiness = (item: UserView) =>
+  ready(item)
+    ? text.value.ready
+    : [!item.phone && text.value.noPhone, !item.telegramChatId && text.value.telegramNotLinked]
+        .filter(Boolean)
+        .join(', ')
 
 const nameOf = (item: UserView) => item.name || item.email || item.uid
 const ministriesOf = (item: UserView) =>
@@ -350,8 +357,11 @@ defineExpose({ load })
   font-weight: 600;
 }
 
-.user-email,
-.ministries {
+.readiness {
+  flex: 0 0 auto;
+}
+
+.user-email {
   color: var(--app-text-muted);
   font-size: 13px;
 }

@@ -299,6 +299,16 @@ export const admin = {
     ru: 'Telegram не подключен',
     en: 'Telegram is not linked'
   },
+  ready: {
+    ua: 'Усе заповнено, Telegram підключено',
+    ru: 'Все заполнено, Telegram подключен',
+    en: 'All given, Telegram linked'
+  },
+  noPhone: {
+    ua: 'немає номера мобільного',
+    ru: 'нет номера мобильного',
+    en: 'no mobile number'
+  },
   lastSeenColumn: {
     ua: 'Востаннє',
     ru: 'Последний раз',
