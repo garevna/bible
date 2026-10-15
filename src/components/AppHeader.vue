@@ -27,47 +27,6 @@
 
     <User :compact="compact" />
 
-    <!-- a phone: the messages, the dashboard and signing out in one menu (the language and the translation stay) -->
-    <v-menu v-if="compact" location="bottom end">
-      <template #activator="{ props }">
-        <v-btn v-bind="props" icon size="small" class="mr-2" :aria-label="header.menu">
-          <v-badge :model-value="worker.unread > 0" :content="worker.unread" color="warning" floating>
-            <v-icon icon="mdi-menu" />
-          </v-badge>
-        </v-btn>
-      </template>
-
-      <v-list density="compact" bg-color="homefone" min-width="270" class="header-menu" color="secondary">
-        <v-list-item
-          v-if="worker.calendar"
-          prepend-icon="mdi-calendar-month-outline"
-          :title="calendarText.title"
-          v-bind="here('calendar')"
-          @click="app.setPage('calendar')"
-        />
-        <v-list-item
-          v-if="worker.canReceive"
-          prepend-icon="mdi-message-arrow-right"
-          :title="messagesText.title"
-          v-bind="here('messages')"
-          @click="app.setPage('messages')"
-        >
-          <template v-if="worker.unread" #append>
-            <v-badge :content="worker.unread" color="warning" inline />
-          </template>
-        </v-list-item>
-        <v-list-item
-          v-if="worker.isAdmin"
-          prepend-icon="mdi-shield-account-outline"
-          :title="admin.openDashboard"
-          v-bind="here('admin')"
-          @click="app.setPage('admin')"
-        />
-        <v-divider v-if="worker.calendar || worker.isAdmin" />
-        <v-list-item prepend-icon="$signOut" :title="header.signOut" @click="user.signOut()" />
-      </v-list>
-    </v-menu>
-
     <template v-if="!user.signed">
       <v-tooltip :text="header.signIn">
         <template #activator="{ props }">
@@ -198,8 +157,6 @@ import { useAppStore } from '@/stores/app'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
-import { useWorkerStore } from '@/stores/worker'
-import type { Page } from '@/types'
 
 const signIn = defineModel<boolean>('signIn', { default: false })
 // const signUp = defineModel<boolean>('signUp', { default: false })
@@ -207,24 +164,13 @@ const signIn = defineModel<boolean>('signIn', { default: false })
 const app = useAppStore()
 const content = useContentStore()
 const user = useUserStore()
-const worker = useWorkerStore()
-const {
-  admin,
-  calendar: calendarText,
-  common,
-  header,
-  messages: messagesText,
-  pages
-} = storeToRefs(useLanguageStore())
+const { common, header, pages } = storeToRefs(useLanguageStore())
 
-/** a phone with a signed in user: one menu instead of a row of buttons */
+/** a phone with a signed in user: the calendar, the messages and the rest are in the menu of the avatar */
 const { smAndDown, height } = useDisplay()
 /** a phone on its side: the header is lower, to leave room for the page */
 const low = computed(() => height.value < 500)
 const compact = computed(() => user.signed && smAndDown.value)
-
-/** the page the user is on: marked, and not opened again */
-const here = (page: Page) => (app.page === page ? { active: true, class: 'pe-none' } : {})
 
 const short = computed(() => app.viewportWidth < 600)
 
@@ -277,5 +223,10 @@ const langIcon = computed(
 
 .bottom-border {
   border-bottom: solid 1px var(--app-surface) !important;
+}
+
+/* the buttons of the panel: big enough to see and to press */
+.bottom-border :deep(.v-btn--icon .v-icon) {
+  font-size: 26px;
 }
 </style>

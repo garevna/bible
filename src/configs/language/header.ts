@@ -89,6 +89,11 @@ export const header = {
     ru: 'Загрузить фото',
     en: 'Upload a photo'
   },
+  changePhoto: {
+    ua: 'Змінити фото',
+    ru: 'Сменить фото',
+    en: 'Change the photo'
+  },
   removePhoto: {
     ua: 'Прибрати фото',
     ru: 'Убрать фото',

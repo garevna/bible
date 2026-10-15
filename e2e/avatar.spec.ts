@@ -1,6 +1,6 @@
 import { expect, openBible, signInLocally, test } from './fixtures'
 
-test('the photo is uploaded from the avatar menu, made small, and taken away', async ({ page }) => {
+test('the photo is changed from the avatar menu and made small', async ({ page }) => {
   await openBible(page)
   await signInLocally(page)
 
@@ -21,15 +21,10 @@ test('the photo is uploaded from the avatar menu, made small, and taken away', a
 
   await avatar.click()
   const chooser = page.waitForEvent('filechooser')
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Завантажити фото' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Змінити фото' }).click()
   await (await chooser).setFiles({ name: 'photo.png', mimeType: 'image/png', buffer: png })
 
   const image = avatar.locator('img')
   await expect(image).toHaveAttribute('src', /^data:image\/jpeg;base64,/)
   await expect(image).toHaveAttribute('referrerpolicy', 'no-referrer')
-
-  await avatar.click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Прибрати фото' }).click()
-  await expect(image).toHaveCount(0)
-  await expect(avatar).toContainText('E')
 })

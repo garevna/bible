@@ -309,6 +309,11 @@ export const admin = {
     ru: 'нет номера мобильного',
     en: 'no mobile number'
   },
+  rowHint: {
+    ua: 'Натисніть на рядок, щоб побачити й змінити деталі.',
+    ru: 'Нажмите на строку, чтобы увидеть и изменить детали.',
+    en: 'Click a row to see and change its details.'
+  },
   lastSeenColumn: {
     ua: 'Востаннє',
     ru: 'Последний раз',

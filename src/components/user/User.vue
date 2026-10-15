@@ -1,6 +1,9 @@
 <template>
   <span v-if="user.signed" class="d-flex align-center">
-    <!-- the avatar opens a small menu: the photo is changed here, there is no profile page -->
+    <!--
+      the avatar opens the menu of the user: the number, Telegram, the photo, signing out
+      (a phone: the calendar and the messages too); there is no profile page
+    -->
     <v-menu location="bottom end">
       <template #activator="{ props: menu }">
         <v-tooltip :text="user.displayName">
@@ -11,9 +14,14 @@
               class="avatar-button mr-2"
               :aria-label="user.displayName"
             >
-              <!-- a minister without a mobile number gets a mark on the avatar -->
-              <v-badge :model-value="worker.needsPhone" color="warning" dot>
-                <v-avatar size="32" color="secondary" class="user-avatar">
+              <!-- a phone: the number of unread messages; a minister without a mobile number: a mark -->
+              <v-badge
+                :model-value="unreadHere > 0 || worker.needsPhone"
+                :content="unreadHere || undefined"
+                :dot="!unreadHere"
+                color="warning"
+              >
+                <v-avatar size="36" color="secondary" class="user-avatar">
                   <!-- Google photos are not shown to pages that send a referrer -->
                   <img
                     v-if="user.avatar && !broken"
@@ -34,6 +42,28 @@
       <v-list density="compact" bg-color="homefone" min-width="220">
         <v-list-item :title="user.displayName" :subtitle="user.userName ? (user.email ?? '') : ''" />
         <v-divider />
+        <!-- a phone: the calendar and the messages are here, not in the header -->
+        <template v-if="compact">
+          <v-list-item
+            v-if="worker.calendar"
+            prepend-icon="mdi-calendar-month-outline"
+            :title="calendarText.title"
+            v-bind="here('calendar')"
+            @click="app.setPage('calendar')"
+          />
+          <v-list-item
+            v-if="worker.canReceive"
+            prepend-icon="mdi-message-arrow-right"
+            :title="messagesText.title"
+            v-bind="here('messages')"
+            @click="app.setPage('messages')"
+          >
+            <template v-if="worker.unread" #append>
+              <v-badge :content="worker.unread" color="warning" inline />
+            </template>
+          </v-list-item>
+        </template>
+        <v-divider v-if="compact && worker.calendar" />
         <v-list-item
           v-if="worker.canReceive"
           prepend-icon="mdi-cellphone"
@@ -60,13 +90,9 @@
             @click="linkTelegram"
           />
         </template>
-        <v-list-item prepend-icon="mdi-camera-outline" :title="header.uploadPhoto" @click="uploadPhoto" />
-        <v-list-item
-          v-if="user.avatar"
-          prepend-icon="mdi-account-circle-outline"
-          :title="header.removePhoto"
-          @click="user.updateUserAvatar('')"
-        />
+        <v-list-item prepend-icon="mdi-image-edit" :title="header.changePhoto" @click="uploadPhoto" />
+        <v-divider />
+        <v-list-item prepend-icon="$signOut" :title="header.signOut" @click="user.signOut()" />
       </v-list>
     </v-menu>
 
@@ -79,11 +105,10 @@
 
     <!-- ministers: the schedule of ministries -->
     <v-tooltip v-if="!compact && worker.calendar" :text="calendarText.title">
-      <template #activator="{ props }">
+      <template #activator="{ props: tooltip }">
         <v-btn
-          v-bind="props"
+          v-bind="tooltip"
           icon="mdi-calendar-month-outline"
-          size="small"
           :aria-label="calendarText.title"
           :active="app.page === 'calendar'"
           :class="{ 'pe-none': app.page === 'calendar' }"
@@ -94,30 +119,28 @@
 
     <!-- ministers: the messages, with the number of unread ones -->
     <v-tooltip v-if="!compact && worker.canReceive" :text="messagesText.title">
-      <template #activator="{ props }">
+      <template #activator="{ props: tooltip }">
         <v-btn
-          v-bind="props"
+          v-bind="tooltip"
           icon
-          size="small"
           :aria-label="messagesText.title"
           :active="app.page === 'messages'"
           :class="{ 'pe-none': app.page === 'messages' }"
           @click="app.setPage('messages')"
         >
           <v-badge :model-value="worker.unread > 0" :content="worker.unread" color="warning" floating>
-            <v-icon icon="mdi-message-arrow-right" />
+            <v-icon icon="mdi-message-arrow-right" size="26" />
           </v-badge>
         </v-btn>
       </template>
     </v-tooltip>
 
     <!-- administrators: the dashboard of the roles -->
-    <v-tooltip v-if="!compact && worker.isAdmin" :text="admin.openDashboard">
-      <template #activator="{ props }">
+    <v-tooltip v-if="worker.isAdmin" :text="admin.openDashboard">
+      <template #activator="{ props: tooltip }">
         <v-btn
-          v-bind="props"
+          v-bind="tooltip"
           icon="mdi-shield-account-outline"
-          size="small"
           :aria-label="admin.openDashboard"
           :active="app.page === 'admin'"
           :class="{ 'pe-none': app.page === 'admin' }"
@@ -125,23 +148,11 @@
         />
       </template>
     </v-tooltip>
-
-    <v-tooltip v-if="!compact" :text="header.signOut">
-      <template #activator="{ props }">
-        <v-btn
-          v-bind="props"
-          icon="$signOut"
-          size="small"
-          :aria-label="header.signOut"
-          @click="user.signOut()"
-        />
-      </template>
-    </v-tooltip>
   </span>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import PhoneDialog from '@/components/PhoneDialog.vue'
@@ -149,15 +160,22 @@ import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { useWorkerStore } from '@/stores/worker'
+import type { Page } from '@/types'
 import { pickImage, resizeImage } from '@/utils/image'
 
-/** compact: on a phone the messages, the dashboard and signing out are in the menu of the header */
-defineProps<{ compact?: boolean }>()
+/** compact: a phone, where the calendar and the messages are in the menu of the avatar too */
+const props = defineProps<{ compact?: boolean }>()
 
 const app = useAppStore()
 const user = useUserStore()
 const worker = useWorkerStore()
 const { admin, calendar: calendarText, header, messages: messagesText } = storeToRefs(useLanguageStore())
+
+/** the number of unread messages on the avatar: a phone, where the messages are in its menu */
+const unreadHere = computed(() => (props.compact ? worker.unread : 0))
+
+/** the page the user is on: marked, and not opened again */
+const here = (page: Page) => (app.page === page ? { active: true, class: 'pe-none' } : {})
 
 /** the photo could not be loaded: show the initials instead */
 const broken = ref(false)

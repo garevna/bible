@@ -281,7 +281,7 @@ test('the lists of ministries and locations', async ({ page }) => {
 test('a role without functions of an administrator has no dashboard', async ({ page }) => {
   await fakeWorker(page, [])
   await signIn(page)
-  await expect(page.getByRole('button', { name: 'Вихід' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'E2E' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Адміністрування' })).toHaveCount(0)
 
   await withStores(page, (stores) => stores.app.setPage('admin'))
@@ -291,30 +291,46 @@ test('a role without functions of an administrator has no dashboard', async ({ p
 test.describe('phone', () => {
   test.use({ viewport: { width: 390, height: 800 } })
 
-  test('the header has one menu instead of a row of buttons', async ({ page }) => {
+  test('the menu of the avatar has it all; the header keeps the language and the translation', async ({
+    page
+  }) => {
     await fakeWorker(page, ['users'])
     await signIn(page)
 
-    // the messages, the dashboard and signing out are in the menu; the language and the translation stay
-    await expect(page.getByRole('button', { name: 'Адміністрування' })).toHaveCount(0)
+    // no row of buttons, no menu of its own: the avatar, the dashboard, the language, the translation
     await expect(page.getByRole('button', { name: 'Вихід' })).toHaveCount(0)
-    await page.getByRole('button', { name: 'Меню' }).click()
-    const menu = page.locator('.header-menu')
-    await expect(menu.locator('.v-list-item', { hasText: 'Повідомлення' })).toBeVisible()
-    await expect(menu.locator('.v-list-item', { hasText: 'Вихід' })).toBeVisible()
-    await expect(menu.locator('.v-list-item', { hasText: 'Синодальний переклад' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Меню' })).toHaveCount(0)
     await expect(page.locator('.v-app-bar .mdi-book-cross')).toBeVisible()
 
-    await menu.locator('.v-list-item', { hasText: 'Адміністрування' }).click()
-    await expect(page.locator('.v-select', { hasText: 'Служителі' })).toBeVisible()
+    await page.getByRole('button', { name: 'E2E' }).click()
+    const menu = page.locator('.v-overlay--active .v-list')
+    for (const item of ['Календар служінь', 'Повідомлення', 'Змінити фото', 'Вихід'])
+      await expect(menu.locator('.v-list-item', { hasText: item })).toBeVisible()
+    await menu.locator('.v-list-item', { hasText: 'Календар служінь' }).click()
+    await expect(page.locator('.view-title', { hasText: 'Календар служінь' })).toBeVisible()
 
     // the page the user is on is marked in the menu and not opened again
-    await page.getByRole('button', { name: 'Меню' }).click()
-    await expect(menu.locator('.v-list-item', { hasText: 'Адміністрування' })).toHaveClass(
+    await page.getByRole('button', { name: 'E2E' }).click()
+    await expect(menu.locator('.v-list-item', { hasText: 'Календар служінь' })).toHaveClass(
       /v-list-item--active/
     )
     await expect(menu.locator('.v-list-item', { hasText: 'Повідомлення' })).not.toHaveClass(
       /v-list-item--active/
     )
+    await page.keyboard.press('Escape')
+
+    // the dashboard is on the panel
+    await page.getByRole('button', { name: 'Адміністрування' }).click()
+    await expect(page.locator('.v-select', { hasText: 'Служителі' })).toBeVisible()
+
+    // the ministers: the name only, a row opens by a click, no scrolling to the side
+    const table = page.locator('.users-table')
+    await expect(table.locator('thead th')).toHaveCount(1)
+    const wrapper = table.locator('.v-table__wrapper')
+    expect(
+      await wrapper.evaluate((element) => element.scrollWidth - element.clientWidth)
+    ).toBeLessThanOrEqual(0)
+    await table.locator('tbody tr', { hasText: 'Лідер' }).click()
+    await expect(table.locator('.details-row')).toBeVisible()
   })
 })

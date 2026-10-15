@@ -2,6 +2,7 @@
   <section>
     <h2 class="admin-title">{{ text.sectionUsers }}</h2>
     <p class="hint">{{ text.usersHint }}</p>
+    <p class="hint">{{ text.rowHint }}</p>
 
     <!-- the filters: words, a role, a ministry, the readers -->
     <div class="filters">
@@ -42,7 +43,7 @@
       />
     </div>
 
-    <!-- a row opens its details (and their changes) by a click; a phone shows the name and the role only -->
+    <!-- a row opens its details (and their changes) by a click; a phone shows the name only -->
     <v-data-table
       v-model:expanded="expanded"
       :headers="headers"
@@ -52,7 +53,6 @@
       :items-per-page="25"
       :items-per-page-text="text.perPage"
       item-value="uid"
-      show-expand
       density="comfortable"
       hover
       class="users-table"
@@ -235,7 +235,7 @@ const names = reactive<Record<string, string>>({})
 /** the user whose mobile number is being entered */
 const phoneOf = shallowRef<UserView | null>(null)
 
-/** the name, the role and the last visit (a phone: the name and the role); the rest is in the details */
+/** the name, the role and the last visit (a phone: the name only); the rest is in the details of the row */
 const headers = computed(() => {
   const all = [
     { key: 'name', title: text.value.userName, sortable: true, value: (item: UserView) => nameOf(item) },
@@ -245,10 +245,9 @@ const headers = computed(() => {
       sortable: true,
       value: (item: UserView) => roleName(item.role)
     },
-    { key: 'lastSeen', title: text.value.lastSeenColumn, sortable: true },
-    { key: 'data-table-expand', title: '' }
+    { key: 'lastSeen', title: text.value.lastSeenColumn, sortable: true }
   ]
-  return phone.value ? all.filter((item) => ['name', 'role', 'data-table-expand'].includes(item.key)) : all
+  return phone.value ? all.filter((item) => item.key === 'name') : all
 })
 
 const roleItems = computed(() => props.roles.map((role) => ({ value: role.id, title: role.name })))
