@@ -63,6 +63,8 @@ export interface ScheduleContext {
   bot: ServiceBot
   /** the leaders of the ministries: they plan the events of their own ministry */
   leaders: Record<string, string[]>
+  /** the addresses of the locations: a map opens them */
+  addresses?: Record<string, string>
   /** a reader (not a minister): sees and applies to the open events for everyone only */
   reader?: boolean
   now: number
@@ -221,6 +223,7 @@ export async function handleSchedule(
       types: eventTypes,
       calendar,
       leaders,
+      addresses: context.addresses ?? {},
       today
     })
   }

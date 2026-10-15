@@ -301,6 +301,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   const people = shallowRef<Person[]>([])
   const ministries = shallowRef<string[]>([])
   const locations = shallowRef<string[]>([])
+  /** the addresses of the locations: a map opens them */
+  const addresses = shallowRef<Record<string, string>>({})
   const today = ref('')
   /** the month shown, 'YYYY-MM' */
   const month = ref(isoDay(new Date()).slice(0, 7))
@@ -412,6 +414,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       types?: EventType[]
       calendar?: CalendarSettings
       changes?: DayChange[]
+      addresses?: Record<string, string>
       today: string
     }>('GET', `/schedule${query}`)
     events.value = answer.events.map((event) => ({
@@ -426,6 +429,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     materials.value = answer.materials ?? []
     types.value = answer.types ?? []
     changes.value = answer.changes ?? []
+    addresses.value = answer.addresses ?? addresses.value
     settings.value = { ...DEFAULT_CALENDAR, ...answer.calendar }
     today.value = answer.today
   }
@@ -447,11 +451,15 @@ export const useScheduleStore = defineStore('schedule', () => {
   async function loadChoices() {
     const [answer, lists] = await Promise.all([
       worker.request<{ people: Person[] }>('GET', '/schedule/people'),
-      worker.request<{ ministries: string[]; locations?: string[] }>('GET', '/ministries')
+      worker.request<{ ministries: string[]; locations?: string[]; addresses?: Record<string, string> }>(
+        'GET',
+        '/ministries'
+      )
     ])
     people.value = answer.people
     ministries.value = lists.ministries
     locations.value = lists.locations ?? []
+    addresses.value = lists.addresses ?? {}
   }
 
   const reload = () => loadMonth()
@@ -551,6 +559,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     people,
     ministries,
     locations,
+    addresses,
     today,
     month,
     filters,

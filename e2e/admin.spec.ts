@@ -160,7 +160,13 @@ async function fakeWorker(page: Page, manage: string[]) {
     const body = request.postData() ? request.postDataJSON() : null
     requests.push({ method: request.method(), path, body })
     if (
-      ['/admin/roles', '/admin/event-types', '/admin/calendar', '/admin/leaders'].includes(path) ||
+      [
+        '/admin/roles',
+        '/admin/event-types',
+        '/admin/calendar',
+        '/admin/leaders',
+        '/admin/addresses'
+      ].includes(path) ||
       path.startsWith('/admin/directories/')
     )
       return route.fulfill({ json: body })
@@ -361,6 +367,18 @@ test('the lists of ministries and locations', async ({ page }) => {
       method: 'PUT',
       path: '/admin/directories/locations',
       body: { items: ['Церква', 'Філія на Салтівці'] }
+    })
+
+  // the address of a location: the map opens it
+  const church = page.locator('.directory-item', { hasText: 'Церква' })
+  await church.getByPlaceholder('Адреса (для карти; онлайн — порожньо)').fill('Харків, вул. Сумська, 1')
+  await church.getByPlaceholder('Адреса (для карти; онлайн — порожньо)').press('Enter')
+  await expect
+    .poll(() => requests)
+    .toContainEqual({
+      method: 'PUT',
+      path: '/admin/addresses',
+      body: { addresses: { Церква: 'Харків, вул. Сумська, 1' } }
     })
 })
 

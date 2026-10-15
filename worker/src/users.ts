@@ -193,6 +193,28 @@ export function parseLeaders(value: unknown, ministries: string[]): Leaders | nu
   return leaders
 }
 
+/** The addresses of the locations: { 'Церква': 'Харків, вул. …' }; a map opens them (none: online) */
+export type Addresses = Record<string, string>
+
+const ADDRESSES_KEY = 'settings:addresses'
+
+export const getAddresses = async (store: UsersStore) =>
+  (await store.get<Addresses>(ADDRESSES_KEY, 'json')) ?? {}
+
+export const setAddresses = (store: UsersStore, addresses: Addresses) =>
+  store.put(ADDRESSES_KEY, JSON.stringify(addresses))
+
+/** { location: address } of known locations, up to 200 letters each (empty: none); null when it is not that */
+export function parseAddresses(value: unknown, locations: string[]): Addresses | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const addresses: Addresses = {}
+  for (const [location, address] of Object.entries(value as Record<string, unknown>)) {
+    if (!locations.includes(location) || typeof address !== 'string' || address.length > 200) return null
+    if (address.trim()) addresses[location] = address.trim()
+  }
+  return addresses
+}
+
 /** The user's chat with the service bot (null: unlinked) */
 export async function setTelegramChat(store: UsersStore, record: UserRecord, chatId: number | null) {
   const { telegramChatId: _old, ...rest } = record

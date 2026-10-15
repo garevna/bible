@@ -6,6 +6,19 @@
 
     <div v-for="item of items" :key="item" class="directory-item">
       <span class="flex-grow-1">{{ item }}</span>
+      <!-- a location: its address opens on the map (none: online) -->
+      <v-text-field
+        v-if="addresses"
+        :model-value="draftAddresses[item] ?? addresses[item] ?? ''"
+        :placeholder="text.address"
+        :disabled="busy"
+        density="compact"
+        hide-details
+        class="address mr-2"
+        @update:model-value="(value: string) => (draftAddresses[item] = value)"
+        @blur="saveAddress(item)"
+        @keydown.enter="saveAddress(item)"
+      />
       <ButtonTooltip
         icon="$unlink"
         color="delete"
@@ -28,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
@@ -36,6 +49,8 @@ import { useLanguageStore } from '@/stores/language'
 import { useWorkerStore } from '@/stores/worker'
 
 const items = defineModel<string[]>({ required: true })
+/** the addresses of the locations, by location (the list of the locations only) */
+const addresses = defineModel<Record<string, string> | null>('addresses', { default: null })
 const props = defineProps<{ name: 'ministries' | 'locations'; title: string }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
@@ -43,6 +58,23 @@ const worker = useWorkerStore()
 const { admin: text } = storeToRefs(useLanguageStore())
 
 const newItem = ref('')
+/** the addresses being written, by location */
+const draftAddresses = reactive<Record<string, string>>({})
+
+/** an address is saved when it is left (or by Enter) */
+async function saveAddress(location: string) {
+  const address = draftAddresses[location]
+  if (address === undefined || address === (addresses.value?.[location] ?? '')) return
+  busy.value = true
+  try {
+    addresses.value = await worker.setAddresses({ ...addresses.value, [location]: address })
+    delete draftAddresses[location]
+  } catch (cause) {
+    emit('error', cause)
+  } finally {
+    busy.value = false
+  }
+}
 const busy = ref(false)
 
 /** every change is saved at once */
@@ -74,6 +106,10 @@ async function add() {
 
 .directory-item + .directory-item {
   border-top: solid 1px var(--app-border-light);
+}
+
+.address {
+  flex: 0 1 360px;
 }
 
 .new-item {

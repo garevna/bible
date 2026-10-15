@@ -579,6 +579,11 @@ export const calendar = {
     ru: 'Добавить гостя',
     en: 'Add the guest'
   },
+  openMap: {
+    ua: 'Відкрити на карті',
+    ru: 'Открыть на карте',
+    en: 'Open the map'
+  },
   later: {
     ua: 'Пізніше',
     ru: 'Позже',

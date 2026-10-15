@@ -359,6 +359,11 @@ export const admin = {
     ru: 'Служений пока нет',
     en: 'No ministries yet'
   },
+  address: {
+    ua: 'Адреса (для карти; онлайн — порожньо)',
+    ru: 'Адрес (для карты; онлайн — пусто)',
+    en: 'Address (for the map; online: empty)'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',

@@ -722,6 +722,26 @@ describe('the schedule of ministries', () => {
     ).toEqual({ invited: 1 })
   })
 
+  it('the addresses of the locations: kept by the administrators, given with the schedule', async () => {
+    const { call } = await church()
+    expect(
+      (await call('PUT', '/admin/addresses', 'pastor', { addresses: { Церква: 'Харків' } })).status
+    ).toBe(403)
+    expect(
+      (await call('PUT', '/admin/addresses', 'owner', { addresses: { Невідома: 'Харків' } })).status
+    ).toBe(400)
+    const saved = await call('PUT', '/admin/addresses', 'owner', {
+      addresses: { Церква: ' Харків, вул. Сумська, 1 ', Онлайн: '' }
+    })
+    expect(saved.body).toEqual({ addresses: { Церква: 'Харків, вул. Сумська, 1' } })
+    expect((await call('GET', '/schedule', 'leader')).body.addresses).toEqual({
+      Церква: 'Харків, вул. Сумська, 1'
+    })
+    expect((await call('GET', '/ministries', 'leader')).body.addresses).toEqual({
+      Церква: 'Харків, вул. Сумська, 1'
+    })
+  })
+
   it('a leader of a ministry plans its events, not the events of another ministry', async () => {
     const { call } = await church()
     // the leader (a servant) leads the prayer ministry

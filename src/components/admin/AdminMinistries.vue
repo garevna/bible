@@ -80,9 +80,7 @@
                         ><v-icon icon="mdi-clock-outline" size="x-small" />
                         {{ scheduleText(event, locale) }}</span
                       >
-                      <span v-if="event.location">
-                        <v-icon icon="mdi-map-marker-outline" size="x-small" /> {{ event.location }}
-                      </span>
+                      <LocationLink v-if="event.location" :location="event.location" />
                       <span>{{ calendar.responsible }}: {{ event.responsibleName }}</span>
                       <span v-if="event.deputyName">{{ calendar.deputy }}: {{ event.deputyName }}</span>
                       <span>{{ event.mode === 'open' ? applicantsText(event) : calendar.modeInvite }}</span>
@@ -158,6 +156,7 @@ import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import EventDialog from '@/components/calendar/EventDialog.vue'
 import InvitationsDialog from '@/components/calendar/InvitationsDialog.vue'
+import LocationLink from '@/components/calendar/LocationLink.vue'
 import { useLanguageStore } from '@/stores/language'
 import { scheduleText, useScheduleStore, type Occurrence, type ScheduleEvent } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'

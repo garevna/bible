@@ -304,7 +304,12 @@ export const useWorkerStore = defineStore('worker', () => {
       eventTypes: EventType[]
       calendar: CalendarSettings
       leaders: Record<string, string[]>
+      addresses: Record<string, string>
     }>('GET', '/admin/settings')
+
+  /** the addresses of the locations: a map opens them */
+  const setAddresses = async (addresses: Record<string, string>) =>
+    (await call<{ addresses: Record<string, string> }>('PUT', '/admin/addresses', { addresses })).addresses
 
   /** the leaders of the ministries: they plan the events of their own ministry */
   const setLeaders = async (leaders: Record<string, string[]>) =>
@@ -387,6 +392,7 @@ export const useWorkerStore = defineStore('worker', () => {
     setEventTypes,
     setCalendar,
     setLeaders,
+    setAddresses,
     setRoles,
     setDirectory,
     loadMessages,

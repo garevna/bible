@@ -70,6 +70,7 @@
             <AdminDirectory
               v-else-if="section === 'locations'"
               v-model="settings.locations"
+              v-model:addresses="settings.addresses"
               name="locations"
               :title="text.sectionLocations"
               @error="fail"
@@ -147,6 +148,7 @@ const settings = ref<{
   eventTypes: EventType[]
   calendar: CalendarSettings
   leaders: Record<string, string[]>
+  addresses: Record<string, string>
 } | null>(null)
 const busy = ref(false)
 const error = ref('')
@@ -163,7 +165,9 @@ async function load() {
   if (!worker.isAdmin) return
   busy.value = true
   try {
-    settings.value = await worker.getSettings()
+    const loaded = await worker.getSettings()
+    // a worker of an older version has no leaders and no addresses yet
+    settings.value = { ...loaded, leaders: loaded.leaders ?? {}, addresses: loaded.addresses ?? {} }
   } catch (cause) {
     fail(cause)
   } finally {

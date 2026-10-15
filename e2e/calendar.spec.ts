@@ -140,6 +140,7 @@ async function fakeWorker(page: Page, planner = false) {
             participant('communion', { uid: 'singer-uid', name: 'Співачка', status: 'applied' })
           ],
           materials: [],
+          addresses: { Церква: 'Харків, вул. Сумська, 1' },
           types: [communion],
           calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] },
           today: TODAY
@@ -226,6 +227,15 @@ test('a minister lands on the calendar: the day is red until settled; answers an
       path: '/schedule/apply',
       body: { eventId: 'evening', day: TODAY }
     })
+
+  // a place with an address: the map opens in a tab of its own
+  const map = card(page, 'Причастя').getByLabel('Відкрити на карті: Харків, вул. Сумська, 1')
+  await expect(map).toHaveAttribute('target', '_blank')
+  await expect(map).toHaveAttribute(
+    'href',
+    'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Харків, вул. Сумська, 1')
+  )
+  await expect(card(page, 'Ранкова молитва').locator('.map-link')).toHaveCount(0)
 
   // the communion is not the user's: nothing to approve; the filters narrow the day
   await card(page, 'Причастя').getByRole('button', { name: 'Учасники' }).click()

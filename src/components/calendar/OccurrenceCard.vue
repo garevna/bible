@@ -12,9 +12,7 @@
         <div class="event-name">{{ schedule.nameOf(event) }}</div>
         <div class="details">
           <span v-if="schedule.nameOf(event) !== event.ministry">{{ event.ministry }}</span>
-          <span v-if="occurrence.location">
-            <v-icon icon="mdi-map-marker-outline" size="x-small" /> {{ occurrence.location }}
-          </span>
+          <LocationLink v-if="occurrence.location" :location="occurrence.location" />
           <span>{{ text.responsible }}: {{ event.responsibleName }}</span>
           <span>{{ format(text.teamOf, { count: confirmed }) }} / {{ occurrence.needed }}</span>
         </div>
@@ -241,6 +239,7 @@ import { computed, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
+import LocationLink from '@/components/calendar/LocationLink.vue'
 import MaterialsPanel from '@/components/calendar/MaterialsPanel.vue'
 import RolesPanel from '@/components/calendar/RolesPanel.vue'
 import TeamPanel from '@/components/calendar/TeamPanel.vue'

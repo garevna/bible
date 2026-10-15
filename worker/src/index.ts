@@ -41,17 +41,20 @@ import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from 
 import { getTypes, parseTypes, setTypes } from './types'
 import {
   DIRECTORIES,
+  getAddresses,
   getDirectory,
   getLeaders,
   getUser,
   getMinistries,
   isPhone,
   listUsers,
+  parseAddresses,
   parseLeaders,
   parseMinistries,
   removeUser,
   RoleChangeError,
   roleOf,
+  setAddresses,
   setDirectory,
   setLeaders,
   setOwnPhone,
@@ -141,7 +144,7 @@ const ROUTES = [
   /^POST \/messages$/,
   /^POST \/messages\/[^/]+\/read$/,
   /^GET \/admin\/(settings|users)$/,
-  /^PUT \/admin\/(roles|types|event-types|calendar|leaders)$/,
+  /^PUT \/admin\/(roles|types|event-types|calendar|leaders|addresses)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
   /^GET \/schedule(\/people|\/materials)?$/,
@@ -205,6 +208,7 @@ async function scheduleContext(
     messages: deps.messages ?? d1Store(env.DB),
     bot: botFor(env, deps, users),
     leaders: await getLeaders(env.USERS),
+    addresses: await getAddresses(env.USERS),
     reader,
     now: deps.now?.() ?? Date.now()
   }
@@ -537,7 +541,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       // the locations too: the schedule chooses from them
       return json({
         ministries: await getMinistries(env.USERS),
-        locations: await getDirectory(env.USERS, 'locations')
+        locations: await getDirectory(env.USERS, 'locations'),
+        addresses: await getAddresses(env.USERS)
       })
     }
     return handleMessages(request, env, deps, me, roles, rights, json, body)
@@ -553,8 +558,21 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       locations: await getDirectory(env.USERS, 'locations'),
       eventTypes: await getEventTypes(env.USERS),
       calendar: await getCalendar(env.USERS),
-      leaders: await getLeaders(env.USERS)
+      leaders: await getLeaders(env.USERS),
+      addresses: await getAddresses(env.USERS)
     })
+  }
+
+  // the addresses of the locations: kept with the list of the locations
+  if (route === 'PUT /admin/addresses') {
+    if (!can('directories')) return json({ error: 'forbidden' }, 403)
+    const addresses = parseAddresses(
+      ((await body()) as { addresses?: unknown } | null)?.addresses,
+      await getDirectory(env.USERS, 'locations')
+    )
+    if (!addresses) return json({ error: 'bad-request' }, 400)
+    await setAddresses(env.USERS, addresses)
+    return json({ addresses })
   }
 
   // the leaders of the ministries: kept with the list of the ministries
