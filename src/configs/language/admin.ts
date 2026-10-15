@@ -324,6 +324,41 @@ export const admin = {
     ru: 'Строк на странице:',
     en: 'Rows per page:'
   },
+  ministriesTableHint: {
+    ua: 'Натисніть на служіння: його керівники, події та найближчі дні з учасниками.',
+    ru: 'Нажмите на служение: его руководители, события и ближайшие дни с участниками.',
+    en: 'Click a ministry: its leaders, events and coming days with their people.'
+  },
+  ministryColumn: {
+    ua: 'Служіння',
+    ru: 'Служение',
+    en: 'Ministry'
+  },
+  eventsColumn: {
+    ua: 'Подій',
+    ru: 'Событий',
+    en: 'Events'
+  },
+  leadersHint: {
+    ua: 'Керівники створюють події цього служіння, запрошують і затверджують учасників',
+    ru: 'Руководители создают события этого служения, приглашают и утверждают участников',
+    en: 'The leaders create the events of the ministry, invite and approve the people'
+  },
+  ministryEvents: {
+    ua: 'Події служіння (найближчий місяць)',
+    ru: 'События служения (ближайший месяц)',
+    en: 'The events of the ministry (the coming month)'
+  },
+  noMinistryEvents: {
+    ua: 'Подій немає',
+    ru: 'Событий нет',
+    en: 'No events'
+  },
+  noMinistries: {
+    ua: 'Служінь ще немає',
+    ru: 'Служений пока нет',
+    en: 'No ministries yet'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',

@@ -6,23 +6,6 @@
 
     <div v-for="item of items" :key="item" class="directory-item">
       <span class="flex-grow-1">{{ item }}</span>
-      <!-- a ministry: its leaders plan its events -->
-      <v-autocomplete
-        v-if="leaders"
-        :model-value="leaders[item] ?? []"
-        :items="people"
-        item-title="name"
-        item-value="uid"
-        :label="text.leaders"
-        :disabled="busy"
-        multiple
-        chips
-        closable-chips
-        density="compact"
-        hide-details
-        class="leaders mr-2"
-        @update:model-value="(uids: string[]) => saveLeaders(item, uids)"
-      />
       <ButtonTooltip
         icon="$unlink"
         color="delete"
@@ -45,43 +28,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import { useLanguageStore } from '@/stores/language'
-import { useScheduleStore } from '@/stores/schedule'
 import { useWorkerStore } from '@/stores/worker'
 
 const items = defineModel<string[]>({ required: true })
-/** the leaders of the ministries, by ministry (the list of the ministries only) */
-const leaders = defineModel<Record<string, string[]> | null>('leaders', { default: null })
 const props = defineProps<{ name: 'ministries' | 'locations'; title: string }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
 const worker = useWorkerStore()
 const { admin: text } = storeToRefs(useLanguageStore())
-
-const schedule = useScheduleStore()
-/** the ministers to choose the leaders from */
-const people = ref<{ uid: string; name: string }[]>([])
-onMounted(async () => {
-  if (!leaders.value) return
-  await schedule.loadChoices().catch(() => undefined)
-  people.value = schedule.people
-})
-
-/** a change of the leaders of a ministry is saved at once */
-async function saveLeaders(ministry: string, uids: string[]) {
-  busy.value = true
-  try {
-    leaders.value = await worker.setLeaders({ ...leaders.value, [ministry]: uids })
-  } catch (cause) {
-    emit('error', cause)
-  } finally {
-    busy.value = false
-  }
-}
 
 const newItem = ref('')
 const busy = ref(false)
@@ -115,10 +74,6 @@ async function add() {
 
 .directory-item + .directory-item {
   border-top: solid 1px var(--app-border-light);
-}
-
-.leaders {
-  flex: 0 1 360px;
 }
 
 .new-item {

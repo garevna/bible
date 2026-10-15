@@ -199,7 +199,8 @@ import { format } from '@/utils/format'
 
 /** A new event, or a change of one (event); a new one is passed on for its invitations */
 const open = defineModel<boolean>({ default: false })
-const props = defineProps<{ event?: ScheduleEvent | null }>()
+/** ministry: the ministry of a new event, when it is chosen already (the directory of the ministries) */
+const props = defineProps<{ event?: ScheduleEvent | null; ministry?: string | null }>()
 const emit = defineEmits<{ created: [event: ScheduleEvent] }>()
 
 const schedule = useScheduleStore()
@@ -208,7 +209,7 @@ const { calendar: text, common, publish } = storeToRefs(useLanguageStore())
 
 const empty = (): EventDraft => ({
   typeId: null,
-  ministry: '',
+  ministry: props.ministry ?? '',
   title: '',
   description: '',
   location: '',

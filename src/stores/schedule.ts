@@ -223,6 +223,51 @@ const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.sl
 /** an event is gone from the calendar once it begins (as the worker says): then it is too late to change */
 export const isOver = (time: string, now: string) => minutes(time) <= minutes(now)
 
+/**
+ * When an event happens, in words: "пн–пт 06:45 · сб 08:00" (Monday first, the days of one time
+ * together), or the day of a single event, "чт, 15 жовт. · 10:00"
+ */
+export function scheduleText(
+  event: Pick<ScheduleEvent, 'day' | 'weekdays' | 'time' | 'times' | 'until'>,
+  locale: string
+): string {
+  if (event.day) {
+    const date = new Date(`${event.day}T12:00:00`)
+    const day = new Intl.DateTimeFormat(locale, { weekday: 'short', day: 'numeric', month: 'short' }).format(
+      date
+    )
+    return `${day} · ${event.time}`
+  }
+  const name = new Intl.DateTimeFormat(locale, { weekday: 'short' })
+  // 2024-01-01 was a Monday
+  const short = (weekday: number) => name.format(new Date(2024, 0, weekday === 0 ? 7 : weekday))
+  const days = [1, 2, 3, 4, 5, 6, 0].filter((weekday) => event.weekdays?.includes(weekday))
+  const groups: { first: number; last: number; time: string; length: number }[] = []
+  let previous = -1
+  for (const weekday of days) {
+    const time = event.times?.[String(weekday)] ?? event.time
+    const index = (weekday + 6) % 7
+    const group = groups.at(-1)
+    if (group && group.time === time && index === previous + 1) {
+      group.last = weekday
+      group.length++
+    } else groups.push({ first: weekday, last: weekday, time, length: 1 })
+    previous = index
+  }
+  const text = groups
+    .map((group) =>
+      group.length === 1
+        ? `${short(group.first)} ${group.time}`
+        : `${short(group.first)}–${short(group.last)} ${group.time}`
+    )
+    .join(' · ')
+  if (!event.until) return text
+  const until = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(
+    new Date(`${event.until}T12:00:00`)
+  )
+  return `${text} (до ${until})`
+}
+
 /** 'YYYY-MM-DD' of a date in local time */
 export const isoDay = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`

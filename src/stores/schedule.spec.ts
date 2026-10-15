@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 
-import { dayStateOf, isOver, issuesOf, monthGrid, type Participant, type ScheduleEvent } from './schedule'
+import {
+  dayStateOf,
+  isOver,
+  issuesOf,
+  monthGrid,
+  scheduleText,
+  type Participant,
+  type ScheduleEvent
+} from './schedule'
 
 const event = (change: Partial<ScheduleEvent> = {}): ScheduleEvent => ({
   id: 'e1',
@@ -100,5 +108,25 @@ describe('the events of today', () => {
     expect(isOver('06:45', '06:44')).toBe(false)
     expect(isOver('06:45', '06:45')).toBe(true)
     expect(isOver('23:59', '23:58')).toBe(false)
+  })
+})
+
+describe('when an event happens, in words', () => {
+  it('the days of one time together, Monday first', () => {
+    const prayer = {
+      day: null,
+      weekdays: [1, 2, 3, 4, 5, 6],
+      time: '06:45',
+      times: { 6: '08:00' },
+      until: null
+    }
+    expect(scheduleText(prayer, 'uk')).toBe('пн–пт 06:45 · сб 08:00')
+    expect(scheduleText({ ...prayer, weekdays: [0, 3], times: null }, 'uk')).toBe('ср 06:45 · нд 06:45')
+  })
+
+  it('a single event: its day and time', () => {
+    expect(
+      scheduleText({ day: '2026-10-15', weekdays: null, time: '10:00', times: null, until: null }, 'uk')
+    ).toMatch(/^чт, 15 жовт\.? · 10:00$/)
   })
 })

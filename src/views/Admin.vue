@@ -61,12 +61,10 @@
               :ministries="settings.ministries"
               @error="fail"
             />
-            <AdminDirectory
+            <AdminMinistries
               v-else-if="section === 'ministries'"
               v-model="settings.ministries"
               v-model:leaders="settings.leaders"
-              name="ministries"
-              :title="text.sectionMinistries"
               @error="fail"
             />
             <AdminDirectory
@@ -97,6 +95,7 @@ import { useDisplay } from 'vuetify'
 
 import AdminDirectory from '@/components/admin/AdminDirectory.vue'
 import AdminEvents from '@/components/admin/AdminEvents.vue'
+import AdminMinistries from '@/components/admin/AdminMinistries.vue'
 import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
 import { useLanguageStore } from '@/stores/language'

@@ -26,6 +26,57 @@ const ROLES = [
   })
 ]
 
+/** today in the time zone of the browser: the coming days of the events */
+const today = new Date()
+const TODAY = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+const SCHEDULE = {
+  events: [
+    {
+      id: 'prayer',
+      typeId: null,
+      ministry: 'Молитовне служіння',
+      title: 'Ранкова молитва',
+      description: '',
+      location: 'Онлайн',
+      day: null,
+      weekdays: [0, 1, 2, 3, 4, 5, 6],
+      // late: the events of today are gone once they begin
+      time: '23:58',
+      times: null,
+      until: null,
+      needed: 2,
+      slots: [],
+      mode: 'invite',
+      applicants: 'ministry',
+      responsibleUid: 'leader-uid',
+      responsibleName: 'Лідер',
+      deputyUid: null,
+      deputyName: null
+    }
+  ],
+  days: [{ eventId: 'prayer', day: TODAY }],
+  participants: [
+    {
+      eventId: 'prayer',
+      day: TODAY,
+      uid: 'leader-uid',
+      name: 'Лідер',
+      status: 'confirmed',
+      backupUid: null,
+      backupName: null,
+      backupStatus: null,
+      reason: null,
+      role: null
+    }
+  ],
+  changes: [],
+  materials: [],
+  types: [],
+  calendar: { redDays: 2, orangeDays: 5, filters: [] },
+  today: TODAY
+}
+
 /** The worker (see playwright.config.ts); signInLocally signs in as e2e-uid with the given functions */
 async function fakeWorker(page: Page, manage: string[]) {
   const users = [
@@ -88,10 +139,28 @@ async function fakeWorker(page: Page, manage: string[]) {
     }
     if (path === '/admin/users')
       return route.fulfill({ json: { users, roles: ROLES, ministries: ['Музичне служіння'] } })
+    // the calendar, as the directory of the ministries shows it
+    if (path === '/schedule/people') {
+      return route.fulfill({
+        json: {
+          people: users.map((item) => ({
+            uid: item.uid,
+            name: item.name ?? item.email,
+            ministries: [],
+            phone: null
+          }))
+        }
+      })
+    }
+    if (path === '/ministries')
+      return route.fulfill({
+        json: { ministries: ['Музичне служіння', 'Молитовне служіння'], locations: ['Церква'] }
+      })
+    if (path === '/schedule') return route.fulfill({ json: SCHEDULE })
     const body = request.postData() ? request.postDataJSON() : null
     requests.push({ method: request.method(), path, body })
     if (
-      ['/admin/roles', '/admin/event-types', '/admin/calendar'].includes(path) ||
+      ['/admin/roles', '/admin/event-types', '/admin/calendar', '/admin/leaders'].includes(path) ||
       path.startsWith('/admin/directories/')
     )
       return route.fulfill({ json: body })
@@ -265,6 +334,23 @@ test('the lists of ministries and locations', async ({ page }) => {
       path: '/admin/directories/ministries',
       body: { items: ['Музичне служіння', 'Молитовне служіння', 'Дитяче служіння'] }
     })
+
+  // a ministry opens: its leaders, its events and their coming days
+  await page.locator('.ministries-table tbody tr', { hasText: 'Молитовне служіння' }).click()
+  const details = page.locator('.details-row')
+  await expect(details.locator('.event')).toContainText('Ранкова молитва')
+  await expect(details.locator('.event')).toContainText('Онлайн')
+  await expect(details.locator('.day')).toContainText('1 / 2')
+  await details.locator('.v-autocomplete', { hasText: 'Керівники служіння' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
+  await expect
+    .poll(() => requests)
+    .toContainEqual({
+      method: 'PUT',
+      path: '/admin/leaders',
+      body: { leaders: { 'Молитовне служіння': ['leader-uid'] } }
+    })
+  await page.keyboard.press('Escape')
 
   await page.locator('.admin-nav').getByText('Локації').click()
   await page.getByPlaceholder('Нова назва, Enter').fill('Філія на Салтівці')
