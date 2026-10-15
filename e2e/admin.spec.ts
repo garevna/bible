@@ -452,7 +452,7 @@ test.describe('phone', () => {
 
     // the dashboard is on the panel
     await page.getByRole('button', { name: 'Адміністрування' }).click()
-    await expect(page.locator('.v-select', { hasText: 'Служителі' })).toBeVisible()
+    await expect(page.locator('.section-pill', { hasText: 'Служителі' })).toBeVisible()
 
     // the ministers: the name only, a row opens by a click, no scrolling to the side
     const table = page.locator('.users-table')

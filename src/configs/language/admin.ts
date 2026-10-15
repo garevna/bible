@@ -389,6 +389,11 @@ export const admin = {
     ru: 'Карта недоступна в этом браузере; адрес можно найти поиском',
     en: 'The map does not work in this browser; the search does'
   },
+  sections: {
+    ua: 'Розділи адміністрування',
+    ru: 'Разделы администрирования',
+    en: 'The sections of the dashboard'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',

@@ -17,16 +17,29 @@
 
       <div class="admin-layout">
         <!-- the sections the role of the user may open; on a phone they are a list above -->
-        <v-select
-          v-if="compact"
-          v-model="section"
-          :items="sections"
-          item-title="title"
-          item-value="value"
-          density="compact"
-          hide-details
-          class="mb-4"
-        />
+        <v-menu v-if="compact" location="bottom end">
+          <template #activator="{ props: menu }">
+            <button
+              v-bind="menu"
+              type="button"
+              class="section-pill d-flex justify-space-between align-center mt-3 mb-8"
+              :aria-label="text.sections"
+            >
+              <span>{{ current?.title }}</span>
+              <v-icon icon="mdi-dots-vertical" />
+            </button>
+          </template>
+          <v-list density="compact" bg-color="homefone" color="secondary" class="section-menu">
+            <v-list-item
+              v-for="item of sections"
+              :key="item.value"
+              :prepend-icon="item.icon"
+              :title="item.title"
+              :active="item.value === section"
+              @click="section = item.value"
+            />
+          </v-list>
+        </v-menu>
         <v-list
           v-else
           v-model:selected="selected"
@@ -117,7 +130,7 @@ const all: { value: Section; icon: string; manage: Manage; label: keyof typeof t
   { value: 'users', icon: 'mdi-account-group-outline', manage: 'users', label: 'sectionUsers' },
   { value: 'ministries', icon: 'mdi-hand-heart-outline', manage: 'directories', label: 'sectionMinistries' },
   { value: 'locations', icon: 'mdi-map-marker-outline', manage: 'directories', label: 'sectionLocations' },
-  { value: 'events', icon: 'mdi-calendar-cog-outline', manage: 'schedule', label: 'sectionEvents' }
+  { value: 'events', icon: 'mdi-calendar-edit-outline', manage: 'schedule', label: 'sectionEvents' }
 ]
 
 const sections = computed(() =>
@@ -127,6 +140,7 @@ const sections = computed(() =>
 )
 
 const section = ref<Section | null>(null)
+const current = computed(() => sections.value.find((item) => item.value === section.value))
 const selected = computed({
   get: () => (section.value ? [section.value] : []),
   set: (value: Section[]) => value[0] && (section.value = value[0])
@@ -193,6 +207,19 @@ watch(() => worker.isAdmin, load)
   top: 120px;
   border: solid 1px var(--app-border);
   border-radius: var(--app-radius);
+}
+
+/* a phone: the sections in a menu under a pill with the current one */
+.section-pill {
+  width: 100%;
+  background: var(--app-available-date);
+  padding: 12px 16px 12px 20px;
+  border-radius: 36px;
+  border: solid 1px var(--app-scrollbar-track);
+  color: var(--app-scrollbar-track);
+  font-weight: 600;
+  font-size: 16px;
+  text-align: left;
 }
 
 .admin-section {

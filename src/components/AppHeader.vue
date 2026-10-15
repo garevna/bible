@@ -139,7 +139,11 @@
 
     <v-progress-linear :active="app.progress" indeterminate absolute location="bottom" color="warning" />
 
-    <h4 class="view-title bg-primary" :class="{ 'view-title--low': low }">{{ title }}</h4>
+    <h4 class="view-title bg-primary" :class="{ 'view-title--low': low }">
+      <!-- the icon of the page: the same as the button that opens it -->
+      <v-icon v-if="icon" :icon="icon" size="small" class="view-title__icon" />
+      {{ title }}
+    </h4>
   </v-app-bar>
 </template>
 
@@ -152,11 +156,12 @@ import langFallbackIcon from '@/assets/lang.svg'
 import logo from '@/assets/logo.png'
 import User from '@/components/user/User.vue'
 // import ButtonTooltip from '@/components/ButtonTooltip.vue'
-import { langMenuItems, translationMenuItems } from '@/configs'
+import { footerMenu, langMenuItems, translationMenuItems } from '@/configs'
 import { useAppStore } from '@/stores/app'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
+import type { Page } from '@/types'
 
 const signIn = defineModel<boolean>('signIn', { default: false })
 // const signUp = defineModel<boolean>('signUp', { default: false })
@@ -177,6 +182,18 @@ const short = computed(() => app.viewportWidth < 600)
 const title = computed(() => {
   const page = (app.page ?? 'bible') as keyof typeof pages.value
   return pages.value[page] ?? ''
+})
+
+/** the icon of a page of the footer, or of a button of the header */
+const PAGE_ICONS: Partial<Record<Page, string>> = {
+  topic: '$topics',
+  admin: 'mdi-shield-account-outline',
+  messages: 'mdi-message-arrow-right',
+  calendar: 'mdi-calendar-month-outline'
+}
+const icon = computed(() => {
+  const page = (app.page ?? 'bible') as Page
+  return PAGE_ICONS[page] ?? footerMenu.find((item) => item.value === page)?.icon ?? ''
 })
 
 const langIcon = computed(
@@ -219,6 +236,10 @@ const langIcon = computed(
   padding: 2px 16px 4px;
   border-radius: 0 0 8px 8px;
   font-size: 13px;
+}
+
+.view-title__icon {
+  margin: -2px 4px 0 0;
 }
 
 .bottom-border {
