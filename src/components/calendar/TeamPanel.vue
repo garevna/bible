@@ -150,25 +150,17 @@
     <!-- somebody without the app: a guest pastor, say -->
     <template v-if="canApprove || canInvite">
       <p class="label mt-4">{{ text.guest }}</p>
-      <div class="d-flex flex-wrap ga-2 align-center">
-        <v-text-field
-          v-model="guest"
-          :label="text.guest"
-          density="compact"
-          hide-details
-          class="field"
-          @keyup.enter="addGuest"
-        />
-        <v-btn
-          variant="tonal"
-          color="buttons"
-          class="text-none"
-          :disabled="!guest.trim() || busy"
-          @click="addGuest"
-        >
-          {{ text.addGuest }}
-        </v-btn>
-      </div>
+      <v-text-field
+        v-model="guest"
+        :label="text.guest"
+        :disabled="busy"
+        append-inner-icon="mdi-plus-thick"
+        density="compact"
+        hide-details
+        class="field"
+        @click:append-inner="addGuest"
+        @keyup.enter="addGuest"
+      />
     </template>
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-2">{{ error }}</v-alert>
   </div>

@@ -43,6 +43,8 @@ export interface MessagesStore {
   markRead(id: string, uid: string, now: number): Promise<void>
   sentSince(uid: string, since: number): Promise<number>
   deleteExpired(now: number): Promise<void>
+  /** the messages of the ids that are to or from the user go (for both of them) */
+  remove(ids: string[], uid: string): Promise<void>
 }
 
 /** The body of POST /messages, or null */
@@ -169,6 +171,10 @@ export function d1Store(db: D1Database): MessagesStore {
     },
     async deleteExpired(now) {
       await db.prepare('DELETE FROM messages WHERE expires_at <= ?').bind(now).run()
+    },
+    async remove(ids, uid) {
+      const statement = db.prepare('DELETE FROM messages WHERE id = ? AND (to_uid = ? OR from_uid = ?)')
+      await db.batch(ids.map((id) => statement.bind(id, uid, uid)))
     }
   }
 }
@@ -188,6 +194,10 @@ export function memoryStore(): MessagesStore {
       if (message && !message.readAt) message.readAt = now
     },
     sentSince: async (uid, since) => messages.filter((m) => m.fromUid === uid && m.createdAt > since).length,
-    deleteExpired: async (now) => void (messages = messages.filter((m) => m.expiresAt > now))
+    deleteExpired: async (now) => void (messages = messages.filter((m) => m.expiresAt > now)),
+    remove: async (ids, uid) =>
+      void (messages = messages.filter(
+        (m) => !(ids.includes(m.id) && (m.toUid === uid || m.fromUid === uid))
+      ))
   }
 }

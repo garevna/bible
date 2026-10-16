@@ -112,6 +112,7 @@ async function fakeWorker(page: Page, manage: string[]) {
     }
   ]
   const requests: { method: string; path: string; body: unknown }[] = []
+  const lists = { ministries: ['Музичне служіння', 'Молитовне служіння'], locations: ['Церква'] }
   await page.route('**/worker-test/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
@@ -168,8 +169,18 @@ async function fakeWorker(page: Page, manage: string[]) {
         '/admin/addresses'
       ].includes(path) ||
       path.startsWith('/admin/directories/')
-    )
+    ) {
+      // a renamed item: the list with its new name
+      const renamed = path.match(/^\/admin\/directories\/(\w+)\/rename$/)?.[1] as
+        keyof typeof lists | undefined
+      if (renamed) {
+        lists[renamed] = lists[renamed].map((item) => (item === body.from ? body.to : item))
+        return route.fulfill({ json: { items: lists[renamed] } })
+      }
+      const list = path.match(/^\/admin\/directories\/(\w+)$/)?.[1] as keyof typeof lists | undefined
+      if (list) lists[list] = body.items
       return route.fulfill({ json: body })
+    }
     const uid = decodeURIComponent(path.replace('/admin/users/', ''))
     const user = users.find((item) => item.uid === uid)!
     if (request.method() === 'DELETE') return route.fulfill({ json: { removed: uid } })
@@ -233,7 +244,7 @@ test('the sections on the left; ministers get roles, the readers are shown on re
     .poll(() => requests)
     .toContainEqual({ method: 'PUT', path: '/admin/users/pastor-uid', body: { role: 'servant' } })
   await details.getByLabel('Ім’я').fill('Пастор Петро')
-  await details.getByRole('button', { name: 'Зберегти' }).click()
+  await details.locator('.mdi-content-save-outline').click()
   await expect
     .poll(() => requests)
     .toContainEqual({ method: 'PUT', path: '/admin/users/pastor-uid', body: { name: 'Пастор Петро' } })
@@ -331,8 +342,10 @@ test('the lists of ministries and locations', async ({ page }) => {
 
   // only the sections of its functions
   await expect(page.locator('.admin-nav .v-list-item')).toHaveText(['Служіння', 'Локації'])
-  await page.getByPlaceholder('Нова назва, Enter').fill('Дитяче служіння')
-  await page.keyboard.press('Enter')
+  // a new one: added by the icon at the end of the field
+  const add = page.getByRole('textbox', { name: 'Додати: нова назва' })
+  await add.fill('Дитяче служіння')
+  await page.locator('.new-item .mdi-plus-thick').click()
   await expect
     .poll(() => requests)
     .toContainEqual({
@@ -359,8 +372,8 @@ test('the lists of ministries and locations', async ({ page }) => {
   await page.keyboard.press('Escape')
 
   await page.locator('.admin-nav').getByText('Локації').click()
-  await page.getByPlaceholder('Нова назва, Enter').fill('Філія на Салтівці')
-  await page.keyboard.press('Enter')
+  await add.fill('Філія на Салтівці')
+  await page.locator('.new-item .mdi-plus-thick').click()
   await expect
     .poll(() => requests)
     .toContainEqual({
@@ -369,10 +382,23 @@ test('the lists of ministries and locations', async ({ page }) => {
       body: { items: ['Церква', 'Філія на Салтівці'] }
     })
 
+  // a name changed in place, saved by the icon at its end
+  const branch = page.locator('.directory-item').nth(1)
+  await branch.getByRole('textbox', { name: 'Назва' }).fill('Філія на Салтівці, вул. Гвардійців')
+  await branch.locator('.mdi-content-save-outline').click()
+  await expect
+    .poll(() => requests)
+    .toContainEqual({
+      method: 'PUT',
+      path: '/admin/directories/locations/rename',
+      body: { from: 'Філія на Салтівці', to: 'Філія на Салтівці, вул. Гвардійців' }
+    })
+
   // the address of a location: the map opens it
-  const church = page.locator('.directory-item', { hasText: 'Церква' })
-  await church.getByPlaceholder('Адреса (для карти; онлайн — порожньо)').fill('Харків, вул. Сумська, 1')
-  await church.getByPlaceholder('Адреса (для карти; онлайн — порожньо)').press('Enter')
+  const church = page.locator('.directory-item').first()
+  const address = church.getByRole('textbox', { name: 'Адреса (для карти; онлайн — порожньо)' })
+  await address.fill('Харків, вул. Сумська, 1')
+  await church.locator('.mdi-content-save-outline').click()
   await expect
     .poll(() => requests)
     .toContainEqual({

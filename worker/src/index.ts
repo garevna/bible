@@ -52,6 +52,7 @@ import {
   parseLeaders,
   parseMinistries,
   removeUser,
+  renameUsersMinistry,
   RoleChangeError,
   roleOf,
   setAddresses,
@@ -82,6 +83,7 @@ import {
  *   GET    /messages/recipients     whom the user may write to
  *   POST   /messages                { to?, ministries?, roles?, text, attachment?, replyTo? }
  *   POST   /messages/:id/read       marks a message read
+ *   DELETE /messages                { ids }: the user's own messages go (to or from them)
  * The dashboard, each part for the roles that have its function (the owners have all):
  *   GET    /admin/settings          the roles, types, ministries and locations
  *   PUT    /admin/roles             { roles }                                        roles
@@ -143,6 +145,8 @@ const ROUTES = [
   /^GET \/messages(\/recipients)?$/,
   /^POST \/messages$/,
   /^POST \/messages\/[^/]+\/read$/,
+  /^DELETE \/messages$/,
+  /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
   /^GET \/admin\/(settings|users)$/,
   /^PUT \/admin\/(roles|types|event-types|calendar|leaders|addresses)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
@@ -212,6 +216,44 @@ async function scheduleContext(
     reader,
     now: deps.now?.() ?? Date.now()
   }
+}
+
+/**
+ * A location or a ministry gets another name, everywhere it is: the list, the events (and the changes
+ * of days), the addresses of the locations; the leaders, the ministries of the users, the ministries
+ * the roles invite to, the types of events
+ */
+async function renameEverywhere(env: Env, deps: Deps, directory: Directory, from: string, to: string) {
+  const store = env.USERS
+  const swap = <T>(record: Record<string, T>) =>
+    Object.fromEntries(Object.entries(record).map(([key, value]) => [key === from ? to : key, value]))
+  const items = await getDirectory(store, directory)
+  await setDirectory(
+    store,
+    directory,
+    items.map((item) => (item === from ? to : item))
+  )
+  await (deps.schedule ?? d1Schedule(env.DB)).rename(
+    directory === 'locations' ? 'location' : 'ministry',
+    from,
+    to
+  )
+  if (directory === 'locations') {
+    await setAddresses(store, swap(await getAddresses(store)))
+    return
+  }
+  await setLeaders(store, swap(await getLeaders(store)))
+  await renameUsersMinistry(store, env.OWNERS, from, to)
+  const roles = await getRoles(store)
+  await setRoles(
+    store,
+    roles.map((role) => ({ ...role, invite: role.invite.map((item) => (item === from ? to : item)) }))
+  )
+  const types = await getEventTypes(store)
+  await setEventTypes(
+    store,
+    types.map((type) => (type.ministry === from ? { ...type, ministry: to } : type))
+  )
 }
 
 /** a button under the field of the chat: Telegram sends the number of the user's own account */
@@ -620,6 +662,21 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     return json({ types })
   }
 
+  // a location or a ministry renamed: everything that has the old name keeps up
+  const renamed = pathname.match(/^\/admin\/directories\/(ministries|locations)\/rename$/)?.[1] as
+    Directory | undefined
+  if (renamed) {
+    if (!can('directories')) return json({ error: 'forbidden' }, 403)
+    const { from, to } = ((await body()) ?? {}) as { from?: unknown; to?: unknown }
+    const items = await getDirectory(env.USERS, renamed)
+    const name = typeof to === 'string' ? to.trim() : ''
+    if (typeof from !== 'string' || !items.includes(from) || !name || name.length > 60)
+      return json({ error: 'bad-request' }, 400)
+    if (name !== from && items.includes(name)) return json({ error: 'exists' }, 409)
+    await renameEverywhere(env, deps, renamed, from, name)
+    return json({ items: items.map((item) => (item === from ? name : item)) })
+  }
+
   const directory = pathname.match(/^\/admin\/directories\/(\w+)$/)?.[1] as Directory | undefined
   if (directory && DIRECTORIES.includes(directory)) {
     if (!can('directories')) return json({ error: 'forbidden' }, 403)
@@ -706,6 +763,14 @@ async function handleMessages(
     const messages = await store.forUser(me.uid, now)
     const unread = messages.filter((m) => m.toUid === me.uid && !m.readAt).length
     return json({ messages, unread })
+  }
+
+  if (request.method === 'DELETE' && pathname === '/messages') {
+    const ids = ((await body()) as { ids?: unknown } | null)?.ids
+    if (!Array.isArray(ids) || !ids.length || ids.length > 300 || !ids.every((id) => typeof id === 'string'))
+      return json({ error: 'bad-request' }, 400)
+    await store.remove(ids as string[], me.uid)
+    return json({ removed: ids.length })
   }
 
   const read = pathname.match(/^\/messages\/([^/]+)\/read$/)

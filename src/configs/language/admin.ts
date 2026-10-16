@@ -214,15 +214,10 @@ export const admin = {
     ru: 'Служители — все, кроме читателей. Чтобы сделать читателя служителем, включите «Показать читателей» и дайте ему роль.',
     en: 'Ministers are everyone but the readers. To make a reader a minister, show the readers and give them a role.'
   },
-  directoryHint: {
-    ua: 'Довідник: додайте назву і натисніть Enter, видаліть — хрестиком.',
-    ru: 'Справочник: добавьте название и нажмите Enter, удалите — крестиком.',
-    en: 'A list: type a name and press Enter, remove with the cross.'
-  },
   newItem: {
-    ua: 'Нова назва, Enter',
-    ru: 'Новое название, Enter',
-    en: 'A new name, Enter'
+    ua: 'Додати: нова назва',
+    ru: 'Добавить: новое название',
+    en: 'Add: a new name'
   },
   removeItem: {
     ua: 'Видалити',
@@ -393,6 +388,11 @@ export const admin = {
     ua: 'Розділи адміністрування',
     ru: 'Разделы администрирования',
     en: 'The sections of the dashboard'
+  },
+  itemName: {
+    ua: 'Назва',
+    ru: 'Название',
+    en: 'Name'
   },
   sectionEvents: {
     ua: 'Події календаря',

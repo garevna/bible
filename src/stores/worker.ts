@@ -325,6 +325,10 @@ export const useWorkerStore = defineStore('worker', () => {
     (await call<{ roles: RoleDef[] }>('PUT', '/admin/roles', { roles: list })).roles
 
   /** the ministries or the locations of the church */
+  /** a ministry or a location gets another name: the events, the people and the rest keep up */
+  const renameItem = async (name: 'ministries' | 'locations', from: string, to: string) =>
+    (await call<{ items: string[] }>('PUT', `/admin/directories/${name}/rename`, { from, to })).items
+
   const setDirectory = async (name: 'ministries' | 'locations', items: string[]) =>
     (await call<{ items: string[] }>('PUT', `/admin/directories/${name}`, { items })).items
 
@@ -353,6 +357,13 @@ export const useWorkerStore = defineStore('worker', () => {
 
   const setTypes = async (list: NoteType[]) => {
     types.value = (await call<{ types: NoteType[] }>('PUT', '/admin/types', { types: list })).types
+  }
+
+  /** the user's own messages go (to or from them), for both of them */
+  async function deleteMessages(ids: string[]) {
+    await call('DELETE', '/messages', { ids })
+    messages.value = messages.value.filter((message) => !ids.includes(message.id))
+    unread.value = messages.value.filter((message) => message.toUid === user.uid && !message.readAt).length
   }
 
   return {
@@ -395,8 +406,10 @@ export const useWorkerStore = defineStore('worker', () => {
     setAddresses,
     setRoles,
     setDirectory,
+    renameItem,
     loadMessages,
     markRead,
+    deleteMessages,
     recipients,
     sendMessage
   }

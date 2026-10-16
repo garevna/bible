@@ -37,6 +37,19 @@
         <tr class="details-row">
           <td :colspan="columns.length">
             <div class="details">
+              <!-- the name: changed in place, saved by the icon at its end (the events and the people keep up) -->
+              <v-text-field
+                :model-value="names[item.name] ?? item.name"
+                :label="text.itemName"
+                :disabled="saving"
+                :append-inner-icon="renamed(item.name) ? 'mdi-content-save-outline' : undefined"
+                density="compact"
+                hide-details
+                class="leaders"
+                @update:model-value="(value: string) => (names[item.name] = value)"
+                @click:append-inner="rename(item.name)"
+                @keydown.enter="rename(item.name)"
+              />
               <!-- the leaders plan the events of the ministry -->
               <v-autocomplete
                 :model-value="leaders?.[item.name] ?? []"
@@ -129,11 +142,13 @@
 
     <v-text-field
       v-model="newMinistry"
-      :placeholder="text.newItem"
+      :label="text.newItem"
       :disabled="saving"
+      append-inner-icon="mdi-plus-thick"
       density="compact"
       hide-details
       class="mt-3 new-item"
+      @click:append-inner="add"
       @keydown.enter="add"
     />
 
@@ -148,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef } from 'vue'
+import { computed, onMounted, reactive, ref, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useDisplay } from 'vuetify'
 
@@ -182,6 +197,27 @@ const expanded = ref<string[]>([])
 const busy = ref(false)
 const saving = ref(false)
 const newMinistry = ref('')
+/** the names being written, by ministry */
+const names = reactive<Record<string, string>>({})
+const renamed = (ministry: string) => {
+  const name = (names[ministry] ?? ministry).trim()
+  return Boolean(name) && name !== ministry
+}
+
+/** another name: the events, the people, the leaders and the rest keep up */
+const rename = (ministry: string) =>
+  renamed(ministry) &&
+  run(async () => {
+    const name = names[ministry]!.trim()
+    ministries.value = await worker.renameItem('ministries', ministry, name)
+    if (leaders.value?.[ministry]) {
+      const { [ministry]: uids, ...rest } = leaders.value
+      leaders.value = { ...rest, [name]: uids! }
+    }
+    delete names[ministry]
+    expanded.value = expanded.value.map((item) => (item === ministry ? name : item))
+    await schedule.load()
+  })
 
 /** a phone: the name of the ministry and the number of its events */
 const headers = computed(() => {

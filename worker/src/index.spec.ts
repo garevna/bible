@@ -722,6 +722,53 @@ describe('the schedule of ministries', () => {
     ).toEqual({ invited: 1 })
   })
 
+  it('a location or a ministry renamed: the events, the people, the leaders and the addresses keep up', async () => {
+    const { call } = await church()
+    const eventId = ((await call('POST', '/schedule/events', 'owner', prayer)).body.event as { id: string })
+      .id
+    await call('PUT', '/admin/addresses', 'owner', { addresses: { Онлайн: 'Zoom' } })
+    await call('PUT', '/admin/leaders', 'owner', { leaders: { 'Молитовне служіння': ['leader-uid'] } })
+
+    const location = await call('PUT', '/admin/directories/locations/rename', 'owner', {
+      from: 'Онлайн',
+      to: 'Онлайн (Zoom)'
+    })
+    expect(location.body.items).toEqual(['Церква', 'Онлайн (Zoom)'])
+    const ministry = await call('PUT', '/admin/directories/ministries/rename', 'owner', {
+      from: 'Молитовне служіння',
+      to: 'Служіння молитви'
+    })
+    expect(ministry.body.items).toContain('Служіння молитви')
+
+    const { body } = await call('GET', '/schedule?from=2026-10-13&to=2026-10-13', 'leader')
+    expect(
+      (body.events as { id: string; location: string; ministry: string }[]).find(
+        (item) => item.id === eventId
+      )
+    ).toMatchObject({ location: 'Онлайн (Zoom)', ministry: 'Служіння молитви' })
+    expect(body.addresses).toEqual({ 'Онлайн (Zoom)': { address: 'Zoom' } })
+    expect(body.leaders).toEqual({ 'Служіння молитви': ['leader-uid'] })
+    expect((await call('GET', '/me', 'leader')).body.ministries).toEqual(['Служіння молитви'])
+
+    // a name that is there already, or a name that is not
+    expect(
+      (
+        await call('PUT', '/admin/directories/locations/rename', 'owner', {
+          from: 'Церква',
+          to: 'Онлайн (Zoom)'
+        })
+      ).status
+    ).toBe(409)
+    expect(
+      (await call('PUT', '/admin/directories/locations/rename', 'owner', { from: 'Невідома', to: 'Х' }))
+        .status
+    ).toBe(400)
+    expect(
+      (await call('PUT', '/admin/directories/locations/rename', 'pastor', { from: 'Церква', to: 'Храм' }))
+        .status
+    ).toBe(403)
+  })
+
   it('the addresses of the locations: kept by the administrators, given with the schedule', async () => {
     const { call } = await church()
     expect(
@@ -1066,6 +1113,18 @@ describe('messages between ministers', () => {
     ])
 
     expect((await call('PUT', '/me', 'musician', { phone: null })).body).toEqual({ phone: null })
+  })
+
+  it('a person deletes their own messages, not the messages of others', async () => {
+    const { call } = await church()
+    await call('POST', '/messages', 'pastor', { to: ['musician-uid', 'leader-uid'], text: 'Сьогодні' })
+    const [toMusician] = (await call('GET', '/messages', 'musician')).body.messages as { id: string }[]
+    const [toLeader] = (await call('GET', '/messages', 'leader')).body.messages as { id: string }[]
+    // the musician cannot delete the message of the leader
+    await call('DELETE', '/messages', 'musician', { ids: [toMusician!.id, toLeader!.id] })
+    expect((await call('GET', '/messages', 'musician')).body.messages).toEqual([])
+    expect((await call('GET', '/messages', 'leader')).body.messages).toHaveLength(1)
+    expect((await call('DELETE', '/messages', 'leader', { ids: [] })).status).toBe(400)
   })
 
   it('messages live for a day; a person sends at most 100 in an hour', async () => {

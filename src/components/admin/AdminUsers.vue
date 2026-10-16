@@ -100,28 +100,25 @@
         <tr class="details-row">
           <td :colspan="columns.length">
             <div class="details">
-              <div class="d-flex flex-wrap ga-2 align-center">
+              <div class="d-flex flex-wrap ga-5 align-center">
+                <!-- saved by the icon at its end, once it is changed -->
                 <v-text-field
                   :model-value="names[item.uid] ?? item.name ?? ''"
                   :label="text.userName"
                   :hint="item.nameSet ? text.nameSetHint : text.nameAccountHint"
                   persistent-hint
+                  :disabled="saving === item.uid"
+                  :append-inner-icon="
+                    (names[item.uid] ?? item.name ?? '') !== (item.name ?? '')
+                      ? 'mdi-content-save-outline'
+                      : undefined
+                  "
                   density="compact"
-                  class="field"
+                  class="field mt-4"
                   @update:model-value="(value: string) => (names[item.uid] = value)"
+                  @click:append-inner="saveName(item)"
                   @keydown.enter="saveName(item)"
                 />
-                <v-btn
-                  variant="tonal"
-                  color="buttons"
-                  class="text-none"
-                  :disabled="
-                    (names[item.uid] ?? item.name ?? '') === (item.name ?? '') || saving === item.uid
-                  "
-                  @click="saveName(item)"
-                >
-                  {{ common.save }}
-                </v-btn>
               </div>
 
               <div class="info">
@@ -208,6 +205,7 @@ import PhoneDialog from '@/components/PhoneDialog.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { READER, useWorkerStore, type Role, type RoleDef, type UserView } from '@/stores/worker'
+import { formatDate, localeOf } from '@/utils/dates'
 import { format } from '@/utils/format'
 
 /**
@@ -219,7 +217,7 @@ const emit = defineEmits<{ error: [cause: unknown] }>()
 
 const worker = useWorkerStore()
 const user = useUserStore()
-const { admin: text, common, header } = storeToRefs(useLanguageStore())
+const { admin: text, header } = storeToRefs(useLanguageStore())
 const { smAndDown: phone } = useDisplay()
 
 const users = shallowRef<UserView[]>([])
@@ -283,7 +281,7 @@ const shown = computed(() => {
     )
 })
 
-const day = (ms: number) => new Date(ms).toLocaleDateString()
+const day = (ms: number) => formatDate(new Date(ms), localeOf(user.lang)).short
 
 async function run(action: () => Promise<void>) {
   try {

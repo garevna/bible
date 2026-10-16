@@ -84,6 +84,16 @@ p {
   font-weight: bold;
 }
 
+.v-menu > .v-overlay__content {
+  border-radius: 16px;
+  background: var(--app-available-date);
+}
+
+.v-menu > .v-overlay__content > .v-list {
+  border-radius: 16px;
+  background: var(--app-available-date);
+}
+
 .v-tooltip > .v-overlay__content {
   background: var(--app-tooltip);
 }

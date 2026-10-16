@@ -5,6 +5,17 @@
     <template v-else>
       <div class="d-flex align-center ga-2 mb-2">
         <h2 class="messages-title flex-grow-1">{{ text.title }}</h2>
+        <v-btn
+          v-if="stale.length"
+          variant="tonal"
+          color="secondary"
+          size="small"
+          class="text-none"
+          prepend-icon="mdi-broom"
+          @click="remove(stale.map((message) => message.id))"
+        >
+          {{ format(text.removeStale, { count: stale.length }) }}
+        </v-btn>
         <SendMessage v-if="worker.canSend" />
         <ButtonTooltip icon="mdi-refresh" :text="admin.reload" color="secondary" @click="load" />
       </div>
@@ -45,6 +56,7 @@
             </span>
             <v-spacer />
             <small class="text-medium-emphasis">{{ time(message.createdAt) }}</small>
+            <ConfirmButton icon="$delete" :text="text.removeMessage" @confirm="remove([message.id])" />
             <!-- an incoming message: answered, or waiting for an answer -->
             <v-icon
               v-if="incoming(message)"
@@ -134,12 +146,14 @@ import { storeToRefs } from 'pinia'
 import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
+import ConfirmButton from '@/components/ConfirmButton.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
 import SendMessage from '@/components/messages/SendMessage.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import type { Participant } from '@/stores/schedule'
 import { useWorkerStore, WorkerError, type Ask, type Message } from '@/stores/worker'
+import { formatDateTime, formatDay, localeOf } from '@/utils/dates'
 import { format } from '@/utils/format'
 import { saveAttachment } from '@/utils/saveAttachment'
 
@@ -187,12 +201,7 @@ const stateText = (state: AskState) =>
 const stateColor = (state: AskState) =>
   ({ waiting: 'secondary', confirmed: 'primary', declined: 'delete', gone: 'secondary' })[state]
 
-const dayLabel = (day: string) =>
-  new Date(`${day}T12:00:00`).toLocaleDateString(undefined, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short'
-  })
+const dayLabel = (day: string) => formatDay(day, localeOf(user.lang))
 
 async function loadTeam() {
   const days = worker.messages
@@ -272,13 +281,16 @@ const threads = computed(() => {
     .sort((a, b) => latest(b) - latest(a))
 })
 
-const time = (ms: number) =>
-  new Date(ms).toLocaleString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+const time = (ms: number) => formatDateTime(ms, localeOf(user.lang))
+
+/** the invitations that need nothing more: every day answered, or gone from the calendar */
+const stale = computed(() =>
+  worker.messages.filter(
+    (message) => message.asks?.length && message.asks.every((ask) => stateOf(ask) !== 'waiting')
+  )
+)
+
+const remove = (ids: string[]) => run(() => worker.deleteMessages(ids))
 
 async function run(action: () => Promise<void>) {
   error.value = ''

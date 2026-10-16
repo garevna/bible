@@ -288,6 +288,11 @@ test('an invitation is answered right in the message, a day at a time', async ({
   await expect(days.last()).toContainText('❌ Ви не можете')
   // every day answered: the message is answered
   await expect(card.getByLabel('Ви відповіли')).toBeVisible()
+  // the time in the words of the app: "16 жовтня о 20:16"
+  await expect(card.locator('header small')).toHaveText(/^\d{1,2} \p{L}+ о \d{2}:\d{2}$/u)
+  // nothing more to answer: it is cleared away
+  await page.getByRole('button', { name: 'Прибрати неактуальні (1)' }).click()
+  await expect(card).toHaveCount(0)
   expect(answers).toEqual([
     { eventId: 'prayer', day: '2026-11-02', uid: 'e2e-uid', as: 'main', answer: 'confirm' },
     {

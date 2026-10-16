@@ -145,6 +145,16 @@ export async function updateUser(
   return view(updated, owners)
 }
 
+/** A ministry got another name: the users who serve in it keep serving (the owners too) */
+export async function renameUsersMinistry(store: UsersStore, owners: string, from: string, to: string) {
+  for (const user of await listUsers(store, owners, true)) {
+    if (!user.ministries?.includes(from)) continue
+    const { owner: _owner, ...record } = user
+    const kept = (await getUser(store, user.uid)) ?? record
+    await save(store, { ...kept, ministries: kept.ministries?.map((item) => (item === from ? to : item)) })
+  }
+}
+
 /* ---------- phone numbers ---------- */
 
 /** '+380501234567' (E.164); the app checks the number with libphonenumber-js, the worker its form */

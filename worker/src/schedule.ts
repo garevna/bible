@@ -284,6 +284,8 @@ export interface ScheduleStore {
   material(id: string): Promise<Material | null>
   putMaterial(material: Material): Promise<void>
   deleteMaterial(id: string): Promise<void>
+  /** a location or a ministry got another name: the events (and the changes of days) keep up */
+  rename(field: 'location' | 'ministry', from: string, to: string): Promise<void>
   /** the changes of some days */
   changes(from: string, to: string): Promise<DayChange[]>
   change(eventId: string, day: string): Promise<DayChange | null>
@@ -554,6 +556,12 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async deleteMaterial(id) {
       await db.prepare('DELETE FROM materials WHERE id = ?').bind(id).run()
     },
+    async rename(field, from, to) {
+      const statements = [db.prepare(`UPDATE events SET ${field} = ? WHERE ${field} = ?`).bind(to, from)]
+      if (field === 'location')
+        statements.push(db.prepare('UPDATE day_changes SET location = ? WHERE location = ?').bind(to, from))
+      await db.batch(statements)
+    },
     async changes(from, to) {
       const { results } = await db
         .prepare('SELECT * FROM day_changes WHERE day BETWEEN ? AND ?')
@@ -626,6 +634,11 @@ export function memorySchedule(): ScheduleStore {
     putMaterial: async (material) =>
       void (materials = [...materials.filter((m) => m.id !== material.id), material]),
     deleteMaterial: async (id) => void (materials = materials.filter((m) => m.id !== id)),
+    rename: async (field, from, to) => {
+      events = events.map((e) => (e[field] === from ? { ...e, [field]: to } : e))
+      if (field === 'location')
+        changes = changes.map((c) => (c.location === from ? { ...c, location: to } : c))
+    },
     changes: async (from, to) => changes.filter((c) => c.day >= from && c.day <= to),
     change: async (eventId, day) => changes.find((c) => c.eventId === eventId && c.day === day) ?? null,
     putChange: async (change) =>

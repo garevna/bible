@@ -143,5 +143,15 @@ export const messages = {
     ua: 'Уже неактуально',
     ru: 'Уже неактуально',
     en: 'No longer actual'
+  },
+  removeMessage: {
+    ua: 'Видалити повідомлення (у обох)',
+    ru: 'Удалить сообщение (у обоих)',
+    en: 'Delete the message (for both)'
+  },
+  removeStale: {
+    ua: 'Прибрати неактуальні ({count})',
+    ru: 'Убрать неактуальные ({count})',
+    en: 'Clear the stale ones ({count})'
   }
 }

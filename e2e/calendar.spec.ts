@@ -310,8 +310,10 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
 
   // a guest pastor, written by name
   await communionCard.getByRole('button', { name: 'Учасники' }).click()
-  await communionCard.getByLabel('Гість (без застосунку): ім’я, звідки').fill('Пастор Іван, Київ')
-  await communionCard.getByRole('button', { name: 'Додати гостя' }).click()
+  await communionCard
+    .getByRole('textbox', { name: 'Гість (без застосунку): ім’я, звідки' })
+    .fill('Пастор Іван, Київ')
+  await communionCard.locator('.mdi-plus-thick').click()
   await expect
     .poll(() => posted.at(-1))
     .toEqual({
