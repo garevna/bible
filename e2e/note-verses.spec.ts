@@ -46,9 +46,9 @@ test('verses are added to a note by text search and by reference', async ({ page
     .toEqual(
       expect.arrayContaining([
         '1.000.000.000',
-        'ohienko:1.000.004.002',
-        'ohienko:1.000.004.003',
-        'ohienko:1.000.004.004'
+        'homenko:1.000.004.002',
+        'homenko:1.000.004.003',
+        'homenko:1.000.004.004'
       ])
     )
   await expect(editor.locator('.field-set', { hasText: 'Вірші з Біблії' }).locator('p')).toHaveCount(6)
@@ -85,5 +85,5 @@ test('a verse is picked in another translation; the translation of the menu stay
   )
 
   // the Bible page still reads in Ukrainian
-  expect(await withStores(page, (stores) => stores.user.translation)).toBe('ohienko')
+  expect(await withStores(page, (stores) => stores.user.translation)).toBe('homenko')
 })

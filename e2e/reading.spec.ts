@@ -3,9 +3,18 @@ import { expect, openBible, test, verse } from './fixtures'
 test.describe('reading the Bible', () => {
   test.beforeEach(async ({ page }) => openBible(page))
 
+  // the free translation of P. Kulish and I. Puluj (1905) by default
   test('loads the translation and shows Matthew 1', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'Від Матвія' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Євангелия від сьв. Маттея' })).toBeVisible()
     await expect(verse(page, '1.000.000.000')).toHaveText(/Книга родоводу Ісуса Христа/)
+  })
+
+  test('a guest sees the free translations only (not those that need a permission)', async ({ page }) => {
+    await page.locator('.v-app-bar .mdi-book-cross').click()
+    const menu = page.locator('.v-overlay--active .v-list')
+    await expect(menu.locator('.v-list-item', { hasText: 'Куліша' })).toBeVisible()
+    await expect(menu.locator('.v-list-item', { hasText: 'Синодальний переклад' })).toBeVisible()
+    await expect(menu.locator('.v-list-item', { hasText: 'Огієнка' })).toHaveCount(0)
   })
 
   test('changes chapters with the pagination', async ({ page }) => {
@@ -18,10 +27,10 @@ test.describe('reading the Bible', () => {
     await expect(page.locator('.book-menu-item')).toHaveCount(27)
 
     await page.locator('.v-switch input').click()
-    await expect(page.locator('.book-menu-item').first()).toHaveText('Буття')
+    await expect(page.locator('.book-menu-item').first()).toContainText('Перва книга Мойсея')
 
-    await page.locator('.book-menu-item', { hasText: 'Псалми' }).click()
-    await expect(page.getByRole('heading', { name: 'Псалми' })).toBeVisible()
+    await page.locator('.book-menu-item', { hasText: 'Псалтир' }).click()
+    await expect(page.getByRole('heading', { name: 'Псалтир' })).toBeVisible()
     await expect(verse(page, '0.018.000.000')).toBeVisible()
   })
 

@@ -20,6 +20,7 @@ import AppHeader from '@/components/AppHeader.vue'
 import { useVerseLinks } from '@/composables/useVerseLinks'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
+import { useTranslationAccess } from '@/composables/useTranslations'
 import { useWorkerStore } from '@/stores/worker'
 
 const AuthDialog = defineAsyncComponent(() => import('@/components/user/AuthDialog.vue'))
@@ -68,6 +69,9 @@ watch(
 
 /** a minister sees the schedule of ministries first, once a session (the rights come from the worker a bit later) */
 const worker = useWorkerStore()
+// the translations that need a permission are for some people only
+useTranslationAccess()
+
 const LANDED = 'bible:calendar-landed'
 watch(
   () => worker.canReceive,

@@ -109,7 +109,7 @@ test.describe('signed in: verse details, notes and keywords', () => {
     await page.locator('.v-bottom-navigation').getByRole('button', { name: 'Ключові слова' }).click()
     await page.locator('.v-expansion-panel-title', { hasText: 'покоління' }).click()
     await expect(page.locator('.v-expansion-panel-text .link-to-verse')).toHaveText(
-      '(Огієнко, Від Матвія 1:2)'
+      '(Куліш, Євангелия від сьв. Маттея 1:2)'
     )
   })
 })

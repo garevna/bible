@@ -78,6 +78,7 @@
               v-else-if="section === 'ministries'"
               v-model="settings.ministries"
               v-model:leaders="settings.leaders"
+              v-model:translations="settings.translationMinistries"
               @error="fail"
             />
             <AdminDirectory
@@ -163,6 +164,7 @@ const settings = ref<{
   calendar: CalendarSettings
   leaders: Record<string, string[]>
   addresses: Record<string, Place>
+  translationMinistries: string[]
 } | null>(null)
 const busy = ref(false)
 const error = ref('')
@@ -181,7 +183,12 @@ async function load() {
   try {
     const loaded = await worker.getSettings()
     // a worker of an older version has no leaders and no addresses yet
-    settings.value = { ...loaded, leaders: loaded.leaders ?? {}, addresses: loaded.addresses ?? {} }
+    settings.value = {
+      ...loaded,
+      leaders: loaded.leaders ?? {},
+      addresses: loaded.addresses ?? {},
+      translationMinistries: loaded.translationMinistries ?? []
+    }
   } catch (cause) {
     fail(cause)
   } finally {

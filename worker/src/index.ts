@@ -44,6 +44,7 @@ import {
   getAddresses,
   getDirectory,
   getLeaders,
+  getTranslationMinistries,
   getUser,
   getMinistries,
   isPhone,
@@ -58,6 +59,7 @@ import {
   setAddresses,
   setDirectory,
   setLeaders,
+  setTranslationMinistries,
   setOwnPhone,
   setTelegramChat,
   touchUser,
@@ -83,7 +85,7 @@ import {
  *   GET    /messages/recipients     whom the user may write to
  *   POST   /messages                { to?, ministries?, roles?, text, attachment?, replyTo? }
  *   POST   /messages/:id/read       marks a message read
- *   DELETE /messages                { ids }: the user's own messages go (to or from them)
+ *   DELETE /messages                { ids }: the messages are hidden from the user (the other side keeps them)
  * The dashboard, each part for the roles that have its function (the owners have all):
  *   GET    /admin/settings          the roles, types, ministries and locations
  *   PUT    /admin/roles             { roles }                                        roles
@@ -148,7 +150,7 @@ const ROUTES = [
   /^DELETE \/messages$/,
   /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
   /^GET \/admin\/(settings|users)$/,
-  /^PUT \/admin\/(roles|types|event-types|calendar|leaders|addresses)$/,
+  /^PUT \/admin\/(roles|types|event-types|calendar|leaders|addresses|translation-ministries)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
   /^GET \/schedule(\/people|\/materials)?$/,
@@ -243,6 +245,10 @@ async function renameEverywhere(env: Env, deps: Deps, directory: Directory, from
     return
   }
   await setLeaders(store, swap(await getLeaders(store)))
+  await setTranslationMinistries(
+    store,
+    (await getTranslationMinistries(store)).map((item) => (item === from ? to : item))
+  )
   await renameUsersMinistry(store, env.OWNERS, from, to)
   const roles = await getRoles(store)
   await setRoles(
@@ -496,6 +502,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   const body = async () => (await request.json().catch(() => null)) as unknown
 
   if (route === 'GET /me') {
+    const translationMinistries = await getTranslationMinistries(env.USERS)
     return json({
       role: roleId,
       roleName: rights.name,
@@ -515,6 +522,11 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       phone: me.phone ?? null,
       // the service bot: offered to the ministers, and whether the user linked it
       serviceBot: Boolean(env.SERVICE_BOT_TOKEN) && serves(roles, roleId),
+      // the translations that need a permission: the owners, the administrators, some ministries
+      allTranslations:
+        roleId === 'owner' ||
+        rights.manage.length > 0 ||
+        (me.ministries ?? []).some((ministry) => translationMinistries.includes(ministry)),
       // the ministries the user leads (plans their events)
       leads: Object.entries(await getLeaders(env.USERS))
         .filter(([, uids]) => uids.includes(me.uid))
@@ -601,8 +613,20 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       eventTypes: await getEventTypes(env.USERS),
       calendar: await getCalendar(env.USERS),
       leaders: await getLeaders(env.USERS),
-      addresses: await getAddresses(env.USERS)
+      addresses: await getAddresses(env.USERS),
+      translationMinistries: await getTranslationMinistries(env.USERS)
     })
+  }
+
+  // the ministries whose people see the translations that need a permission
+  if (route === 'PUT /admin/translation-ministries') {
+    if (!can('directories')) return json({ error: 'forbidden' }, 403)
+    const list = parseMinistries(((await body()) as { ministries?: unknown } | null)?.ministries)
+    const known = await getDirectory(env.USERS, 'ministries')
+    if (!list || list.some((ministry) => !known.includes(ministry)))
+      return json({ error: 'bad-request' }, 400)
+    await setTranslationMinistries(env.USERS, list)
+    return json({ ministries: list })
   }
 
   // the addresses of the locations: kept with the list of the locations

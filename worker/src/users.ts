@@ -259,6 +259,18 @@ export function parseAddresses(value: unknown, locations: string[]): Addresses |
   return addresses
 }
 
+/**
+ * The ministries whose people see the translations of the Bible that need a permission (the menu warns
+ * of them): the pastoral one at first. The readers see the free translations only.
+ */
+const TRANSLATIONS_KEY = 'settings:translationMinistries'
+
+export const getTranslationMinistries = async (store: UsersStore) =>
+  (await store.get<string[]>(TRANSLATIONS_KEY, 'json')) ?? ['Пасторське служіння']
+
+export const setTranslationMinistries = (store: UsersStore, ministries: string[]) =>
+  store.put(TRANSLATIONS_KEY, JSON.stringify(ministries))
+
 /** The user's chat with the service bot (null: unlinked) */
 export async function setTelegramChat(store: UsersStore, record: UserRecord, chatId: number | null) {
   const { telegramChatId: _old, ...rest } = record

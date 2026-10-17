@@ -145,9 +145,9 @@ export const messages = {
     en: 'No longer actual'
   },
   removeMessage: {
-    ua: 'Видалити повідомлення (у обох)',
-    ru: 'Удалить сообщение (у обоих)',
-    en: 'Delete the message (for both)'
+    ua: 'Прибрати в себе (у співрозмовника лишиться)',
+    ru: 'Убрать у себя (у собеседника останется)',
+    en: 'Remove for me (the other side keeps it)'
   },
   removeStale: {
     ua: 'Прибрати неактуальні ({count})',

@@ -107,7 +107,7 @@
 
       <v-list density="compact" bg-color="homefone">
         <v-list-item
-          v-for="item of translationMenuItems"
+          v-for="item of translations"
           :key="item.value"
           :active="item.value === user.translation"
           @click="content.switchTranslation(item.value)"
@@ -156,7 +156,8 @@ import langFallbackIcon from '@/assets/lang.svg'
 import logo from '@/assets/logo.png'
 import User from '@/components/user/User.vue'
 // import ButtonTooltip from '@/components/ButtonTooltip.vue'
-import { footerMenu, langMenuItems, translationMenuItems } from '@/configs'
+import { useTranslations } from '@/composables/useTranslations'
+import { footerMenu, langMenuItems } from '@/configs'
 import { useAppStore } from '@/stores/app'
 import { useContentStore } from '@/stores/content'
 import { useLanguageStore } from '@/stores/language'
@@ -173,6 +174,8 @@ const { common, header, pages } = storeToRefs(useLanguageStore())
 
 /** a phone with a signed in user: the calendar, the messages and the rest are in the menu of the avatar */
 const { smAndDown, height } = useDisplay()
+/** the translations the user may read */
+const { translations } = useTranslations()
 /** a phone on its side: the header is lower, to leave room for the page */
 const low = computed(() => height.value < 500)
 const compact = computed(() => user.signed && smAndDown.value)

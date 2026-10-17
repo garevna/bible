@@ -132,7 +132,7 @@ import AddButton from '@/components/AddButton.vue'
 import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
-import { translationMenuItems } from '@/configs'
+import { useTranslations } from '@/composables/useTranslations'
 import { getRecordsByIndex } from '@/db'
 import { chapterVersesOf, loadBible, searchBible, type BibleJSON } from '@/db/bibles'
 import { useContentStore } from '@/stores/content'
@@ -146,6 +146,8 @@ import { markWords, queryWords } from '@/utils/search'
 /** Picks Bible verses, found by text or chosen by reference, and emits their ids */
 /** hideActivator: no own button, the parent opens it with show() (e.g. from a menu) */
 defineProps<{ label?: string; hideActivator?: boolean; activatorIcon?: string; large?: boolean }>()
+/** the translations the user may read */
+const { translations } = useTranslations()
 const emit = defineEmits<{ add: [verseIds: string[]] }>()
 
 const content = useContentStore()
@@ -173,7 +175,7 @@ const loadingBible = ref(false)
 const foreign = computed(() => source.value !== loadedTranslation() && Boolean(bible.value))
 
 const translationItems = computed(() =>
-  translationMenuItems.map((item) => ({ value: item.value, title: item.text[user.lang] }))
+  translations.value.map((item) => ({ value: item.value, title: item.text[user.lang] }))
 )
 
 watch(source, async (value) => {

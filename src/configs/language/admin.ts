@@ -394,6 +394,11 @@ export const admin = {
     ru: 'Название',
     en: 'Name'
   },
+  seeAllTranslations: {
+    ua: 'Бачать переклади Біблії з обмеженнями (як Огієнка)',
+    ru: 'Видят переводы Библии с ограничениями (как Огиенко)',
+    en: 'See the translations of the Bible that need a permission (like Ohienko)'
+  },
   sectionEvents: {
     ua: 'Події календаря',
     ru: 'События календаря',

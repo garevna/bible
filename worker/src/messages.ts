@@ -43,7 +43,7 @@ export interface MessagesStore {
   markRead(id: string, uid: string, now: number): Promise<void>
   sentSince(uid: string, since: number): Promise<number>
   deleteExpired(now: number): Promise<void>
-  /** the messages of the ids that are to or from the user go (for both of them) */
+  /** the messages of the ids are hidden from the user (the other side keeps them); hidden by both, they go */
   remove(ids: string[], uid: string): Promise<void>
 }
 
@@ -146,7 +146,7 @@ export function d1Store(db: D1Database): MessagesStore {
     async forUser(uid, now) {
       const { results } = await db
         .prepare(
-          'SELECT * FROM messages WHERE (to_uid = ?1 OR from_uid = ?1) AND expires_at > ?2 ORDER BY created_at DESC LIMIT 300'
+          'SELECT * FROM messages WHERE ((to_uid = ?1 AND hidden_to = 0) OR (from_uid = ?1 AND hidden_from = 0)) AND expires_at > ?2 ORDER BY created_at DESC LIMIT 300'
         )
         .bind(uid, now)
         .all<Row>()
@@ -173,8 +173,10 @@ export function d1Store(db: D1Database): MessagesStore {
       await db.prepare('DELETE FROM messages WHERE expires_at <= ?').bind(now).run()
     },
     async remove(ids, uid) {
-      const statement = db.prepare('DELETE FROM messages WHERE id = ? AND (to_uid = ? OR from_uid = ?)')
-      await db.batch(ids.map((id) => statement.bind(id, uid, uid)))
+      const toMe = db.prepare('UPDATE messages SET hidden_to = 1 WHERE id = ? AND to_uid = ?')
+      const fromMe = db.prepare('UPDATE messages SET hidden_from = 1 WHERE id = ? AND from_uid = ?')
+      const gone = db.prepare('DELETE FROM messages WHERE id = ? AND hidden_to = 1 AND hidden_from = 1')
+      await db.batch(ids.flatMap((id) => [toMe.bind(id, uid), fromMe.bind(id, uid), gone.bind(id)]))
     }
   }
 }
@@ -182,12 +184,14 @@ export function d1Store(db: D1Database): MessagesStore {
 /** Messages in memory, for the tests */
 export function memoryStore(): MessagesStore {
   let messages: Message[] = []
+  /** the sides that hid each message */
+  const hidden = new Map<string, Set<string>>()
+  const visible = (m: Message, uid: string) =>
+    (m.toUid === uid && !hidden.get(m.id)?.has('to')) || (m.fromUid === uid && !hidden.get(m.id)?.has('from'))
   return {
     insert: async (items) => void messages.push(...items),
     forUser: async (uid, now) =>
-      messages
-        .filter((m) => (m.toUid === uid || m.fromUid === uid) && m.expiresAt > now)
-        .sort((a, b) => b.createdAt - a.createdAt),
+      messages.filter((m) => visible(m, uid) && m.expiresAt > now).sort((a, b) => b.createdAt - a.createdAt),
     get: async (id) => messages.find((m) => m.id === id) ?? null,
     markRead: async (id, uid, now) => {
       const message = messages.find((m) => m.id === id && m.toUid === uid)
@@ -195,9 +199,14 @@ export function memoryStore(): MessagesStore {
     },
     sentSince: async (uid, since) => messages.filter((m) => m.fromUid === uid && m.createdAt > since).length,
     deleteExpired: async (now) => void (messages = messages.filter((m) => m.expiresAt > now)),
-    remove: async (ids, uid) =>
-      void (messages = messages.filter(
-        (m) => !(ids.includes(m.id) && (m.toUid === uid || m.fromUid === uid))
-      ))
+    remove: async (ids, uid) => {
+      for (const m of messages.filter((item) => ids.includes(item.id))) {
+        const sides = hidden.get(m.id) ?? new Set<string>()
+        if (m.toUid === uid) sides.add('to')
+        if (m.fromUid === uid) sides.add('from')
+        hidden.set(m.id, sides)
+      }
+      messages = messages.filter((m) => !(hidden.get(m.id)?.has('to') && hidden.get(m.id)?.has('from')))
+    }
   }
 }

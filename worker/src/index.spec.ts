@@ -1115,14 +1115,38 @@ describe('messages between ministers', () => {
     expect((await call('PUT', '/me', 'musician', { phone: null })).body).toEqual({ phone: null })
   })
 
-  it('a person deletes their own messages, not the messages of others', async () => {
+  it('the translations that need a permission: administrators and some ministries see them', async () => {
+    const { call } = await church()
+    expect((await call('GET', '/me', 'owner')).body.allTranslations).toBe(true)
+    expect((await call('GET', '/me', 'reader')).body.allTranslations).toBe(false)
+    expect((await call('GET', '/me', 'leader')).body.allTranslations).toBe(false)
+    expect(
+      (await call('PUT', '/admin/translation-ministries', 'owner', { ministries: ['Лідер домашньої групи'] }))
+        .body
+    ).toEqual({ ministries: ['Лідер домашньої групи'] })
+    expect((await call('GET', '/me', 'leader')).body.allTranslations).toBe(true)
+    expect(
+      (await call('PUT', '/admin/translation-ministries', 'owner', { ministries: ['Невідоме'] })).status
+    ).toBe(400)
+    expect((await call('PUT', '/admin/translation-ministries', 'leader', { ministries: [] })).status).toBe(
+      403
+    )
+  })
+
+  it('a person deletes a message for themself only; the other side keeps it', async () => {
     const { call } = await church()
     await call('POST', '/messages', 'pastor', { to: ['musician-uid', 'leader-uid'], text: 'Сьогодні' })
     const [toMusician] = (await call('GET', '/messages', 'musician')).body.messages as { id: string }[]
     const [toLeader] = (await call('GET', '/messages', 'leader')).body.messages as { id: string }[]
-    // the musician cannot delete the message of the leader
+    // the musician cannot touch the message of the leader
     await call('DELETE', '/messages', 'musician', { ids: [toMusician!.id, toLeader!.id] })
     expect((await call('GET', '/messages', 'musician')).body.messages).toEqual([])
+    expect((await call('GET', '/messages', 'leader')).body.messages).toHaveLength(1)
+    // the pastor still has both sent
+    expect((await call('GET', '/messages', 'pastor')).body.messages).toHaveLength(2)
+    // the pastor deletes the sent ones: the leader keeps the one they got
+    await call('DELETE', '/messages', 'pastor', { ids: [toMusician!.id, toLeader!.id] })
+    expect((await call('GET', '/messages', 'pastor')).body.messages).toEqual([])
     expect((await call('GET', '/messages', 'leader')).body.messages).toHaveLength(1)
     expect((await call('DELETE', '/messages', 'leader', { ids: [] })).status).toBe(400)
   })

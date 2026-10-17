@@ -18,17 +18,17 @@ test.describe('full-text search', () => {
   test('ignores case and apostrophes', async ({ page }) => {
     for (const text of ['П’ЯТЬ', "п'ять", 'пять']) {
       await query(page).fill(text)
-      await expect(count(page)).toHaveText('215')
+      await expect(count(page)).toHaveText('351')
     }
   })
 
   test('narrows the results by testament', async ({ page }) => {
     await query(page).fill('Ісус')
-    await expect(count(page)).toHaveText('1139')
+    await expect(count(page)).toHaveText('997')
     await page.locator('.v-chip', { hasText: 'Старий Заповіт' }).click()
-    await expect(count(page)).toHaveText('224')
+    await expect(count(page)).toHaveText('64')
     await page.locator('.v-chip', { hasText: 'Новий Заповіт' }).click()
-    await expect(count(page)).toHaveText('915')
+    await expect(count(page)).toHaveText('933')
   })
 
   test('asks for a longer query', async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe('full-text search', () => {
   })
 
   test('opens the verse of a result', async ({ page }) => {
-    await query(page).fill('Ангол Господній у сні')
+    await query(page).fill('явивсь йому вві снї ангел')
     await page.locator('.result').first().click()
     await expect(verse(page, '1.000.000.019')).toHaveClass(/line-text--emph/)
   })

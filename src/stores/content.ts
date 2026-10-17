@@ -31,7 +31,7 @@ type BibleJSON = { title: string; books: { title: string; chapters: string[][] }
 const NO_COLOR = '#0000'
 
 /** raise it when the texts in public/bible-*.json change, so they are loaded into IndexedDB again */
-const CONTENT_VERSION = '5'
+const CONTENT_VERSION = '6'
 
 function readCovenantNames(): string[] {
   const stored = localStorage.getItem('covenant-names')

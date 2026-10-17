@@ -68,6 +68,17 @@
                 @update:model-value="(uids: string[]) => saveLeaders(item.name, uids)"
               />
 
+              <!-- the translations of the Bible that need a permission (the menu warns of them) -->
+              <v-switch
+                :model-value="translations?.includes(item.name) ?? false"
+                :label="text.seeAllTranslations"
+                :disabled="saving"
+                color="secondary"
+                density="compact"
+                hide-details
+                @update:model-value="(on: boolean | null) => saveTranslations(item.name, Boolean(on))"
+              />
+
               <div class="d-flex align-center flex-wrap ga-2">
                 <p class="label flex-grow-1">{{ text.ministryEvents }}</p>
                 <v-btn
@@ -183,6 +194,8 @@ import { useWorkerStore } from '@/stores/worker'
  */
 const ministries = defineModel<string[]>({ required: true })
 const leaders = defineModel<Record<string, string[]> | null>('leaders', { default: null })
+/** the ministries whose people see the translations that need a permission */
+const translations = defineModel<string[] | null>('translations', { default: null })
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
 const worker = useWorkerStore()
@@ -282,6 +295,12 @@ onMounted(async () => {
 const saveLeaders = (ministry: string, uids: string[]) =>
   run(async () => {
     leaders.value = await worker.setLeaders({ ...leaders.value, [ministry]: uids })
+  })
+
+const saveTranslations = (ministry: string, on: boolean) =>
+  run(async () => {
+    const list = (translations.value ?? []).filter((item) => item !== ministry)
+    translations.value = await worker.setTranslationMinistries(on ? [...list, ministry] : list)
   })
 
 const saveMinistries = (list: string[]) =>

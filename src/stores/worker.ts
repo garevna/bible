@@ -154,6 +154,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const leads = ref<string[]>([])
   /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
   const calendar = ref(false)
+  /** the translations that need a permission: the owners, the administrators, some ministries */
+  const allTranslations = ref(false)
   const telegramLinked = ref(false)
   /** the types of notes and topics (the administrators keep them; the defaults until they come) */
   const types = ref<NoteType[]>(DEFAULT_TYPES)
@@ -199,6 +201,7 @@ export const useWorkerStore = defineStore('worker', () => {
     serviceBot.value = telegramLinked.value = false
     leads.value = []
     calendar.value = false
+    allTranslations.value = false
     phone.value = null
     if (!workerUrl || !user.signed) return
     try {
@@ -214,6 +217,7 @@ export const useWorkerStore = defineStore('worker', () => {
         needsPhone?: boolean
         serviceBot?: boolean
         leads?: string[]
+        allTranslations?: boolean
         telegramLinked?: boolean
       }>('GET', '/me')
       role.value = me.role
@@ -228,6 +232,7 @@ export const useWorkerStore = defineStore('worker', () => {
       serviceBot.value = Boolean(me.serviceBot)
       leads.value = me.leads ?? []
       calendar.value = true
+      allTranslations.value = Boolean(me.allTranslations)
       telegramLinked.value = Boolean(me.telegramLinked)
       types.value = (await call<{ types: NoteType[] }>('GET', '/types')).types
     } catch (error) {
@@ -305,7 +310,12 @@ export const useWorkerStore = defineStore('worker', () => {
       calendar: CalendarSettings
       leaders: Record<string, string[]>
       addresses: Record<string, Place>
+      translationMinistries: string[]
     }>('GET', '/admin/settings')
+
+  /** the ministries whose people see the translations that need a permission */
+  const setTranslationMinistries = async (ministries: string[]) =>
+    (await call<{ ministries: string[] }>('PUT', '/admin/translation-ministries', { ministries })).ministries
 
   /** the addresses of the locations: a map opens them */
   const setAddresses = async (addresses: Record<string, Place>) =>
@@ -359,7 +369,7 @@ export const useWorkerStore = defineStore('worker', () => {
     types.value = (await call<{ types: NoteType[] }>('PUT', '/admin/types', { types: list })).types
   }
 
-  /** the user's own messages go (to or from them), for both of them */
+  /** the messages are hidden from the user (the other side keeps them) */
   async function deleteMessages(ids: string[]) {
     await call('DELETE', '/messages', { ids })
     messages.value = messages.value.filter((message) => !ids.includes(message.id))
@@ -384,6 +394,7 @@ export const useWorkerStore = defineStore('worker', () => {
     serviceBot,
     leads,
     calendar,
+    allTranslations,
     telegramLinked,
     telegramLink,
     unlinkTelegram,
@@ -404,6 +415,7 @@ export const useWorkerStore = defineStore('worker', () => {
     setCalendar,
     setLeaders,
     setAddresses,
+    setTranslationMinistries,
     setRoles,
     setDirectory,
     renameItem,
