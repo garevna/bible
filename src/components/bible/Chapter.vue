@@ -24,6 +24,9 @@
       </tbody>
     </table>
 
+    <!-- a translation read online: the notice its license asks to show with the text -->
+    <p v-if="content.remoteNotice" class="remote-notice">{{ content.remoteNotice }}</p>
+
     <LineDetails v-model="details" />
 
     <div v-if="user.signed" class="highlighter-bar">
@@ -206,6 +209,13 @@ onBeforeUnmount(() => {
 .line-text--emph {
   font-weight: bold;
   color: rgb(var(--v-theme-secondary));
+}
+
+.remote-notice {
+  margin: 16px 8px 0;
+  font-size: 12px;
+  white-space: pre-line;
+  color: var(--app-text-muted);
 }
 
 .highlighter-bar {

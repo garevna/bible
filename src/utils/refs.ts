@@ -33,9 +33,11 @@ export function splitRef(ref: string): { translation: string | null; lineRef: st
     : { translation: ref.slice(0, at), lineRef: ref.slice(at + 1) }
 }
 
-/** The translation in IndexedDB, i.e. the one chosen in the menu */
+/** The translation chosen in the menu: one read online (see src/db/remote.ts), or the one in IndexedDB */
 export const loadedTranslation = () =>
-  typeof localStorage === 'undefined' ? null : localStorage.getItem('content-translation')
+  typeof localStorage === 'undefined'
+    ? null
+    : (localStorage.getItem('remote-translation') ?? localStorage.getItem('content-translation'))
 
 /** The ref points to this verse of the loaded translation: plainly, or with the name of that translation */
 export const refersTo = (ref: string, lineRef: string, translation = loadedTranslation()) =>

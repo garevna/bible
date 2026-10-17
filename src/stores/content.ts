@@ -15,6 +15,7 @@ import {
   testLocalDB,
   userStoreNames
 } from '@/db'
+import { isRemote, loadRemote, remoteBooks, remoteChapterLines } from '@/db/remote'
 import type { Book, HighlightRecord, Keyword, Note, Topic, Verse, VerseRef } from '@/types'
 import { idFrom, pushUnique, removeById } from '@/utils/array'
 import { clearHighlights, getHTML, updateIntervals } from '@/utils/highlights'
@@ -60,6 +61,9 @@ export const useContentStore = defineStore('content', () => {
   const bookTitle = ref<string | null>(null)
   const chapterIndex = ref(0)
   const chapterContent = ref<Verse[] | null>(null)
+  /** a translation read online: the notice its license asks to show with the text ('' for the others) */
+  const remoteNotice = ref('')
+  const remote = computed(() => isRemote(user.translation))
   const lineIndex = ref(0)
   /** verse to emphasize and scroll to after navigating to it */
   const verseId = ref<string | null>(null)
@@ -183,14 +187,31 @@ export const useContentStore = defineStore('content', () => {
   /* ---------- loading the Bible text ---------- */
 
   async function getBooks() {
+    // a translation read online keeps its books in memory (refreshContent)
+    if (remote.value) return
     books.value = await Promise.all(
       [0, 1].map((covenant) => getRecordsByIndex<Book>('books', 'covenant', covenant))
     )
     if (book.value) bookTitle.value = book.value.title
   }
 
-  /** Loads the current translation into IndexedDB unless it is already there */
+  /**
+   * Loads the current translation into IndexedDB unless it is already there; a translation read online
+   * gets only the list of its books (its chapters come one at a time, see src/db/remote.ts)
+   */
   async function refreshContent(forced = false) {
+    if (remote.value) {
+      const bible = await loadRemote(user.translation)
+      localStorage.setItem('remote-translation', user.translation)
+      covenantNames.value = bible.covenants.map((covenant) => covenant.title)
+      books.value = remoteBooks(bible, (title) => beforeDivider.includes(title))
+      remoteNotice.value = bible.copyright
+      if (book.value) bookTitle.value = book.value.title
+      return
+    }
+    localStorage.removeItem('remote-translation')
+    remoteNotice.value = ''
+
     const loaded = localStorage.getItem('content-translation')
     // a new version of the texts (e.g. the verse numbers taken out of the Synodal one) is loaded again
     const sameTexts = localStorage.getItem('content-version') === CONTENT_VERSION
@@ -260,7 +281,14 @@ export const useContentStore = defineStore('content', () => {
     if (!ref) return
 
     await app.withProgress(async () => {
-      const lines = await getRecordsByIndex<Verse>('content', 'chapter', ref)
+      const lines = remote.value
+        ? await remoteChapterLines(
+            user.translation,
+            covenantIndex.value,
+            bookIndex.value!,
+            chapterIndex.value
+          )
+        : await getRecordsByIndex<Verse>('content', 'chapter', ref)
 
       if (user.signed) {
         const markers = await getRecordsByIndex<HighlightRecord>('highlights', 'chapter', ref)
@@ -303,7 +331,10 @@ export const useContentStore = defineStore('content', () => {
 
   async function getLine(id: string) {
     currentLineId.value = id
-    verse.value = (await app.withProgress(() => getRecord<Verse>('content', id))) ?? null
+    // a translation read online: the verse is in the chapter on the page
+    verse.value = remote.value
+      ? (chapterContent.value?.find((line) => line._id === id) ?? null)
+      : ((await app.withProgress(() => getRecord<Verse>('content', id))) ?? null)
   }
 
   async function getLineKeywords(id: string) {
@@ -447,6 +478,8 @@ export const useContentStore = defineStore('content', () => {
   }
 
   return {
+    remote,
+    remoteNotice,
     covenantNames,
     covenantIndex,
     books,

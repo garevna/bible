@@ -35,7 +35,12 @@
     <v-window v-model="tab" class="verse-picker">
       <!-- full-text search: tick the verses to add -->
       <v-window-item value="search" class="pt-2">
+        <!-- a translation read online has no full text to search in: the verses are picked by reference -->
+        <v-alert v-if="online" type="info" variant="tonal" density="compact" class="mb-3">
+          {{ searchText.notOnline }}
+        </v-alert>
         <v-text-field
+          v-else
           v-model="query"
           :placeholder="searchText.placeholder"
           prepend-inner-icon="$search"
@@ -140,6 +145,7 @@ import { useLanguageStore } from '@/stores/language'
 import { useSearchStore } from '@/stores/search'
 import { useUserStore } from '@/stores/user'
 import type { Verse } from '@/types'
+import { isRemote, loadRemote, remoteChapterLines, type RemoteBible } from '@/db/remote'
 import { getChapterRef, loadedTranslation, qualifiedRef } from '@/utils/refs'
 import { markWords, queryWords } from '@/utils/search'
 
@@ -172,7 +178,10 @@ function reference({ covenant, book, chapter, line, bookName }: Verse & { bookNa
 const source = ref(user.translation)
 const bible = shallowRef<BibleJSON | null>(null)
 const loadingBible = ref(false)
-const foreign = computed(() => source.value !== loadedTranslation() && Boolean(bible.value))
+const foreign = computed(() => !online.value && source.value !== loadedTranslation() && Boolean(bible.value))
+/** a translation read online: its books, and its chapters one at a time */
+const online = computed(() => isRemote(source.value))
+const remoteBible = shallowRef<RemoteBible | null>(null)
 
 const translationItems = computed(() =>
   translations.value.map((item) => ({ value: item.value, title: item.text[user.lang] }))
@@ -180,7 +189,13 @@ const translationItems = computed(() =>
 
 watch(source, async (value) => {
   bible.value = null
-  if (value !== loadedTranslation()) {
+  remoteBible.value = null
+  if (isRemote(value)) {
+    loadingBible.value = true
+    remoteBible.value = await loadRemote(value).catch(() => null)
+    loadingBible.value = false
+    tab.value = 'reference'
+  } else if (value !== loadedTranslation()) {
     loadingBible.value = true
     bible.value = await loadBible(value).catch(() => null)
     loadingBible.value = false
@@ -203,7 +218,8 @@ const shown = ref(50)
 const ticked = ref<string[]>([])
 
 /** another translation is still loading: the search and the chapter wait, its load runs them */
-const waiting = () => source.value !== loadedTranslation() && !bible.value
+const waiting = () =>
+  online.value ? !remoteBible.value : source.value !== loadedTranslation() && !bible.value
 
 let searchRun = 0
 async function runSearch(value: string[]) {
@@ -211,6 +227,10 @@ async function runSearch(value: string[]) {
   // a slower search started earlier (e.g. in the translation of the menu) must not overwrite this one
   const run = ++searchRun
   shown.value = 50
+  if (online.value) {
+    found.value = []
+    return
+  }
   const result = foreign.value
     ? search.searchable(value)
       ? searchBible(bible.value!, value, source.value)
@@ -235,23 +255,29 @@ const toVerse = ref<number | null>(null)
 const chapterVerses = shallowRef<Verse[]>([])
 
 const covenantItems = computed(() => {
-  const names = foreign.value
-    ? bible.value!.map((item) => item.title)
-    : content.covenantNames.length === 2
-      ? content.covenantNames
-      : common.value.covenantNames
+  const names = online.value
+    ? (remoteBible.value?.covenants ?? []).map((item) => item.title)
+    : foreign.value
+      ? bible.value!.map((item) => item.title)
+      : content.covenantNames.length === 2
+        ? content.covenantNames
+        : common.value.covenantNames
   return names.map((title: string, value: number) => ({ title, value }))
 })
 const bookTitles = computed(() =>
-  foreign.value
-    ? (bible.value![covenant.value]?.books ?? []).map((book) => book.title)
-    : (content.books?.[covenant.value] ?? []).map((book) => book.title)
+  online.value
+    ? (remoteBible.value?.covenants[covenant.value]?.books ?? []).map((book) => book.title)
+    : foreign.value
+      ? (bible.value![covenant.value]?.books ?? []).map((book) => book.title)
+      : (content.books?.[covenant.value] ?? []).map((book) => book.title)
 )
 const bookItems = computed(() => bookTitles.value.map((title, value) => ({ title, value })))
 const chapterCount = computed(() =>
-  foreign.value
-    ? (bible.value![covenant.value]?.books[bookNum.value]?.chapters.length ?? 0)
-    : (content.books?.[covenant.value]?.[bookNum.value]?.chapters ?? 0)
+  online.value
+    ? (remoteBible.value?.covenants[covenant.value]?.books[bookNum.value]?.chapters.length ?? 0)
+    : foreign.value
+      ? (bible.value![covenant.value]?.books[bookNum.value]?.chapters.length ?? 0)
+      : (content.books?.[covenant.value]?.[bookNum.value]?.chapters ?? 0)
 )
 
 const rangeVerses = computed(() =>
@@ -271,6 +297,16 @@ async function loadChapter() {
   const run = ++chapterRun
   fromVerse.value = 1
   toVerse.value = null
+  if (online.value) {
+    const lines = await remoteChapterLines(
+      source.value,
+      covenant.value,
+      bookNum.value,
+      chapter.value - 1
+    ).catch(() => [])
+    if (run === chapterRun) chapterVerses.value = lines
+    return
+  }
   if (foreign.value) {
     chapterVerses.value = chapterVersesOf(
       bible.value!,

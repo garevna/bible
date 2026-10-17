@@ -8,7 +8,15 @@ import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
-const all = ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'OWNERS', 'SERVICE_BOT_TOKEN', 'SERVICE_CHAT_ID']
+const all = [
+  'TELEGRAM_BOT_TOKEN',
+  'TELEGRAM_CHAT_ID',
+  'OWNERS',
+  'SERVICE_BOT_TOKEN',
+  'SERVICE_CHAT_ID',
+  // the key of the app on the YouVersion Platform: the translations read online
+  'YOUR_VERSION_API_KEY'
+]
 const chosen = process.argv.slice(2)
 const unknown = chosen.filter((name) => !all.includes(name))
 if (unknown.length) {

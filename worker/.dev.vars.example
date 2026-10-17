@@ -6,3 +6,5 @@ OWNERS=
 SERVICE_BOT_TOKEN=
 # the service chat of the ministers (-100…, pnpm worker:chat-id service): the emergencies
 SERVICE_CHAT_ID=
+# the key of the app on the YouVersion Platform (platform.youversion.com): the translations read online, e.g. NRT
+YOUR_VERSION_API_KEY=

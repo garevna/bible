@@ -1472,6 +1472,79 @@ describe('the service bot', () => {
   })
 })
 
+describe('translations read online', () => {
+  /** the YouVersion Platform, as it answers for the New Russian Translation */
+  function online() {
+    const context = setup()
+    context.env.YOUR_VERSION_API_KEY = 'YV'
+    const asked: string[] = []
+    context.fetcher.mockImplementation(async (url: unknown, init?: RequestInit) => {
+      asked.push(String(url))
+      expect((init?.headers as Record<string, string>)['X-YVP-App-Key']).toBe('YV')
+      const path = String(url).replace('https://api.youversion.com/v1/bibles/', '')
+      if (path === '143')
+        return Response.json({
+          title: 'New Russian Translation',
+          localized_title: 'Новый русский перевод',
+          copyright: '© Biblica',
+          language_tag: 'ru'
+        })
+      if (path === '143/books')
+        return Response.json({
+          data: [
+            {
+              id: 'GEN',
+              title: 'Бытие',
+              canon: 'old_testament',
+              chapters: [{ id: '1', verses: [{ id: '1' }, { id: '2' }] }]
+            },
+            {
+              id: 'MAT',
+              title: 'От Матфея',
+              canon: 'new_testament',
+              chapters: [
+                { id: '1', verses: [{ id: '1' }] },
+                { id: '2', verses: [] }
+              ]
+            }
+          ]
+        })
+      if (path === '143/passages/MAT.1?format=html')
+        return Response.json({
+          content:
+            '<div><span class="yv-v" v="1"></span><span class="yv-vlbl">1</span>Родословие Иисуса Христа</div>'
+        })
+      return new Response('{}', { status: 403 })
+    })
+    return { ...context, asked }
+  }
+
+  it('the books, then a chapter: no token is needed, the key stays on the worker', async () => {
+    const { call, asked } = online()
+    const books = await call('GET', '/bible/nrt/books')
+    expect(books.body).toEqual({
+      title: 'Новый русский перевод',
+      copyright: '© Biblica',
+      covenants: [
+        { title: 'Ветхий Завет', books: [{ code: 'GEN', title: 'Бытие', chapters: [2] }] },
+        { title: 'Новый Завет', books: [{ code: 'MAT', title: 'От Матфея', chapters: [1, 0] }] }
+      ]
+    })
+    expect(books.headers.get('access-control-allow-origin')).toBe('https://garevna.github.io')
+    expect((await call('GET', '/bible/nrt/1/0/0')).body).toEqual({ verses: ['Родословие Иисуса Христа'] })
+    expect(asked.some((url) => url.includes('MAT.1?format=html'))).toBe(true)
+    // a chapter that is not there, a translation that is not online
+    expect((await call('GET', '/bible/nrt/1/0/5')).status).toBe(404)
+    expect((await call('GET', '/bible/kjv/books')).status).toBe(404)
+  })
+
+  it('without the key there is no translation online', async () => {
+    const { call, env } = online()
+    env.YOUR_VERSION_API_KEY = undefined
+    expect((await call('GET', '/bible/nrt/books')).status).toBe(404)
+  })
+})
+
 describe('Firebase ID tokens', async () => {
   const { publicKey, privateKey } = await generateKeyPair('RS256')
   const keys = createLocalJWKSet({ keys: [{ ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256' }] })

@@ -20,6 +20,7 @@ import {
   type RoleDef
 } from './roles'
 import { d1Schedule, localDay, type ScheduleStore } from './schedule'
+import { cached, remoteBooks, remoteChapter, REMOTE_BIBLES, RemoteError } from './remoteBible'
 import { handleSchedule, type ScheduleContext } from './scheduleRoutes'
 import {
   answered,
@@ -105,6 +106,8 @@ export interface Env {
   SERVICE_BOT_TOKEN?: string
   /** the service chat of the ministers (a channel or a group, the service bot in it): the emergencies */
   SERVICE_CHAT_ID?: string
+  /** the key of the app on the YouVersion Platform: the translations read online (remoteBible.ts) */
+  YOUR_VERSION_API_KEY?: string
   FIREBASE_PROJECT_ID: string
   /** user ids and verified emails of the owners: every right, the dashboard cannot change them */
   OWNERS: string
@@ -140,6 +143,8 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
 }
 
 const ROUTES = [
+  /^GET \/bible\/[a-z]+\/books$/,
+  /^GET \/bible\/[a-z]+\/[01]\/\d{1,2}\/\d{1,3}$/,
   /^(GET|PUT) \/me$/,
   /^POST \/telegram\/(preview|publish|webhook)$/,
   /^(POST|DELETE) \/telegram\/link$/,
@@ -260,6 +265,38 @@ async function renameEverywhere(env: Env, deps: Deps, directory: Directory, from
     store,
     types.map((type) => (type.ministry === from ? { ...type, ministry: to } : type))
   )
+}
+
+/** The books, or one chapter, of a translation read online (see remoteBible.ts) */
+async function handleRemoteBible(
+  pathname: string,
+  request: Request,
+  env: Env,
+  deps: Deps,
+  json: (body: unknown, status?: number) => Response
+): Promise<Response> {
+  const [, , translation = '', ...rest] = pathname.split('/')
+  const id = REMOTE_BIBLES[translation]
+  const key = env.YOUR_VERSION_API_KEY
+  if (!id || !key) return json({ error: 'not-found' }, 404)
+  try {
+    const answer = await cached(request, async () => {
+      const books = await remoteBooks(id, key, deps.fetcher)
+      if (rest[0] === 'books') return json(books)
+      const [covenant, book, chapter] = rest.map(Number) as [number, number, number]
+      const code = books.covenants[covenant]?.books[book]?.code
+      if (!code || chapter >= (books.covenants[covenant]!.books[book]!.chapters.length ?? 0))
+        return json({ error: 'not-found' }, 404)
+      return json({ verses: await remoteChapter(id, code, chapter, key, deps.fetcher) })
+    })
+    // the cached answer keeps the headers of its first request: these are for this one
+    const headers = new Headers(answer.headers)
+    for (const [name, value] of Object.entries(corsHeaders(request, env))) headers.set(name, value)
+    return new Response(answer.body, { status: answer.status, headers })
+  } catch (error) {
+    if (error instanceof RemoteError) return json({ error: 'remote', status: error.status }, 502)
+    throw error
+  }
 }
 
 /** a button under the field of the chat: Telegram sends the number of the user's own account */
@@ -483,6 +520,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
 
   // Telegram calls the webhook with its secret header, not with a user's token
   if (route === 'POST /telegram/webhook') return handleWebhook(request, env, deps, json)
+
+  // the translations read online: for guests too, one chapter at a time
+  if (pathname.startsWith('/bible/')) return handleRemoteBible(pathname, request, env, deps, json)
 
   const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1]
   if (!token) return json({ error: 'unauthorized' }, 401)

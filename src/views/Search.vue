@@ -1,7 +1,12 @@
 <template>
   <div class="page mx-auto" style="max-width: 960px">
+    <!-- a translation read online has no full text to search in -->
+    <v-alert v-if="content.remote" type="info" variant="tonal" density="compact" class="mb-4">
+      {{ text.notOnline }}
+    </v-alert>
     <v-text-field
       v-model="search.query"
+      :disabled="content.remote"
       :placeholder="text.placeholder"
       :hint="text.hint"
       persistent-hint

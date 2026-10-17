@@ -5,6 +5,7 @@ import { normalize, queryWords } from '@/utils/search'
 
 import { loadBible, verseOf } from './bibles'
 import { dbKeys, dbName, storeNames, type StoreName } from './config'
+import { isRemote, remoteVerse } from './remote'
 
 export * from './config'
 
@@ -219,17 +220,30 @@ async function loadedVerses(lineRefs: string[]): Promise<VerseRef[]> {
  */
 export async function getVersesByRefs(refs: string[]): Promise<VerseRef[]> {
   const loaded = loadedTranslation()
-  const parts = refs.map((ref) => ({ ref, ...splitRef(ref) }))
-  const local = parts.filter(({ translation }) => !translation || translation === loaded)
-
+  // a translation read online: its verses (the plain refs too) come from the worker, a chapter at a time
+  const parts = refs.map((ref) => {
+    const split = splitRef(ref)
+    return { ref, ...split, online: isRemote(split.translation ?? loaded) }
+  })
   const byRef = new Map<string, VerseRef>()
+  for (const part of parts.filter((item) => item.online)) {
+    const verse = await remoteVerse(part.translation ?? loaded!, part.lineRef)
+    verse &&
+      byRef.set(part.ref, {
+        ...verse,
+        _id: part.ref,
+        ...(part.translation ? {} : { translation: undefined })
+      })
+  }
+  const local = parts.filter(({ translation, online }) => !online && (!translation || translation === loaded))
+
   const fromDB = await loadedVerses(local.map(({ lineRef }) => lineRef))
   for (const { ref, translation, lineRef } of local) {
     const verse = fromDB.find((item) => item._id === lineRef)
     verse && byRef.set(ref, { ...verse, _id: ref, ...(translation ? { translation } : {}) })
   }
 
-  const others = parts.filter(({ translation }) => translation && translation !== loaded)
+  const others = parts.filter(({ translation, online }) => !online && translation && translation !== loaded)
   for (const translation of new Set(others.map((part) => part.translation!))) {
     const bible = await loadBible(translation).catch(() => null)
     if (!bible) continue

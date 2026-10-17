@@ -7,8 +7,11 @@ import { beforeDivider, translationMenuItems } from '@/configs'
 type BibleJSON = { title: string; books: { title: string; chapters: string[][] }[] }[]
 
 /** The app shows the number of a verse itself, so the texts must not start with it, nor with another number "(26:7)" */
+/** the files of the translations; the ones read online have none */
+const files = translationMenuItems.filter((item) => !item.remote).map((item) => item.json)
+
 describe('translations', () => {
-  it.each(translationMenuItems.map((item) => item.json))('%s has no verse numbers in the texts', (json) => {
+  it.each(files)('%s has no verse numbers in the texts', (json) => {
     const bible: BibleJSON = JSON.parse(readFileSync(`public/${json}`, 'utf8'))
     const numbered = bible.flatMap(({ books }) =>
       books.flatMap(({ title, chapters }) =>
@@ -25,16 +28,13 @@ describe('translations', () => {
   })
 
   // the list of books is cut into groups: the Law, history, poetry, prophets; Gospels and Acts, two groups of epistles
-  it.each(translationMenuItems.map((item) => item.json))(
-    '%s has the dividers of the list of books',
-    (json) => {
-      const bible: BibleJSON = JSON.parse(readFileSync(`public/${json}`, 'utf8'))
-      const dividers = bible.map(
-        ({ books }) => books.filter(({ title }) => beforeDivider.includes(title)).length
-      )
-      // a partial Bible (e.g. the New Testament and the Psalms) has no groups in its Old Testament
-      const fullOldTestament = (bible[0]?.books.length ?? 0) >= 39
-      expect(dividers).toEqual([fullOldTestament ? 4 : 0, 3])
-    }
-  )
+  it.each(files)('%s has the dividers of the list of books', (json) => {
+    const bible: BibleJSON = JSON.parse(readFileSync(`public/${json}`, 'utf8'))
+    const dividers = bible.map(
+      ({ books }) => books.filter(({ title }) => beforeDivider.includes(title)).length
+    )
+    // a partial Bible (e.g. the New Testament and the Psalms) has no groups in its Old Testament
+    const fullOldTestament = (bible[0]?.books.length ?? 0) >= 39
+    expect(dividers).toEqual([fullOldTestament ? 4 : 0, 3])
+  })
 })

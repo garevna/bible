@@ -43,5 +43,10 @@ export const search = {
     ua: 'Введіть хоча б одне слово з двох або більше літер',
     ru: 'Введите хотя бы одно слово из двух или более букв',
     en: 'Enter at least one word of two or more letters'
+  },
+  notOnline: {
+    ua: 'Цей переклад читається онлайн, по главах (за ліцензією), тож пошуку в ньому немає. Щоб шукати, виберіть інший переклад.',
+    ru: 'Этот перевод читается онлайн, по главам (по лицензии), поэтому поиска в нем нет. Чтобы искать, выберите другой перевод.',
+    en: 'This translation is read online, a chapter at a time (as its license allows), so it cannot be searched. Choose another translation to search.'
   }
 }

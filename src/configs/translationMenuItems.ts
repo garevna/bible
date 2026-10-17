@@ -3,7 +3,8 @@ import type { Localized } from '@/types'
 /**
  * short: the abbreviation of the translation, first in the reference of a verse: "(СП, Бытие 1:3)";
  * rights: set when the text may not be used freely: what is wrong and what to do (the menu shows a warning);
- * notice: what the license of a free text asks to show (the menu shows it in the tooltip).
+ * notice: what the license of a free text asks to show (the menu shows it in the tooltip);
+ * remote: read online, a chapter at a time (licensed on the YouVersion Platform), never held whole: see src/db/remote.ts.
  * Where the texts come from: README, "Тексти Біблії".
  */
 export const translationMenuItems: {
@@ -13,6 +14,7 @@ export const translationMenuItems: {
   json: string
   rights?: Localized
   notice?: Localized
+  remote?: boolean
 }[] = [
   {
     value: 'ohienko',
@@ -65,6 +67,23 @@ export const translationMenuItems: {
     },
     short: 'СП',
     json: 'bible-synodal.json'
+  },
+  {
+    // licensed on the YouVersion Platform (Biblica): read online, a chapter at a time
+    value: 'nrt',
+    text: {
+      ua: 'Новий російський переклад (ru, онлайн)',
+      ru: 'Новый русский перевод (ru, онлайн)',
+      en: 'New Russian Translation (ru, online)'
+    },
+    short: 'НРП',
+    json: '',
+    remote: true,
+    notice: {
+      ua: 'Святая Библия, Новый русский перевод™ НРП™. © Biblica, Inc., 2006, 2010, 2012, 2014, 2023. Используется с разрешения. Все права защищены по всему миру. Текст приходит онлайн с YouVersion Platform.',
+      ru: 'Святая Библия, Новый русский перевод™ НРП™. © Biblica, Inc., 2006, 2010, 2012, 2014, 2023. Используется с разрешения. Все права защищены по всему миру. Текст приходит онлайн с YouVersion Platform.',
+      en: 'The Holy Bible, New Russian Translation™ NRT™. Copyright © 2006, 2010, 2012, 2014, 2023 by Biblica, Inc. Used with permission. All rights reserved worldwide. Read online from the YouVersion Platform.'
+    }
   },
   {
     value: 'asv',

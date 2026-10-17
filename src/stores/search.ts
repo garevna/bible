@@ -42,6 +42,8 @@ export const useSearchStore = defineStore('search', () => {
   async function loadIndex() {
     if (index.value) return index.value
 
+    // a translation read online has no full text here: nothing is searched (the page says so)
+    if (content.remote) return []
     const verses = (await app.withProgress(() => getAllRecords<Verse>('content'))) ?? []
     verses.sort((a, b) => (a._id < b._id ? -1 : 1))
     index.value = verses.map((verse) => ({ verse, text: normalize(verse.verse) }))
