@@ -1,6 +1,7 @@
 import type { CalendarSettings, EventType } from './eventTypes'
 import { MESSAGE_LIFE, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
+import { escape } from './telegram'
 import { ANY_MINISTRY, type RoleDef } from './roles'
 import type { Ask, ServiceBot } from './serviceBot'
 import {
@@ -81,6 +82,46 @@ export const eventLabel = (event: ScheduleEvent, day: string, change?: DayChange
   return `${event.ministry}${event.title ? `: ${event.title}` : ''} — ${day} ${time}${location ? `, ${location}` : ''}`
 }
 
+/** "17 жовтня 2026 р." of '2026-10-17': the full date without the weekday, as the app says it (src/utils/dates.ts) */
+export const dateInWords = (day: string) =>
+  new Intl.DateTimeFormat('uk', { dateStyle: 'full', timeZone: 'UTC' })
+    .format(new Date(`${day}T12:00:00Z`))
+    .split(', ')
+    .slice(1)
+    .join(', ')
+
+const RULE = '_'.repeat(32)
+
+/**
+ * A notice of an event in Telegram (HTML): the heading, then the event, its days and time in bold
+ * between two rules, then what to do
+ */
+export function eventCard(
+  heading: string,
+  event: ScheduleEvent,
+  days: string[],
+  change: DayChange | null | undefined,
+  ending: string,
+  role?: string | null
+) {
+  const time = days.length > 1 ? event.time : timeOf(event, days[0]!, change)
+  const location = change?.location ?? event.location
+  const name = `${event.ministry}${event.title ? `: ${event.title}` : ''}`
+  return [
+    heading,
+    RULE,
+    `<b>${escape(name)}</b>${location ? ` ${escape(location)}` : ''}`,
+    `<b>${days.map(dateInWords).join(', ')}</b>`,
+    `<b>${escape(time)}</b>`,
+    ...(role ? [`Роль: <b>${escape(role)}</b>`] : []),
+    RULE,
+    escape(ending)
+  ].join('\n')
+}
+
+const INVITATION = '🙏🏻 Запрошення взяти участь у служінні'
+const CONFIRM = 'Підтвердіть, будь ласка, кнопками нижче або в календарі служінь.'
+
 /** who may apply, as an open call says it */
 const APPLY_TEXT = {
   ministry: (ministry: string) => `Заявку подають учасники служіння «${ministry}»`,
@@ -123,7 +164,12 @@ export async function handleSchedule(
    * A message from the user to some people (the events speak through the messages), and the same in
    * Telegram for the linked ones; an invitation gets buttons there for its answers
    */
-  async function notify(uids: (string | null | undefined)[], text: string, asks?: Ask[]) {
+  async function notify(
+    uids: (string | null | undefined)[],
+    text: string,
+    asks?: Ask[],
+    html = escape(text)
+  ) {
     // the guests have no app: nothing to send them
     const to = [
       ...new Set(
@@ -147,9 +193,9 @@ export async function handleSchedule(
       readAt: null
     }))
     await messages.insert(list)
-    await Promise.all(to.map((uid) => bot.send(uid, text, asks)))
+    await Promise.all(to.map((uid) => bot.send(uid, html, asks)))
     // the service channel: whom it is for first, then the same; the invited answer there by the same buttons
-    await bot.broadcast(`👤 Кому: ${to.map(toName).join(', ')}\n──────────\n${text}`, asks)
+    await bot.broadcast(`👤 Кому: ${escape(to.map(toName).join(', '))}\n\n${html}`, asks)
   }
 
   /** the notices of an event live until it begins (the last of its days), not to pile up */
@@ -176,7 +222,13 @@ export async function handleSchedule(
         .slice(0, 7)
     if (!coming.length) return 0
     await bot.broadcast(
-      `🙋 Набір на служіння: ${eventLabel(event, coming.join(', '))}\n${APPLY_TEXT[event.applicants](event.ministry)} — кнопкою нижче або в календарі служінь.`,
+      eventCard(
+        '🙋 Набір на служіння',
+        event,
+        coming,
+        coming.length === 1 ? changeOf(coming[0]!) : null,
+        `${APPLY_TEXT[event.applicants](event.ministry)} — кнопкою нижче або в календарі служінь.`
+      ),
       coming.map((day) => ({ eventId: event.id, day, uid: '', as: 'apply' as const }))
     )
     return coming.length
@@ -358,8 +410,15 @@ export async function handleSchedule(
         !self &&
         (await notify(
           [person.uid],
-          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. Підтвердіть, будь ласка, кнопками нижче або в календарі служінь.`,
-          free.map((day) => ({ eventId: event.id, day, uid: person.uid, as: 'main' as const }))
+          `Запрошення на служіння: ${eventLabel(event, free.sort().join(', '))}. ${CONFIRM}`,
+          free.map((day) => ({ eventId: event.id, day, uid: person.uid, as: 'main' as const })),
+          eventCard(
+            INVITATION,
+            event,
+            free,
+            free.length === 1 ? await schedule.change(event.id, free[0]!) : null,
+            CONFIRM
+          )
         ))
     }
     return json({ invited })
@@ -458,14 +517,23 @@ export async function handleSchedule(
     self ||
       (await notify(
         [person.uid],
-        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. Підтвердіть, будь ласка, кнопками нижче або в календарі служінь.`,
-        [{ eventId: event.id, day, uid: person.uid, as: 'main' }]
+        `Запрошення на служіння: ${label}${role ? ` (${role})` : ''}. ${CONFIRM}`,
+        [{ eventId: event.id, day, uid: person.uid, as: 'main' }],
+        eventCard(INVITATION, event, [day], change, CONFIRM, role)
       ))
     backup &&
       (await notify(
         [backup.uid],
         `Вас просять бути дублером (${nameOf(person)}): ${label}. Підтвердіть, будь ласка, кнопками нижче або в календарі.`,
-        [{ eventId: event.id, day, uid: person.uid, as: 'backup' }]
+        [{ eventId: event.id, day, uid: person.uid, as: 'backup' }],
+        eventCard(
+          `🙏🏻 Прохання бути дублером (${escape(nameOf(person))})`,
+          event,
+          [day],
+          change,
+          CONFIRM,
+          role
+        )
       ))
     return json({ participant })
   }

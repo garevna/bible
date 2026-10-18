@@ -23,7 +23,7 @@ async function fakeWorker(page: Page, role: 'publisher' | 'reader') {
     const post = request.postDataJSON()
     if (path === '/telegram/preview') return route.fulfill({ json: { messages: [`<b>${post.title}</b>`] } })
     posts.push(post)
-    return route.fulfill({ json: { sent: 1 } })
+    return route.fulfill({ json: { sent: 1, channel: 'Церква онлайн' } })
   })
   return posts
 }
@@ -54,7 +54,9 @@ test('a publisher previews the topic and publishes it to Telegram', async ({ pag
   const publish = dialog(page)
   await expect(publish.locator('.telegram-message')).toHaveText('Проповідь')
   await publish.getByRole('button', { name: 'Опублікувати', exact: true }).click()
-  await expect(publish).toContainText('Опубліковано в каналі (1)')
+  // a window says where it went, and what
+  await expect(dialog(page)).toContainText('Повідомлення надіслано в канал «Церква онлайн»')
+  await expect(dialog(page).locator('.telegram-message')).toHaveText('Проповідь')
 
   expect(posts).toEqual([
     {
@@ -125,7 +127,7 @@ test('a picture is added to the head of the topic, kept, and published as a phot
   const publish = dialog(page)
   await expect(publish.locator('.telegram-photo img')).toBeVisible()
   await publish.getByRole('button', { name: 'Опублікувати', exact: true }).click()
-  await expect(publish).toContainText('Опубліковано')
+  await expect(dialog(page)).toContainText('Повідомлення надіслано в канал «Церква онлайн»')
   expect((posts[0] as { image: string }).image).toBe(saved)
   await page.getByRole('button', { name: 'Закрити' }).last().click()
 
@@ -151,7 +153,7 @@ test('a note is published from the Notes page: its text and verses, no title', a
   const publish = dialog(page)
   await expect(publish.locator('.telegram-message')).toBeVisible()
   await publish.getByRole('button', { name: 'Опублікувати', exact: true }).click()
-  await expect(publish).toContainText('Опубліковано в каналі (1)')
+  await expect(dialog(page)).toContainText('Повідомлення надіслано в канал «Церква онлайн»')
 
   expect(posts).toEqual([
     {

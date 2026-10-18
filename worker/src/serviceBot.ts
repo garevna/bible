@@ -22,14 +22,48 @@ export interface Ask {
   as: 'main' | 'backup' | 'apply'
 }
 
+/** The texts are the message HTML of Telegram (parse_mode HTML): the callers escape what people wrote */
 export interface ServiceBot {
   /** a private message to a linked user (nothing for one who is not linked); a row of buttons for each answer */
   send(uid: string, text: string, asks?: Ask[]): Promise<void>
   /** a message to the service channel, when there is one; the buttons answer for the invited person */
   broadcast(text: string, asks?: Ask[]): Promise<void>
+  /** what went to the service channel, for the app to show where it went */
+  posted: string[]
+  /** the title of the service channel (asked once) */
+  channelTitle(): Promise<string>
 }
 
-export const NO_BOT: ServiceBot = { send: async () => undefined, broadcast: async () => undefined }
+export const NO_BOT: ServiceBot = {
+  send: async () => undefined,
+  broadcast: async () => undefined,
+  posted: [],
+  channelTitle: async () => ''
+}
+
+/** The title of a channel, asked of Telegram once and kept: "Назва", or its @name, or its id */
+export async function chatTitle(
+  token: string,
+  chatId: string,
+  store: UsersStore,
+  fetcher: typeof fetch
+): Promise<string> {
+  const key = `settings:chatTitle:${chatId}`
+  const kept = await store.get(key)
+  if (kept) return kept
+  const { result } = await call(fetcher, token, 'getChat', { chat_id: chatId }).catch(() => ({
+    result: undefined
+  }))
+  const title =
+    typeof result?.title === 'string'
+      ? result.title
+      : typeof result?.username === 'string'
+        ? `@${result.username}`
+        : ''
+  if (!title) return chatId
+  await store.put(key, title, { expirationTtl: 7 * 24 * 60 * 60 })
+  return title
+}
 
 const LINK_LIFE = 15 * 60
 /** the buttons of an invitation answer for as long as its days may be in the calendar */
@@ -106,16 +140,25 @@ export function serviceBot(
   const post = async (chatId: number | string, text: string, asks: Ask[]) => {
     const rows = await buttons(store, chatId, asks)
     const reply_markup = rows.length ? { inline_keyboard: rows } : undefined
-    await call(fetcher, token, 'sendMessage', { chat_id: chatId, text, reply_markup }).catch(() => undefined)
+    const sent = await call(fetcher, token, 'sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'HTML',
+      reply_markup
+    }).catch(() => undefined)
+    return Boolean(sent?.ok)
   }
+  const posted: string[] = []
   return {
     async send(uid, text, asks = []) {
       const chatId = chatOf(uid)
       if (chatId) await post(chatId, text, asks)
     },
     async broadcast(text, asks = []) {
-      if (chat) await post(chat, text, asks)
-    }
+      if (chat && (await post(chat, text, asks))) posted.push(text)
+    },
+    posted,
+    channelTitle: async () => (chat ? chatTitle(token, chat, store, fetcher) : '')
   }
 }
 
@@ -181,6 +224,8 @@ export interface ButtonsMessage {
   chat: { id: number }
   message_id: number
   text?: string
+  /** the bold and the like of the text: kept when the text is edited */
+  entities?: unknown[]
   reply_markup?: { inline_keyboard: Button[][] }
 }
 
@@ -219,6 +264,7 @@ export async function answered(
     chat_id: message.chat.id,
     message_id: message.message_id,
     text: `${message.text ?? ''}\n${line}`,
+    entities: message.entities,
     reply_markup: { inline_keyboard: rows }
   }).catch(() => undefined)
 }

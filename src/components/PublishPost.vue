@@ -12,11 +12,7 @@
     <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-4" />
 
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mb-4">{{ error }}</v-alert>
-    <v-alert v-if="sent" type="success" variant="tonal" density="compact" class="mb-4">
-      {{ format(text.published, { count: sent }) }}
-    </v-alert>
-
-    <template v-if="!sent && messages.length">
+    <template v-if="messages.length">
       <p class="hint">{{ text.previewHint }}</p>
       <p v-if="messages.length > 1" class="hint">{{ format(text.messages, { count: messages.length }) }}</p>
       <!-- Telegram HTML: the worker escapes the texts, the tags are b, i and blockquote -->
@@ -29,11 +25,7 @@
     </template>
 
     <template #actions>
-      <v-btn v-if="sent" variant="flat" color="primary" class="text-none px-6" @click="open = false">
-        {{ common.close }}
-      </v-btn>
       <DialogButtons
-        v-else
         :confirm-text="text.publishButton"
         :disabled="busy || !messages.length"
         @cancel="open = false"
@@ -62,13 +54,12 @@ import type { TopicPost } from '@/utils/topicPost'
 const props = defineProps<{ build: () => TopicPost | Promise<TopicPost>; small?: boolean }>()
 
 const worker = useWorkerStore()
-const { common, publish: text } = storeToRefs(useLanguageStore())
+const { publish: text } = storeToRefs(useLanguageStore())
 
 const open = ref(false)
 const busy = ref(false)
 const messages = ref<string[]>([])
 const caption = ref<string | null>(null)
-const sent = ref(0)
 const error = ref('')
 
 /** the quotes are blocks here, so the empty lines around them would double the gaps */
@@ -96,7 +87,6 @@ async function run(action: () => Promise<void>) {
 function openDialog() {
   open.value = true
   messages.value = []
-  sent.value = 0
   post.value = null
   run(async () => {
     const built = await props.build()
@@ -111,7 +101,11 @@ function openDialog() {
 
 const publishPost = () =>
   run(async () => {
-    if (post.value) sent.value = await worker.publishToTelegram(post.value)
+    if (!post.value) return
+    // the caption of the picture goes first
+    await worker.publishToTelegram(post.value, [...(caption.value ? [caption.value] : []), ...messages.value])
+    // ChannelPostDialog says where it went
+    open.value = false
   })
 </script>
 

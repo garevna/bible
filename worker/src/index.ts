@@ -24,6 +24,7 @@ import { cached, remoteBooks, remoteChapter, REMOTE_BIBLES, RemoteError } from '
 import { handleSchedule, type ScheduleContext } from './scheduleRoutes'
 import {
   answered,
+  chatTitle,
   askOf,
   forgetChat,
   linkUrl,
@@ -38,7 +39,7 @@ import {
   type ButtonsMessage,
   type ServiceBot
 } from './serviceBot'
-import { formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
+import { escape, formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import { getTypes, parseTypes, setTypes } from './types'
 import {
   DIRECTORIES,
@@ -611,7 +612,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId } = env
       if (post.image && caption !== null) await sendPhoto(token, chatId, post.image, caption, deps.fetcher)
       const sent = await sendMessages(token, chatId, messages, deps.fetcher)
-      return json({ sent: sent + (post.image ? 1 : 0) })
+      // the app says where the post went
+      const channel = await chatTitle(token, chatId, env.USERS, deps.fetcher)
+      return json({ sent: sent + (post.image ? 1 : 0), channel })
     } catch (error) {
       const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
       return json({ error: 'telegram', message }, 502)
@@ -626,7 +629,15 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       deps,
       route === 'GET /schedule' || route === 'POST /schedule/apply'
     )
-    return context ? handleSchedule(request, context, json) : json({ error: 'forbidden' }, 403)
+    if (!context) return json({ error: 'forbidden' }, 403)
+    const response = await handleSchedule(request, context, json)
+    if (!context.bot.posted.length || !response.ok) return response
+    // what went to the service channel: the app shows where it went and what it said
+    const answer = (await response.json()) as Record<string, unknown>
+    return json({
+      ...answer,
+      posted: { channel: await context.bot.channelTitle(), texts: context.bot.posted }
+    })
   }
 
   if (pathname.startsWith('/messages') || route === 'GET /ministries') {
@@ -922,7 +933,9 @@ async function handleMessages(
     ? `\n\n📎 ${draft.attachment.post.title || (draft.attachment.kind === 'topic' ? 'Тема' : 'Нотатка')} — у застосунку`
     : ''
   await Promise.all(
-    messages.map((message) => bot.send(message.toUid, `✉ ${message.fromName}:\n${message.text}${attached}`))
+    messages.map((message) =>
+      bot.send(message.toUid, escape(`✉ ${message.fromName}:\n${message.text}${attached}`))
+    )
   )
   return json({ sent: messages.length })
 }

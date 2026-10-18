@@ -3,7 +3,8 @@ import type { TopicPost, VersePost } from './post'
 /** Telegram limit for the text of one message */
 export const MESSAGE_LIMIT = 4096
 
-const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+export const escape = (text: string) =>
+  text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 const verseBlock = ({ text, ref }: VersePost) =>
   `<blockquote>${escape(text.trim())}\n<i>${escape(ref)}</i></blockquote>`

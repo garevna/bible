@@ -19,10 +19,15 @@ export const publish = {
     ru: 'Опубликовать',
     en: 'Publish'
   },
-  published: {
-    ua: 'Опубліковано в каналі ({count})',
-    ru: 'Опубликовано в канале ({count})',
-    en: 'Published to the channel ({count})'
+  sentTitle: {
+    ua: 'Надіслано в Telegram',
+    ru: 'Отправлено в Telegram',
+    en: 'Sent to Telegram'
+  },
+  sentTo: {
+    ua: 'Повідомлення надіслано в канал «{name}»:',
+    ru: 'Сообщение отправлено в канал «{name}»:',
+    en: 'The message has been sent to the channel “{name}”:'
   },
   failed: {
     ua: 'Не вдалося опублікувати: {name}',

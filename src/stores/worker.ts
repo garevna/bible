@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { DEFAULT_TYPES, type NoteType } from '@/utils/noteTypes'
@@ -90,6 +90,12 @@ export interface Attachment {
 }
 
 /** A day of an event a message asks to answer: as the main person (uid) or as their backup */
+/** what went to a Telegram channel: its title and the texts (Telegram HTML) */
+export interface ChannelPost {
+  channel: string
+  texts: string[]
+}
+
 export interface Ask {
   eventId: string
   day: string
@@ -139,6 +145,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const rights = ref<Rights>(NO_RIGHTS)
   /** the worker has a bot and a channel */
   const telegram = ref(false)
+  /** what has just gone to a Telegram channel: the app shows which channel and the text (ChannelPostDialog) */
+  const channelPost = shallowRef<ChannelPost | null>(null)
   /** the ministries of the user */
   const ministries = ref<string[]>([])
   /** publishers and administrators write to people and ministries */
@@ -187,6 +195,8 @@ export const useWorkerStore = defineStore('worker', () => {
     }
     const data = await response.json().catch(() => ({}))
     if (!response.ok) throw new WorkerError(data.message || data.error || String(response.status))
+    // the notices of the calendar that went to the service channel
+    if (data.posted?.texts?.length) channelPost.value = data.posted
     return data as T
   }
 
@@ -292,8 +302,12 @@ export const useWorkerStore = defineStore('worker', () => {
   const preview = (post: TopicPost) =>
     call<{ messages: string[]; caption: string | null }>('POST', '/telegram/preview', post)
 
-  const publishToTelegram = async (post: TopicPost) =>
-    (await call<{ sent: number }>('POST', '/telegram/publish', post)).sent
+  /** posts to the channel; the messages are the preview of the post, shown again with the channel */
+  async function publishToTelegram(post: TopicPost, messages: string[]) {
+    const { sent, channel } = await call<{ sent: number; channel: string }>('POST', '/telegram/publish', post)
+    channelPost.value = { channel, texts: messages }
+    return sent
+  }
 
   /** the users and the ministries of the church */
   const listUsers = () =>
@@ -379,6 +393,7 @@ export const useWorkerStore = defineStore('worker', () => {
   return {
     /** a request to the worker with the token of the user (for other stores, e.g. the schedule) */
     request: call,
+    channelPost,
     role,
     roleName,
     rights,

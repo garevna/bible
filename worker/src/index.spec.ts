@@ -212,8 +212,12 @@ describe('worker', () => {
       caption: null
     })
     expect(fetcher).not.toHaveBeenCalled()
-    expect((await call('POST', '/telegram/publish', 'reader', topic)).body).toEqual({ sent: 1 })
-    expect(fetcher).toHaveBeenCalledTimes(1)
+    // and the title of the channel, for the app to say where the post went (the fake has none: its id)
+    expect((await call('POST', '/telegram/publish', 'reader', topic)).body).toEqual({
+      sent: 1,
+      channel: '@test_channel'
+    })
+    expect(fetcher).toHaveBeenCalledTimes(2)
   })
 
   it('a topic with a picture goes as a photo with the title, then the texts without it', async () => {
@@ -225,7 +229,7 @@ describe('worker', () => {
       messages: ['<blockquote>Вірш\n<i>Від Матвія 1:1</i></blockquote>'],
       caption: '<b>Тема</b>'
     })
-    expect((await call('POST', '/telegram/publish', 'owner', withImage)).body).toEqual({ sent: 2 })
+    expect((await call('POST', '/telegram/publish', 'owner', withImage)).body).toMatchObject({ sent: 2 })
 
     const [photo, message] = fetcher.mock.calls as unknown as [string, RequestInit][]
     expect(photo![0]).toMatch(/\/sendPhoto$/)
@@ -1306,13 +1310,16 @@ describe('the service bot', () => {
     const invitation = sent('sendMessage').find(
       (body) => body.chat_id === 555 && body.reply_markup?.inline_keyboard
     )!
-    expect(invitation.text).toContain('Запрошення на служіння')
+    // the event, its days in words and its time in bold
+    expect(invitation.parse_mode).toBe('HTML')
+    expect(invitation.text).toMatch(/^🙏🏻 Запрошення взяти участь у служінні\n_+\n<b>/)
+    expect(invitation.text).toContain('<b>13 жовтня 2026 р., 14 жовтня 2026 р.</b>\n<b>06:45</b>')
     // the service channel: the same, with whom it is for, and buttons of its own
     const post = sent('sendMessage').find(
       (body) => body.chat_id === '-100777' && body.reply_markup?.inline_keyboard
     )!
     // whom it is for first, then the message
-    expect(post.text).toMatch(/^👤 Кому: Лідер\n─+\nЗапрошення на служіння/)
+    expect(post.text).toMatch(/^👤 Кому: Лідер\n\n🙏🏻 Запрошення взяти участь у служінні/)
     expect(post.reply_markup!.inline_keyboard!).toHaveLength(2)
     // a row for each day
     const rows = invitation.reply_markup!.inline_keyboard!
@@ -1466,7 +1473,9 @@ describe('the service bot', () => {
     expect(
       (await call('POST', '/schedule/announce', 'owner', { eventId, days: ['2026-10-15'] })).body
     ).toEqual({
-      announced: 1
+      announced: 1,
+      // the app shows where it went and what it said
+      posted: { channel: '-100777', texts: [expect.stringContaining('<b>15 жовтня 2026 р.</b>')] }
     })
     expect((await call('POST', '/schedule/announce', 'leader', { eventId })).status).toBe(403)
   })
