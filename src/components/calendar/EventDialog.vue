@@ -46,20 +46,19 @@
     </v-btn-toggle>
 
     <div class="d-flex flex-wrap ga-2">
-      <v-text-field
+      <DateField
         v-if="kind === 'single'"
-        v-model="day"
+        :model-value="day"
         :label="text.day"
-        type="date"
         density="compact"
         class="field"
+        @update:model-value="(value: string | null) => (day = value ?? '')"
       />
       <TimeField v-model="draft.time" :label="text.time" density="compact" class="field" />
-      <v-text-field
+      <DateField
         v-if="kind === 'repeated'"
         v-model="until"
         :label="text.until"
-        type="date"
         density="compact"
         clearable
         class="field"
@@ -187,6 +186,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
+import DateField from '@/components/DateField.vue'
 import TimeField from '@/components/TimeField.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'

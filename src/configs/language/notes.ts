@@ -184,6 +184,11 @@ export const notes = {
     ru: 'Поиск заметок по дате создания. Дни с заметками выделены; можно выбрать интервал в несколько дней.',
     en: 'Find notes by the creation date. Days with notes are marked; you can pick an interval of several days.'
   },
+  year: {
+    ua: 'Рік',
+    ru: 'Год',
+    en: 'Year'
+  },
   interval: {
     ua: 'Інтервал',
     ru: 'Интервал',

@@ -101,13 +101,14 @@
             hide-details
             class="field"
           />
-          <v-text-field
+          <DateField
             v-model="member.birthday"
             :label="text.birthday"
-            type="date"
+            pick-year
+            clearable
             density="compact"
             hide-details
-            class="field"
+            class="field field--date"
           />
           <v-text-field
             v-model="member.note"
@@ -170,6 +171,7 @@ import { storeToRefs } from 'pinia'
 import AppDialog from '@/components/AppDialog.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import DateField from '@/components/DateField.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
 import TimeField from '@/components/TimeField.vue'
@@ -367,6 +369,10 @@ async function removeGroup() {
 
 .field {
   flex: 1 1 140px;
+}
+
+.field--date {
+  flex: 0 0 200px;
 }
 
 .field--wide {

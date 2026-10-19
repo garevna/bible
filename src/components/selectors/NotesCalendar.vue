@@ -1,7 +1,20 @@
 <template>
   <div class="calendar">
     <div class="calendar__header">
-      <span class="calendar__title">{{ monthTitle }}</span>
+      <!-- a birthday: the year is chosen, not reached month by month -->
+      <template v-if="pickYear">
+        <span class="calendar__title">{{ monthName }}</span>
+        <v-select
+          v-model="year"
+          :items="years"
+          density="compact"
+          variant="plain"
+          hide-details
+          class="calendar__year"
+          :aria-label="text.year"
+        />
+      </template>
+      <span v-else class="calendar__title">{{ monthTitle }}</span>
       <v-spacer />
       <v-btn
         icon="mdi-arrow-left"
@@ -88,10 +101,14 @@ export interface DateRange {
  * Month calendar for notes: days that have notes are marked;
  * a click picks a day, or an interval of several days starting from it.
  */
-const props = withDefaults(defineProps<{ availableDates?: string[]; allowInterval?: boolean }>(), {
-  availableDates: () => [],
-  allowInterval: true
-})
+const props = withDefaults(
+  defineProps<{ availableDates?: string[]; allowInterval?: boolean; pickYear?: boolean }>(),
+  {
+    availableDates: () => [],
+    allowInterval: true,
+    pickYear: false
+  }
+)
 
 const range = defineModel<DateRange>({ default: () => ({ from: null, to: null }) })
 
@@ -125,6 +142,17 @@ const monthTitle = computed(() => {
   )
   return title.charAt(0).toUpperCase() + title.slice(1)
 })
+
+/** the month without the year, when the year has a field of its own */
+const monthName = computed(() => {
+  const name = new Intl.DateTimeFormat(locale.value, { month: 'long' }).format(
+    new Date(year.value, month.value, 1)
+  )
+  return name.charAt(0).toUpperCase() + name.slice(1)
+})
+
+/** the years to choose from: a hundred and ten back from now */
+const years = Array.from({ length: 111 }, (_, index) => new Date().getFullYear() - index)
 
 /** Monday first */
 const weekDays = computed(() => {
@@ -182,6 +210,12 @@ watch([interval, length], () => range.value.from && pick(range.value.from))
 
 .calendar__title {
   font-size: 17px;
+  font-weight: 600;
+}
+
+.calendar__year {
+  flex: 0 0 96px;
+  margin-left: 8px;
   font-weight: 600;
 }
 

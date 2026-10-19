@@ -102,8 +102,30 @@ test('the home groups: on the map, in the calendar and as a list; the leader kee
   await expect(time).toHaveValue('09:30')
   await time.fill('2015')
   await expect(time).toHaveValue('20:15')
+  // or chosen on the clock of the app: the hour, then the minutes
+  await card.locator('.mdi-clock-outline').first().click()
+  await page.locator('.clock [data-hour="07"]').click()
+  await page.locator('.clock [data-minute="45"]').click()
+  await expect(time).toHaveValue('07:45')
+  await expect(page.locator('.clock')).toHaveCount(0)
+
+  // a birthday: in the calendar of the app, its year chosen apart; shown in words
+  await expect(card.getByRole('textbox', { name: 'День народження' }).first()).toHaveValue(
+    '8 березня 1950 р.'
+  )
   await card.getByRole('textbox', { name: 'Новий член групи: ім’я' }).fill('Олена')
   await card.locator('.new-member .mdi-plus-thick').click()
+  await card.getByRole('textbox', { name: 'День народження' }).nth(1).click()
+  await page.locator('.date-card .calendar__year').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: '1985' }).click()
+  const month = String(today.getMonth() + 1).padStart(2, '0')
+  await page.locator(`.date-card [data-date="1985-${month}-15"]`).click()
+  const birthday = new Intl.DateTimeFormat('uk', { dateStyle: 'full' })
+    .format(new Date(1985, today.getMonth(), 15))
+    .split(', ')
+    .slice(1)
+    .join(', ')
+  await expect(card.getByRole('textbox', { name: 'День народження' }).nth(1)).toHaveValue(birthday)
   await card.getByRole('button', { name: 'Зберегти' }).click()
   await expect
     .poll(() => requests.at(-1))
@@ -112,8 +134,11 @@ test('the home groups: on the map, in the calendar and as a list; the leader kee
       path: '/groups/g-mine',
       body: {
         weekday: today.getDay(),
-        time: '20:15',
-        members: [{ name: 'Ганна' }, { name: 'Олена', birthday: null }],
+        time: '07:45',
+        members: [
+          { name: 'Ганна' },
+          { name: 'Олена', birthday: `1985-${String(today.getMonth() + 1).padStart(2, '0')}-15` }
+        ],
         meetingNote: 'Тема: молитва'
       }
     })
