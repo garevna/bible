@@ -1,6 +1,7 @@
 import { admin } from './admin'
 import { calendar } from './calendar'
 import { common } from './common'
+import { groups } from './groups'
 import { header } from './header'
 import { keywords } from './keywords'
 import { messages } from './messages'
@@ -19,6 +20,7 @@ export const languages = {
   admin,
   calendar,
   common,
+  groups,
   header,
   keywords,
   messages,

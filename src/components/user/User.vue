@@ -64,6 +64,14 @@
           </v-list-item>
         </template>
         <v-divider v-if="compact && worker.calendar" />
+        <!-- the home groups: here on every screen (the header keeps few buttons) -->
+        <v-list-item
+          v-if="worker.groups"
+          prepend-icon="mdi-home-group"
+          :title="pages.groups"
+          v-bind="here('groups')"
+          @click="app.setPage('groups')"
+        />
         <v-list-item
           v-if="worker.canReceive"
           prepend-icon="mdi-cellphone"
@@ -169,7 +177,13 @@ const props = defineProps<{ compact?: boolean }>()
 const app = useAppStore()
 const user = useUserStore()
 const worker = useWorkerStore()
-const { admin, calendar: calendarText, header, messages: messagesText } = storeToRefs(useLanguageStore())
+const {
+  admin,
+  calendar: calendarText,
+  header,
+  messages: messagesText,
+  pages
+} = storeToRefs(useLanguageStore())
 
 /** the number of unread messages on the avatar: a phone, where the messages are in its menu */
 const unreadHere = computed(() => (props.compact ? worker.unread : 0))

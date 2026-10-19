@@ -1,4 +1,9 @@
 export const pages = {
+  groups: {
+    ua: 'Домашні групи',
+    ru: 'Домашние группы',
+    en: 'Home groups'
+  },
   calendar: {
     ua: 'Календар служінь',
     ru: 'Календарь служений',

@@ -189,6 +189,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const leads = ref<string[]>([])
   /** the roles of the user in the ministries: { ministry: ['Музикант', …] } */
   const ministryRoles = ref<Record<string, string[]>>({})
+  /** the home groups: the user may see them, or leads one */
+  const groups = ref(false)
   /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
   const calendar = ref(false)
   /** the translations that need a permission: the owners, the administrators, some ministries */
@@ -242,6 +244,7 @@ export const useWorkerStore = defineStore('worker', () => {
     serviceBot.value = telegramLinked.value = false
     leads.value = []
     ministryRoles.value = {}
+    groups.value = false
     calendar.value = false
     allTranslations.value = false
     phone.value = null
@@ -260,6 +263,7 @@ export const useWorkerStore = defineStore('worker', () => {
         serviceBot?: boolean
         leads?: string[]
         ministryRoles?: Record<string, string[]>
+        groups?: boolean
         allTranslations?: boolean
         telegramLinked?: boolean
       }>('GET', '/me')
@@ -275,6 +279,7 @@ export const useWorkerStore = defineStore('worker', () => {
       serviceBot.value = Boolean(me.serviceBot)
       leads.value = me.leads ?? []
       ministryRoles.value = me.ministryRoles ?? {}
+      groups.value = Boolean(me.groups)
       calendar.value = true
       allTranslations.value = Boolean(me.allTranslations)
       telegramLinked.value = Boolean(me.telegramLinked)
@@ -463,6 +468,7 @@ export const useWorkerStore = defineStore('worker', () => {
     phone,
     needsPhone,
     serviceBot,
+    groups,
     ministryRoles,
     leads,
     calendar,

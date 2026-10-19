@@ -43,6 +43,17 @@ import {
   type ServiceBot
 } from './serviceBot'
 import {
+  getGroups,
+  getGroupsVisibility,
+  newGroup,
+  parseGroupHead,
+  parseLeaderChange,
+  publicGroup,
+  setGroups,
+  setGroupsVisibility,
+  type HomeGroup
+} from './groups'
+import {
   byLeader,
   getMinistryRoles,
   leadersOf,
@@ -98,6 +109,11 @@ import {
  *   POST   /messages                { to?, ministries?, roles?, text, attachment?, replyTo? }
  *   POST   /messages/:id/read       marks a message read
  *   DELETE /messages                { ids }: the messages are hidden from the user (the other side keeps them)
+ *   GET    /groups                  the home groups the user may see (the private part: their leaders, the supervisors)
+ *   POST   /groups                  { name, leaderUid }: a new home group           directories
+ *   PUT    /groups/:id              its leader: the day, the place, the members…; directories: the name, the leader
+ *   DELETE /groups/:id              removes it                                       directories
+ *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
  *   GET    /ministry-roles          the roles of the ministries the user leads (all: the keepers of the directories)
  *   PUT    /ministry-roles/:name    { roles }: a leader gives the roles of the ministry, not the leaders
  * The dashboard, each part for the statuses that have its function (the owners have all):
@@ -167,6 +183,9 @@ const ROUTES = [
   /^POST \/messages$/,
   /^POST \/messages\/[^/]+\/read$/,
   /^DELETE \/messages$/,
+  /^(GET|POST) \/groups$/,
+  /^(PUT|DELETE) \/groups\/[^/]+$/,
+  /^PUT \/groups-visibility$/,
   /^GET \/ministry-roles$/,
   /^PUT \/ministry-roles\/[^/]+$/,
   /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
@@ -602,6 +621,12 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         (me.ministries ?? []).some((ministry) => translationMinistries.includes(ministry)),
       // the ministries the user leads (plans their events)
       leads: ministryRightsOf(ministryRoles, me.uid).leads,
+      // the home groups: the user may see them, or leads one
+      groups:
+        roleId === 'owner' ||
+        rights.manage.length > 0 ||
+        ((await getGroupsVisibility(env.USERS)) === 'servants' && serves(roles, roleId)) ||
+        (await getGroups(env.USERS)).some((group) => group.leaderUid === me.uid),
       telegramLinked: Boolean(me.telegramChatId),
       // ministers are asked for their mobile number until they give it
       needsPhone: serves(roles, roleId) && !me.phone
@@ -649,6 +674,86 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
       return json({ error: 'telegram', message }, 502)
     }
+  }
+
+  if (pathname.startsWith('/groups')) {
+    const groups = await getGroups(env.USERS)
+    const visibility = await getGroupsVisibility(env.USERS)
+    const manage = can('directories')
+    const mighty = roleId === 'owner' || roleId === SUPERVISOR
+    const seesAll = mighty || rights.manage.length > 0 || (visibility === 'servants' && serves(roles, roleId))
+    /** the private part of a group: its leader and the supervisors */
+    const own = (group: HomeGroup) => mighty || group.leaderUid === me.uid
+    const users = await listUsers(env.USERS, env.OWNERS, true)
+    const show = (group: HomeGroup) => ({
+      ...(own(group) ? group : publicGroup(group)),
+      leaderName: nameOf(
+        users.find((user) => user.uid === group.leaderUid) ?? {
+          ...me,
+          uid: group.leaderUid,
+          name: null,
+          email: null
+        }
+      ),
+      own: own(group)
+    })
+
+    if (route === 'GET /groups')
+      return json({
+        groups: groups.filter((group) => seesAll || group.leaderUid === me.uid).map(show),
+        visibility,
+        manage
+      })
+
+    if (route === 'PUT /groups-visibility') {
+      if (!manage) return json({ error: 'forbidden' }, 403)
+      const value = ((await body()) as { visibility?: unknown } | null)?.visibility
+      if (value !== 'servants' && value !== 'admins') return json({ error: 'bad-request' }, 400)
+      await setGroupsVisibility(env.USERS, value)
+      return json({ visibility: value })
+    }
+
+    if (route === 'POST /groups') {
+      if (!manage) return json({ error: 'forbidden' }, 403)
+      const head = parseGroupHead(await body())
+      if (!head?.name || !head.leaderUid || !users.some((user) => user.uid === head.leaderUid))
+        return json({ error: 'bad-request' }, 400)
+      const group = newGroup(head.name, head.leaderUid)
+      await setGroups(env.USERS, [...groups, group])
+      return json({ group: show(group) })
+    }
+
+    const id = decodeURIComponent(pathname.slice('/groups/'.length))
+    const group = groups.find((item) => item.id === id)
+    if (!group) return json({ error: 'not-found' }, 404)
+    if (request.method === 'DELETE') {
+      if (!manage) return json({ error: 'forbidden' }, 403)
+      await setGroups(
+        env.USERS,
+        groups.filter((item) => item.id !== id)
+      )
+      return json({ removed: id })
+    }
+
+    // PUT: the administrators give the name and the leader; the leader keeps the rest
+    const leads = group.leaderUid === me.uid
+    const change = (await body()) as Record<string, unknown> | null
+    const head = parseGroupHead(change)
+    const rest = parseLeaderChange(change)
+    if (!head || !rest) return json({ error: 'bad-request' }, 400)
+    if ((head.name || head.leaderUid) && !manage) return json({ error: 'forbidden' }, 403)
+    if (head.leaderUid && !users.some((user) => user.uid === head.leaderUid))
+      return json({ error: 'bad-request' }, 400)
+    if (Object.keys(rest).length && !leads && !manage) return json({ error: 'forbidden' }, 403)
+    // the members and the notes are the leader's (the others do not even see them whole)
+    if ((rest.members || rest.meetingNote !== undefined) && !own(group))
+      return json({ error: 'forbidden' }, 403)
+    const updated: HomeGroup = { ...group, ...head, ...rest }
+    await setGroups(
+      env.USERS,
+      groups.map((item) => (item.id === id ? updated : item))
+    )
+    return json({ group: show(updated) })
   }
 
   // the roles of the ministries the user leads (all of them for the keepers of the directories)

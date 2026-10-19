@@ -519,6 +519,104 @@ describe('roles kept by the administrators', () => {
   })
 })
 
+describe('home groups', () => {
+  async function church() {
+    const context = setup()
+    const { call } = context
+    for (const user of ['owner', 'pastor', 'musician', 'leader', 'reader']) await call('GET', '/me', user)
+    for (const uid of ['pastor-uid', 'leader-uid', 'musician-uid'])
+      await call('PUT', `/admin/users/${uid}`, 'owner', { role: 'servant' })
+    return context
+  }
+
+  it('an administrator creates a group and gives its leader; the leader keeps the rest', async () => {
+    const { call } = await church()
+    expect(
+      (await call('POST', '/groups', 'pastor', { name: 'Салтівка', leaderUid: 'leader-uid' })).status
+    ).toBe(403)
+    expect((await call('POST', '/groups', 'owner', { name: 'Салтівка', leaderUid: 'nobody' })).status).toBe(
+      400
+    )
+    const created = await call('POST', '/groups', 'owner', { name: 'Салтівка', leaderUid: 'leader-uid' })
+    const id = (created.body.group as { id: string }).id
+    expect(created.body.group).toMatchObject({ name: 'Салтівка', leaderName: 'Лідер', weekday: null })
+
+    const path = `/groups/${id}`
+    const members = [
+      { id: 'm1', name: 'Ганна', birthday: '1950-03-08', note: 'Переселенка, потрібна допомога' },
+      { id: 'm2', name: 'Петро', birthday: '--12-01', note: '' }
+    ]
+    const changed = await call('PUT', path, 'leader', {
+      weekday: 3,
+      time: '18:30',
+      address: 'вул. Героїв Праці, 10',
+      lat: 50.03,
+      lng: 36.33,
+      description: 'Біля метро',
+      members,
+      meetingNote: 'Тема: молитва'
+    })
+    expect(changed.body.group).toMatchObject({ weekday: 3, time: '18:30', members, own: true })
+    // the leader does not rename the group or give it to another
+    expect((await call('PUT', path, 'leader', { name: 'Інша' })).status).toBe(403)
+    expect((await call('PUT', path, 'leader', { leaderUid: 'pastor-uid' })).status).toBe(403)
+    expect((await call('PUT', path, 'leader', { weekday: 7 })).status).toBe(400)
+    expect(
+      (await call('PUT', path, 'leader', { members: [{ id: 'm3', name: 'Х', birthday: '31.12' }] })).status
+    ).toBe(400)
+    // another servant changes nothing
+    expect((await call('PUT', path, 'musician', { time: '19:00' })).status).toBe(403)
+
+    // the others see the day, the place and the names; the birthdays and the notes stay with the leader
+    const seen = (await call('GET', '/groups', 'musician')).body.groups as Record<string, unknown>[]
+    expect(seen).toHaveLength(1)
+    expect(seen[0]).toMatchObject({
+      weekday: 3,
+      address: 'вул. Героїв Праці, 10',
+      leaderName: 'Лідер',
+      meetingNote: '',
+      own: false,
+      members: [
+        { name: 'Ганна', birthday: null, note: '' },
+        { name: 'Петро', birthday: null, note: '' }
+      ]
+    })
+    // the supervisors see it whole
+    expect(
+      ((await call('GET', '/groups', 'owner')).body.groups as { members: unknown }[])[0]!.members
+    ).toEqual(members)
+    // an administrator who is not a supervisor does not change the members
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'admin' })
+    expect((await call('PUT', path, 'pastor', { members: [] })).status).toBe(403)
+    expect((await call('PUT', path, 'pastor', { leaderUid: 'musician-uid' })).body.group).toMatchObject({
+      leaderName: 'Музикант'
+    })
+    expect((await call('DELETE', path, 'musician')).status).toBe(403)
+    expect((await call('DELETE', path, 'pastor')).body).toEqual({ removed: id })
+  })
+
+  it('who sees the groups: the servants or the administrators only; a reader none', async () => {
+    const { call } = await church()
+    await call('POST', '/groups', 'owner', { name: 'Центр', leaderUid: 'leader-uid' })
+    expect((await call('GET', '/groups', 'musician')).body.groups).toHaveLength(1)
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({ groups: true })
+    expect((await call('GET', '/groups', 'reader')).body.groups).toHaveLength(0)
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({ groups: false })
+
+    expect((await call('PUT', '/groups-visibility', 'musician', { visibility: 'admins' })).status).toBe(403)
+    expect((await call('PUT', '/groups-visibility', 'owner', { visibility: 'everyone' })).status).toBe(400)
+    await call('PUT', '/groups-visibility', 'owner', { visibility: 'admins' })
+    expect((await call('GET', '/groups', 'musician')).body.groups).toHaveLength(0)
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({ groups: false })
+    // the leader sees their own group
+    expect((await call('GET', '/groups', 'leader')).body).toMatchObject({
+      groups: [{ name: 'Центр', own: true }],
+      visibility: 'admins',
+      manage: false
+    })
+  })
+})
+
 describe('the schedule of ministries', () => {
   // Monday, 2026-10-12, 09:00 in Kyiv
   const MONDAY = Date.parse('2026-10-12T06:00:00Z')
