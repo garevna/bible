@@ -59,6 +59,7 @@
     <v-switch
       v-if="shows.includes('mine')"
       v-model="filters.mine"
+      inset
       :label="text.onlyMine"
       color="secondary"
       density="compact"

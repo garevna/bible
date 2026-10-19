@@ -59,6 +59,7 @@
               />
               <!-- the translations of the Bible that need a permission (the menu warns of them) -->
               <v-switch
+                inset
                 :model-value="translations?.includes(item.name) ?? false"
                 :label="text.seeAllTranslations"
                 :disabled="saving"

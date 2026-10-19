@@ -74,6 +74,7 @@
       <!-- e.g. the morning prayer: 06:45 on weekdays, 08:00 on Saturday -->
       <v-switch
         v-model="perDay"
+        inset
         :label="text.timePerDay"
         color="secondary"
         density="compact"

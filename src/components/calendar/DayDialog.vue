@@ -5,6 +5,7 @@
 
     <v-switch
       v-model="cancelled"
+      inset
       :label="text.dayCancelled"
       color="delete"
       density="compact"

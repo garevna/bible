@@ -35,6 +35,7 @@
       />
       <v-switch
         v-model="readers"
+        inset
         :label="text.showReaders"
         color="secondary"
         density="compact"

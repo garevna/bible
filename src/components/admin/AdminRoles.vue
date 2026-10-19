@@ -24,6 +24,7 @@
           <template v-else>
             <v-switch
               v-model="role.publish"
+              inset
               :label="text.rightPublish"
               color="secondary"
               density="compact"
@@ -31,6 +32,7 @@
             />
             <v-switch
               v-model="role.send"
+              inset
               :label="text.rightSend"
               color="secondary"
               density="compact"
@@ -71,6 +73,7 @@
             </div>
             <v-switch
               v-model="role.approve"
+              inset
               :label="text.rightApprove"
               color="secondary"
               density="compact"
