@@ -35,7 +35,9 @@
         @update:model-value="(chosen: unknown) => setRights(role, chosen as Right[])"
       >
         <v-chip
-          v-for="right of RIGHTS.filter((item) => !leader || item !== 'lead' || role.lead)"
+          v-for="right of RIGHTS.filter(
+            (item) => !leader || !['lead', 'deputy'].includes(item) || role[item]
+          )"
           :key="right"
           :value="right"
           size="small"
@@ -101,11 +103,12 @@ const emit = defineEmits<{ save: [roles: MinistryRole[]] }>()
 
 const { admin: text } = storeToRefs(useLanguageStore())
 
-const RIGHTS = ['lead', 'invite', 'approve', 'publish', 'send'] as const
+const RIGHTS = ['lead', 'deputy', 'invite', 'approve', 'publish', 'send'] as const
 type Right = (typeof RIGHTS)[number]
 
 const rightNames = computed<Record<Right, string>>(() => ({
   lead: text.value.ministryRightLead,
+  deputy: text.value.ministryRightDeputy,
   invite: text.value.ministryRightInvite,
   approve: text.value.ministryRightApprove,
   publish: text.value.ministryRightPublish,
@@ -113,7 +116,8 @@ const rightNames = computed<Record<Right, string>>(() => ({
 }))
 
 const save = (roles: MinistryRole[]) => emit('save', roles)
-const fixed = (role: MinistryRole) => Boolean(props.leader && role.lead)
+/** a leader sees the roles of the leaders and of their deputies as the administrators gave them */
+const fixed = (role: MinistryRole) => Boolean(props.leader && (role.lead || role.deputy))
 
 function setRights(role: MinistryRole, chosen: Right[]) {
   const rights = Object.fromEntries(RIGHTS.map((right) => [right, chosen.includes(right)]))
@@ -141,7 +145,17 @@ function add() {
   const id = `r-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
   save([
     ...props.roles,
-    { id, name, lead: false, invite: false, approve: false, publish: false, send: false, uids: [] }
+    {
+      id,
+      name,
+      lead: false,
+      deputy: false,
+      invite: false,
+      approve: false,
+      publish: false,
+      send: false,
+      uids: []
+    }
   ])
   newRole.value = ''
 }

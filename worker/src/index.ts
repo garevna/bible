@@ -26,6 +26,7 @@ import { d1Schedule, localDay, type ScheduleStore } from './schedule'
 import { cached, remoteBooks, remoteChapter, REMOTE_BIBLES, RemoteError } from './remoteBible'
 import { handleSchedule, type ScheduleContext } from './scheduleRoutes'
 import {
+  type Ask,
   answered,
   chatTitle,
   askOf,
@@ -53,8 +54,11 @@ import {
   setGroupsVisibility,
   type HomeGroup
 } from './groups'
+import { getHandovers, parseUntil, renameHandover, setHandovers, type Handovers } from './handovers'
 import {
   byLeader,
+  deputiesOf,
+  roleLeadersOf,
   getMinistryRoles,
   leadersOf,
   ministryRightsOf,
@@ -114,6 +118,9 @@ import {
  *   PUT    /groups/:id              its leader: the day, the place, the members…; directories: the name, the leader
  *   DELETE /groups/:id              removes it                                       directories
  *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
+ *   POST   /handover                { ministry, toUid, until? }: the leader (or an administrator) asks a deputy
+ *   POST   /handover/answer         { ministry, answer: 'accept' | 'decline' }: the deputy answers
+ *   DELETE /handover                { ministry }: the duties go back (the leader, the deputy, an administrator)
  *   GET    /ministry-roles          the roles of the ministries the user leads (all: the keepers of the directories)
  *   PUT    /ministry-roles/:name    { roles }: a leader gives the roles of the ministry, not the leaders
  * The dashboard, each part for the statuses that have its function (the owners have all):
@@ -186,6 +193,8 @@ const ROUTES = [
   /^(GET|POST) \/groups$/,
   /^(PUT|DELETE) \/groups\/[^/]+$/,
   /^PUT \/groups-visibility$/,
+  /^(POST|DELETE) \/handover$/,
+  /^POST \/handover\/answer$/,
   /^GET \/ministry-roles$/,
   /^PUT \/ministry-roles\/[^/]+$/,
   /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
@@ -212,8 +221,90 @@ const rightsOf = (roles: RoleDef[], roleId: string) =>
   roleId === 'owner' ? OWNER_ROLE : roleDefOf(roles, roleId)
 
 /** what a user may do: their status, and their roles in the ministries */
-const rightsFor = (roles: RoleDef[], ministryRoles: MinistryRoles, roleId: string, uid: string): Rights =>
-  effectiveRights(rightsOf(roles, roleId), ministryRightsOf(ministryRoles, uid))
+const rightsFor = (
+  roles: RoleDef[],
+  ministryRoles: MinistryRoles,
+  roleId: string,
+  uid: string,
+  handovers: Handovers = {}
+): Rights => effectiveRights(rightsOf(roles, roleId), ministryRightsOf(ministryRoles, uid, handovers))
+
+/**
+ * A notice of the app from the user to some people, and the same in Telegram for the linked ones
+ * (with buttons for the asks); it is kept a week
+ */
+async function tell(env: Env, deps: Deps, me: UserRecord, uids: string[], text: string, asks?: Ask[]) {
+  const to = [...new Set(uids)].filter((uid) => uid !== me.uid)
+  if (!to.length) return
+  const users = await listUsers(env.USERS, env.OWNERS, true)
+  const now = deps.now?.() ?? Date.now()
+  const nameOfUid = (uid: string) => {
+    const user = users.find((item) => item.uid === uid)
+    return user?.name ?? user?.email ?? uid
+  }
+  const list: Message[] = to.map((uid) => ({
+    id: crypto.randomUUID(),
+    fromUid: me.uid,
+    fromName: nameOf(me),
+    toUid: uid,
+    toName: nameOfUid(uid),
+    text,
+    attachment: null,
+    replyTo: null,
+    asks: null,
+    createdAt: now,
+    expiresAt: now + 7 * DAY,
+    readAt: null
+  }))
+  await (deps.messages ?? d1Store(env.DB)).insert(list)
+  const bot = botFor(env, deps, users)
+  await Promise.all(to.map((uid) => bot.send(uid, escape(text), asks)))
+}
+
+/** "до 1 листопада 2026 р." of a last day, or nothing */
+const untilText = (until: string | null) =>
+  until
+    ? ` до ${new Intl.DateTimeFormat('uk', { dateStyle: 'full', timeZone: 'UTC' })
+        .format(new Date(`${until}T12:00:00Z`))
+        .split(', ')
+        .slice(1)
+        .join(', ')}`
+    : ''
+
+/** The deputy answers a handover: accepted, the deputy leads; declined, it is gone */
+async function answerHandover(
+  env: Env,
+  deps: Deps,
+  me: UserRecord,
+  ministry: string,
+  accept: boolean
+): Promise<'ok' | 'not-found'> {
+  const today = localDay(deps.now?.() ?? Date.now())
+  const handovers = await getHandovers(env.USERS, today)
+  const handover = handovers[ministry]
+  if (!handover || handover.toUid !== me.uid || handover.status !== 'pending') return 'not-found'
+  if (accept) {
+    await setHandovers(env.USERS, { ...handovers, [ministry]: { ...handover, status: 'accepted' } })
+    await tell(
+      env,
+      deps,
+      me,
+      [handover.fromUid, handover.byUid],
+      `✅ ${nameOf(me)} прийняв(ла) обов'язки лідера служіння «${ministry}»${untilText(handover.until)}.`
+    )
+  } else {
+    const { [ministry]: _gone, ...rest } = handovers
+    await setHandovers(env.USERS, rest)
+    await tell(
+      env,
+      deps,
+      me,
+      [handover.fromUid, handover.byUid],
+      `❌ ${nameOf(me)} не може прийняти обов'язки лідера служіння «${ministry}». Попросіть іншого заступника.`
+    )
+  }
+  return 'ok'
+}
 
 /** everyone but the readers serves: they get messages and see the ministries (a removed role is a reader) */
 const serves = (roles: RoleDef[], roleId: string) =>
@@ -246,9 +337,10 @@ async function scheduleContext(
   // the owners serve too: they are invited, and get the notices
   const users = await listUsers(env.USERS, env.OWNERS, true)
   const ministryRoles = await getMinistryRoles(env.USERS)
+  const handovers = await getHandovers(env.USERS, localDay(deps.now?.() ?? Date.now()))
   return {
     me,
-    rights: rightsFor(roles, ministryRoles, roleId, me.uid),
+    rights: rightsFor(roles, ministryRoles, roleId, me.uid, handovers),
     servants: users.filter((user) => serves(roles, user.role)),
     planners: users
       .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
@@ -258,7 +350,7 @@ async function scheduleContext(
     schedule: deps.schedule ?? d1Schedule(env.DB),
     messages: deps.messages ?? d1Store(env.DB),
     bot: botFor(env, deps, users),
-    leaders: leadersOf(ministryRoles),
+    leaders: leadersOf(ministryRoles, handovers),
     addresses: await getAddresses(env.USERS),
     reader,
     now: deps.now?.() ?? Date.now()
@@ -290,6 +382,7 @@ async function renameEverywhere(env: Env, deps: Deps, directory: Directory, from
     return
   }
   await setMinistryRoles(store, renameMinistry(await getMinistryRoles(store), from, to))
+  await setHandovers(store, renameHandover(await getHandovers(store, '0000-00-00'), from, to))
   await setTranslationMinistries(
     store,
     (await getTranslationMinistries(store)).map((item) => (item === from ? to : item))
@@ -486,6 +579,30 @@ async function handleWebhook(
     }
     const name = me.name ?? me.email ?? ''
 
+    // the duties of a leader: the deputy accepts them or not
+    if (ask.as === 'handover') {
+      if (ask.uid !== me.uid) {
+        await toast(token, fetcher, callback.id, NOT_YOURS)
+        return json({ ok: true })
+      }
+      const accept = choice === 'c'
+      const result = await answerHandover(env, deps, me, ask.eventId, accept)
+      if (result !== 'ok') {
+        await toast(token, fetcher, callback.id, NOT_ACTUAL)
+        return json({ ok: true })
+      }
+      await answered(
+        token,
+        fetcher,
+        callback.id,
+        callback.message,
+        callback.data,
+        accept ? "✅ Обов'язки прийнято. Дякуємо!" : '❌ Відмову передано лідеру',
+        accept ? "✅ Обов'язки прийнято" : '❌ Відмову передано'
+      )
+      return json({ ok: true })
+    }
+
     // an open call: whoever of the ministry applies; the button stays for the others
     if (ask.as === 'apply') {
       const apply = new Request(new URL('/schedule/apply', request.url), {
@@ -577,7 +694,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   const roles = await getRoles(env.USERS)
   const roleId = roleOf(me, env.OWNERS)
   const ministryRoles = await getMinistryRoles(env.USERS)
-  const rights = rightsFor(roles, ministryRoles, roleId, me.uid)
+  const today = localDay(deps.now?.() ?? Date.now())
+  const handovers = await getHandovers(env.USERS, today)
+  const rights = rightsFor(roles, ministryRoles, roleId, me.uid, handovers)
   const can = (function_: Manage) => rights.manage.includes(function_)
   const telegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
   const body = async () => (await request.json().catch(() => null)) as unknown
@@ -620,7 +739,11 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         rights.manage.length > 0 ||
         (me.ministries ?? []).some((ministry) => translationMinistries.includes(ministry)),
       // the ministries the user leads (plans their events)
-      leads: ministryRightsOf(ministryRoles, me.uid).leads,
+      leads: ministryRightsOf(ministryRoles, me.uid, handovers).leads,
+      // the duties of leaders: asked of the user, taken over by the user, handed over by the user
+      handovers: Object.entries(handovers)
+        .filter(([, item]) => item.toUid === me.uid || item.fromUid === me.uid)
+        .map(([ministry, item]) => ({ ministry, ...item })),
       // the home groups: the user may see them, or leads one
       groups:
         roleId === 'owner' ||
@@ -756,9 +879,77 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     return json({ group: show(updated) })
   }
 
+  // the duties of a leader handed over to a deputy, who accepts them first
+  if (pathname.startsWith('/handover')) {
+    const all = can('directories')
+    const payload = ((await body()) ?? {}) as {
+      ministry?: unknown
+      toUid?: unknown
+      until?: unknown
+      answer?: unknown
+    }
+    const ministry = typeof payload.ministry === 'string' ? payload.ministry : ''
+    if (!(await getDirectory(env.USERS, 'ministries')).includes(ministry))
+      return json({ error: 'bad-request' }, 400)
+    const handover = handovers[ministry]
+
+    if (route === 'POST /handover/answer') {
+      if (payload.answer !== 'accept' && payload.answer !== 'decline')
+        return json({ error: 'bad-request' }, 400)
+      const result = await answerHandover(env, deps, me, ministry, payload.answer === 'accept')
+      return result === 'ok' ? json({ answered: payload.answer }) : json({ error: result }, 404)
+    }
+
+    const leaders = roleLeadersOf(ministryRoles, ministry)
+    if (route === 'POST /handover') {
+      // the leader, or an administrator when the leader cannot
+      if (!all && !leaders.includes(me.uid)) return json({ error: 'forbidden' }, 403)
+      const until = parseUntil(payload.until, today)
+      const toUid = typeof payload.toUid === 'string' ? payload.toUid : ''
+      if (until === false || !deputiesOf(ministryRoles, ministry).includes(toUid) || leaders.includes(toUid))
+        return json({ error: 'bad-request' }, 400)
+      const fromUid = leaders.includes(me.uid) ? me.uid : (leaders[0] ?? me.uid)
+      const next = {
+        fromUid,
+        toUid,
+        byUid: me.uid,
+        until,
+        status: 'pending' as const,
+        at: deps.now?.() ?? Date.now()
+      }
+      await setHandovers(env.USERS, { ...handovers, [ministry]: next })
+      const by = me.uid === fromUid ? '' : ` (від імені лідера, ${nameOf(me)})`
+      await tell(
+        env,
+        deps,
+        me,
+        [toUid],
+        `🔁 Прохання прийняти обов'язки лідера служіння «${ministry}»${untilText(until)}${by}. Підтвердіть, будь ласка, кнопками нижче або в застосунку.`,
+        [{ eventId: ministry, day: '', uid: toUid, as: 'handover' }]
+      )
+      return json({ handover: { ministry, ...next } })
+    }
+
+    // DELETE: the duties go back to the leader
+    if (!handover) return json({ error: 'not-found' }, 404)
+    if (!all && ![handover.fromUid, handover.toUid, ...leaders].includes(me.uid))
+      return json({ error: 'forbidden' }, 403)
+    const { [ministry]: _gone, ...rest } = handovers
+    await setHandovers(env.USERS, rest)
+    if (handover.status === 'accepted')
+      await tell(
+        env,
+        deps,
+        me,
+        [handover.fromUid, handover.toUid, handover.byUid],
+        `↩️ Обов'язки лідера служіння «${ministry}» повернулися до лідера.`
+      )
+    return json({ removed: ministry })
+  }
+
   // the roles of the ministries the user leads (all of them for the keepers of the directories)
   if (pathname.startsWith('/ministry-roles')) {
-    const leads = ministryRightsOf(ministryRoles, me.uid).leads
+    const leads = ministryRightsOf(ministryRoles, me.uid, handovers).leads
     const all = can('directories')
     if (route === 'GET /ministry-roles') {
       if (!all && !leads.length) return json({ error: 'forbidden' }, 403)
@@ -766,6 +957,11 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       return json({
         ministryRoles: Object.fromEntries(
           ministries.map((ministry) => [ministry, ministryRoles[ministry] ?? []])
+        ),
+        handovers: Object.fromEntries(
+          ministries
+            .filter((ministry) => handovers[ministry])
+            .map((ministry) => [ministry, handovers[ministry]])
         )
       })
     }
@@ -781,7 +977,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const roles = all ? parsed[ministry]! : byLeader(old, parsed[ministry]!)
     const next = { ...ministryRoles, [ministry]: roles }
     await setMinistryRoles(env.USERS, next)
-    return json({ roles, leaders: leadersOf(next) })
+    return json({ roles, leaders: leadersOf(next, handovers) })
   }
 
   if (pathname.startsWith('/schedule')) {
@@ -826,8 +1022,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       locations: await getDirectory(env.USERS, 'locations'),
       eventTypes: await getEventTypes(env.USERS),
       calendar: await getCalendar(env.USERS),
-      leaders: leadersOf(ministryRoles),
+      leaders: leadersOf(ministryRoles, handovers),
       ministryRoles,
+      handovers,
       addresses: await getAddresses(env.USERS),
       translationMinistries: await getTranslationMinistries(env.USERS)
     })
@@ -865,7 +1062,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     )
     if (!parsed) return json({ error: 'bad-request' }, 400)
     await setMinistryRoles(env.USERS, parsed)
-    return json({ ministryRoles: parsed, leaders: leadersOf(parsed) })
+    return json({ ministryRoles: parsed, leaders: leadersOf(parsed, handovers) })
   }
 
   // the types of events and the settings of the calendar: the ones who plan the schedule

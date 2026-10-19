@@ -12,14 +12,15 @@ import type { UsersStore } from './users'
 
 /**
  * An answer asked by the buttons of a message: to an invitation, as the main person or the backup,
- * or an application to an open event (whoever of its ministry presses it)
+ * an application to an open event (whoever of its ministry presses it), or the duties of a leader
+ * handed over to a deputy (eventId: the ministry, day: '', uid: the deputy)
  */
 export interface Ask {
   eventId: string
   day: string
   /** the main person of the invitation (the backup answers for their place); '' for an application */
   uid: string
-  as: 'main' | 'backup' | 'apply'
+  as: 'main' | 'backup' | 'apply' | 'handover'
 }
 
 /** The texts are the message HTML of Telegram (parse_mode HTML): the callers escape what people wrote */
@@ -118,6 +119,11 @@ async function buttons(store: UsersStore, chatId: number | string, asks: Ask[]):
       })
       const day = asks.length > 1 ? `${shortDay(ask.day)}: ` : ''
       if (ask.as === 'apply') return [{ text: `🙋 ${day}Подати заявку`, callback_data: `${key}|a` }]
+      if (ask.as === 'handover')
+        return [
+          { text: '✅ Приймаю', callback_data: `${key}|c` },
+          { text: '❌ Не можу', callback_data: `${key}|d` }
+        ]
       const yes = ask.as === 'backup' ? 'Згоден бути дублером' : 'Підтвердити'
       return [
         { text: `✅ ${day}${yes}`, callback_data: `${key}|c` },

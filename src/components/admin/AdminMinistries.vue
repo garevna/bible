@@ -26,6 +26,10 @@
       </template>
       <template #[`item.leaders`]="{ item }">
         <span class="muted">{{ item.leaderNames.join(', ') }}</span>
+        <!-- a leader needs at least one deputy -->
+        <v-chip v-if="!item.hasDeputy" size="x-small" color="calendar-orange" variant="tonal" class="ml-1">
+          {{ text.noDeputy }}
+        </v-chip>
       </template>
       <template #[`item.events`]="{ item }">
         <v-chip v-if="item.events.length" size="small" variant="tonal" color="secondary">{{
@@ -56,6 +60,15 @@
                 :people="schedule.people"
                 :disabled="saving"
                 @save="(list: MinistryRole[]) => saveRoles(item.name, list)"
+              />
+              <!-- the duties of the leader: an administrator hands them over when the leader cannot -->
+              <HandoverPanel
+                :roles="roles?.[item.name] ?? []"
+                :handover="handovers?.[item.name] ?? null"
+                :people="schedule.people"
+                :disabled="saving"
+                @ask="(toUid: string, until: string | null) => askHandover(item.name, toUid, until)"
+                @end="endHandover(item.name)"
               />
               <!-- the translations of the Bible that need a permission (the menu warns of them) -->
               <v-switch
@@ -173,11 +186,12 @@ import ConfirmButton from '@/components/ConfirmButton.vue'
 import EventDialog from '@/components/calendar/EventDialog.vue'
 import InvitationsDialog from '@/components/calendar/InvitationsDialog.vue'
 import LocationLink from '@/components/calendar/LocationLink.vue'
+import HandoverPanel from '@/components/admin/HandoverPanel.vue'
 import MinistryRolesEditor from '@/components/admin/MinistryRolesEditor.vue'
 import { useLanguageStore } from '@/stores/language'
 import { scheduleText, useScheduleStore, type Occurrence, type ScheduleEvent } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
-import { useWorkerStore, type MinistryRole, type MinistryRoles } from '@/stores/worker'
+import { useWorkerStore, type Handovers, type MinistryRole, type MinistryRoles } from '@/stores/worker'
 
 /**
  * The ministries as a table: a ministry opens its roles and their people, its events (when, where, who leads them)
@@ -186,6 +200,8 @@ import { useWorkerStore, type MinistryRole, type MinistryRoles } from '@/stores/
 const ministries = defineModel<string[]>({ required: true })
 /** the roles inside the ministries and their people */
 const roles = defineModel<MinistryRoles | null>('roles', { default: null })
+/** the duties of the leaders handed over to their deputies */
+const handovers = defineModel<Handovers | null>('handovers', { default: null })
 /** the ministries whose people see the translations that need a permission */
 const translations = defineModel<string[] | null>('translations', { default: null })
 const emit = defineEmits<{ error: [cause: unknown] }>()
@@ -244,6 +260,7 @@ const rows = computed(() =>
     ]
       .map(nameOfPerson)
       .filter(Boolean),
+    hasDeputy: (roles.value?.[name] ?? []).some((role) => role.deputy && role.uids.length),
     events: schedule.events.filter((event) => event.ministry === name)
   }))
 )
@@ -291,6 +308,19 @@ onMounted(async () => {
 const saveRoles = (ministry: string, list: MinistryRole[]) =>
   run(async () => {
     roles.value = (await worker.setMinistryRoles({ ...roles.value, [ministry]: list })).ministryRoles
+  })
+
+const askHandover = (ministry: string, toUid: string, until: string | null) =>
+  run(async () => {
+    const { ministry: _name, ...handover } = await worker.askHandover(ministry, toUid, until)
+    handovers.value = { ...handovers.value, [ministry]: handover }
+  })
+
+const endHandover = (ministry: string) =>
+  run(async () => {
+    await worker.endHandover(ministry)
+    const { [ministry]: _gone, ...rest } = handovers.value ?? {}
+    handovers.value = rest
   })
 
 const saveTranslations = (ministry: string, on: boolean) =>

@@ -51,6 +51,8 @@ export interface MinistryRole {
   name: string
   /** leads the ministry: its events, the invitations, the applications */
   lead: boolean
+  /** a deputy of the leader: takes the duties over when the leader hands them over */
+  deputy: boolean
   invite: boolean
   approve: boolean
   /** posts notes and topics to the Telegram channel */
@@ -61,6 +63,20 @@ export interface MinistryRole {
 }
 
 export type MinistryRoles = Record<string, MinistryRole[]>
+
+/** The duties of a leader handed over to a deputy, who accepts them first (see worker/src/handovers.ts) */
+export interface Handover {
+  fromUid: string
+  toUid: string
+  /** the leader, or an administrator for the leader */
+  byUid: string
+  /** the last day, or null until it is ended */
+  until: string | null
+  status: 'pending' | 'accepted'
+  at: number
+}
+
+export type Handovers = Record<string, Handover>
 
 export interface Rights {
   publish: boolean
@@ -191,6 +207,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const ministryRoles = ref<Record<string, string[]>>({})
   /** the home groups: the user may see them, or leads one */
   const groups = ref(false)
+  /** the duties of leaders asked of the user, taken over by the user, or handed over by the user */
+  const handovers = ref<(Handover & { ministry: string })[]>([])
   /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
   const calendar = ref(false)
   /** the translations that need a permission: the owners, the administrators, some ministries */
@@ -245,6 +263,7 @@ export const useWorkerStore = defineStore('worker', () => {
     leads.value = []
     ministryRoles.value = {}
     groups.value = false
+    handovers.value = []
     calendar.value = false
     allTranslations.value = false
     phone.value = null
@@ -264,6 +283,7 @@ export const useWorkerStore = defineStore('worker', () => {
         leads?: string[]
         ministryRoles?: Record<string, string[]>
         groups?: boolean
+        handovers?: (Handover & { ministry: string })[]
         allTranslations?: boolean
         telegramLinked?: boolean
       }>('GET', '/me')
@@ -280,6 +300,7 @@ export const useWorkerStore = defineStore('worker', () => {
       leads.value = me.leads ?? []
       ministryRoles.value = me.ministryRoles ?? {}
       groups.value = Boolean(me.groups)
+      handovers.value = me.handovers ?? []
       calendar.value = true
       allTranslations.value = Boolean(me.allTranslations)
       telegramLinked.value = Boolean(me.telegramLinked)
@@ -363,6 +384,7 @@ export const useWorkerStore = defineStore('worker', () => {
       calendar: CalendarSettings
       leaders: Record<string, string[]>
       ministryRoles?: MinistryRoles
+      handovers?: Handovers
       addresses: Record<string, Place>
       translationMinistries: string[]
     }>('GET', '/admin/settings')
@@ -375,9 +397,33 @@ export const useWorkerStore = defineStore('worker', () => {
   const setAddresses = async (addresses: Record<string, Place>) =>
     (await call<{ addresses: Record<string, Place> }>('PUT', '/admin/addresses', { addresses })).addresses
 
-  /** the roles of the ministries the user leads */
-  const getLeaderRoles = async () =>
-    (await call<{ ministryRoles: MinistryRoles }>('GET', '/ministry-roles')).ministryRoles
+  /** the roles of the ministries the user leads, and their handovers */
+  const getLeaderRoles = async () => {
+    const answer = await call<{ ministryRoles: MinistryRoles; handovers?: Handovers }>(
+      'GET',
+      '/ministry-roles'
+    )
+    return { ministryRoles: answer.ministryRoles, handovers: answer.handovers ?? {} }
+  }
+
+  /** the leader (or an administrator) asks a deputy to take the duties over */
+  const askHandover = async (ministry: string, toUid: string, until: string | null) =>
+    (
+      await call<{ handover: Handover & { ministry: string } }>('POST', '/handover', {
+        ministry,
+        toUid,
+        until
+      })
+    ).handover
+
+  /** the deputy answers; what the user may do comes again */
+  async function answerHandover(ministry: string, answer: 'accept' | 'decline') {
+    await call('POST', '/handover/answer', { ministry, answer })
+    await loadRole()
+  }
+
+  /** the duties go back to the leader */
+  const endHandover = (ministry: string) => call('DELETE', '/handover', { ministry })
 
   /** a leader gives the roles of their ministry (the roles that lead stay as the administrators gave them) */
   const setRolesOf = async (ministry: string, roles: MinistryRole[]) =>
@@ -469,6 +515,10 @@ export const useWorkerStore = defineStore('worker', () => {
     needsPhone,
     serviceBot,
     groups,
+    handovers,
+    askHandover,
+    answerHandover,
+    endHandover,
     ministryRoles,
     leads,
     calendar,

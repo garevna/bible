@@ -14,6 +14,16 @@
         leader
         @save="(list: MinistryRole[]) => save(String(ministry), list)"
       />
+      <!-- the duties: handed over to a deputy, or given back -->
+      <HandoverPanel
+        class="mt-3"
+        :roles="roles"
+        :handover="handovers[ministry] ?? null"
+        :people="schedule.people"
+        :disabled="saving"
+        @ask="(toUid: string, until: string | null) => ask(String(ministry), toUid, until)"
+        @end="end(String(ministry))"
+      />
     </article>
   </section>
 </template>
@@ -22,10 +32,11 @@
 import { onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import HandoverPanel from '@/components/admin/HandoverPanel.vue'
 import MinistryRolesEditor from '@/components/admin/MinistryRolesEditor.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore } from '@/stores/schedule'
-import { useWorkerStore, type MinistryRole, type MinistryRoles } from '@/stores/worker'
+import { useWorkerStore, type Handovers, type MinistryRole, type MinistryRoles } from '@/stores/worker'
 
 /**
  * The ministries the user leads: the leader gives the roles there to its people (the leaders
@@ -38,20 +49,47 @@ const schedule = useScheduleStore()
 const { admin: text } = storeToRefs(useLanguageStore())
 
 const ministryRoles = ref<MinistryRoles>({})
+const handovers = ref<Handovers>({})
 const busy = ref(false)
 const saving = ref(false)
 
 onMounted(async () => {
   busy.value = true
   try {
-    const [roles] = await Promise.all([worker.getLeaderRoles(), schedule.loadChoices()])
-    ministryRoles.value = roles
+    const [answer] = await Promise.all([worker.getLeaderRoles(), schedule.loadChoices()])
+    ministryRoles.value = answer.ministryRoles
+    handovers.value = answer.handovers
   } catch (cause) {
     emit('error', cause)
   } finally {
     busy.value = false
   }
 })
+
+async function ask(ministry: string, toUid: string, until: string | null) {
+  saving.value = true
+  try {
+    const { ministry: _name, ...handover } = await worker.askHandover(ministry, toUid, until)
+    handovers.value = { ...handovers.value, [ministry]: handover }
+  } catch (cause) {
+    emit('error', cause)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function end(ministry: string) {
+  saving.value = true
+  try {
+    await worker.endHandover(ministry)
+    const { [ministry]: _gone, ...rest } = handovers.value
+    handovers.value = rest
+  } catch (cause) {
+    emit('error', cause)
+  } finally {
+    saving.value = false
+  }
+}
 
 async function save(ministry: string, list: MinistryRole[]) {
   saving.value = true

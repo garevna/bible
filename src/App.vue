@@ -5,6 +5,7 @@
     <v-main class="bg-homefone">
       <AuthDialog v-model="authOpen" v-model:tab="authTab" />
       <ChannelPostDialog />
+      <HandoverBanner />
 
       <component :is="view" v-if="view" />
     </v-main>
@@ -26,6 +27,7 @@ import { useWorkerStore } from '@/stores/worker'
 
 const AuthDialog = defineAsyncComponent(() => import('@/components/user/AuthDialog.vue'))
 const ChannelPostDialog = defineAsyncComponent(() => import('@/components/ChannelPostDialog.vue'))
+const HandoverBanner = defineAsyncComponent(() => import('@/components/HandoverBanner.vue'))
 
 const views = {
   Home: defineAsyncComponent(() => import('@/views/Home.vue')),

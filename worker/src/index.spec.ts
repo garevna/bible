@@ -111,6 +111,7 @@ const ministryRole = (id: string, rights: Record<string, boolean> = {}, uids: st
   id,
   name: id,
   lead: false,
+  deputy: false,
   invite: false,
   approve: false,
   publish: false,
@@ -516,6 +517,124 @@ describe('roles kept by the administrators', () => {
       'Молитовне служіння': [{ name: 'Лідер служіння', lead: true, uids: ['pastor-uid'] }]
     })
     expect(settings.leaders).toEqual({ 'Молитовне служіння': ['pastor-uid'] })
+  })
+})
+
+describe('deputies of the leaders', () => {
+  const CHANNEL = 'Канал ХХЦ'
+
+  async function church() {
+    const context = setup()
+    const { call, clock } = context
+    clock.now = Date.parse('2026-10-12T06:00:00Z')
+    for (const user of ['owner', 'pastor', 'musician', 'leader', 'reader']) await call('GET', '/me', user)
+    for (const uid of ['pastor-uid', 'leader-uid', 'musician-uid'])
+      await call('PUT', `/admin/users/${uid}`, 'owner', { role: 'servant' })
+    await call('PUT', '/admin/directories/ministries', 'owner', { items: [CHANNEL] })
+    await call('PUT', '/admin/ministry-roles', 'owner', {
+      ministryRoles: {
+        [CHANNEL]: [
+          ministryRole('r-lead', { lead: true }, ['pastor-uid']),
+          ministryRole('r-deputy', { deputy: true }, ['leader-uid'])
+        ]
+      }
+    })
+    return context
+  }
+
+  it('the leader hands the duties over; nothing changes until the deputy accepts; they go back', async () => {
+    const { call, messages, clock } = await church()
+    // to a deputy only, by the leader (or an administrator)
+    expect(
+      (await call('POST', '/handover', 'pastor', { ministry: CHANNEL, toUid: 'musician-uid' })).status
+    ).toBe(400)
+    expect(
+      (await call('POST', '/handover', 'musician', { ministry: CHANNEL, toUid: 'leader-uid' })).status
+    ).toBe(403)
+    expect(
+      (
+        await call('POST', '/handover', 'pastor', {
+          ministry: CHANNEL,
+          toUid: 'leader-uid',
+          until: '2026-10-01'
+        })
+      ).status
+    ).toBe(400)
+
+    const asked = await call('POST', '/handover', 'pastor', { ministry: CHANNEL, toUid: 'leader-uid' })
+    expect(asked.body.handover).toMatchObject({
+      fromUid: 'pastor-uid',
+      toUid: 'leader-uid',
+      status: 'pending'
+    })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({
+      leads: [],
+      handovers: [{ ministry: CHANNEL, status: 'pending', fromUid: 'pastor-uid' }]
+    })
+    expect((await messages.forUser('leader-uid', clock.now))[0]!.text).toContain(
+      "Прохання прийняти обов'язки"
+    )
+
+    // only the deputy asked answers
+    expect(
+      (await call('POST', '/handover/answer', 'musician', { ministry: CHANNEL, answer: 'accept' })).status
+    ).toBe(404)
+    await call('POST', '/handover/answer', 'leader', { ministry: CHANNEL, answer: 'accept' })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({
+      leads: [CHANNEL],
+      rights: { invite: [CHANNEL], approveIn: [CHANNEL] }
+    })
+    expect(
+      (await messages.forUser('pastor-uid', clock.now)).some((message) =>
+        message.text.includes('прийняв(ла)')
+      )
+    ).toBe(true)
+    // the leader keeps leading
+    expect((await call('GET', '/me', 'pastor')).body).toMatchObject({ leads: [CHANNEL] })
+
+    // the deputy gives the duties back
+    expect((await call('DELETE', '/handover', 'musician', { ministry: CHANNEL })).status).toBe(403)
+    expect((await call('DELETE', '/handover', 'leader', { ministry: CHANNEL })).body).toEqual({
+      removed: CHANNEL
+    })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({ leads: [], handovers: [] })
+  })
+
+  it('an administrator hands over for a leader who cannot; a last day ends it; a declined one is gone', async () => {
+    const { call, clock } = await church()
+    await call('POST', '/handover', 'owner', { ministry: CHANNEL, toUid: 'leader-uid', until: '2026-10-14' })
+    await call('POST', '/handover/answer', 'leader', { ministry: CHANNEL, answer: 'decline' })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({ leads: [], handovers: [] })
+
+    const asked = await call('POST', '/handover', 'owner', {
+      ministry: CHANNEL,
+      toUid: 'leader-uid',
+      until: '2026-10-14'
+    })
+    // the duties are the leader's, asked by the administrator
+    expect(asked.body.handover).toMatchObject({ fromUid: 'pastor-uid', byUid: 'owner-uid' })
+    await call('POST', '/handover/answer', 'leader', { ministry: CHANNEL, answer: 'accept' })
+    expect((await call('GET', '/admin/settings', 'owner')).body.leaders).toEqual({
+      [CHANNEL]: ['pastor-uid', 'leader-uid']
+    })
+    clock.now = Date.parse('2026-10-15T06:00:00Z')
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({ leads: [] })
+  })
+
+  it('the deputies are given by the administrators, not by the leader', async () => {
+    const { call } = await church()
+    const changed = await call('PUT', `/ministry-roles/${encodeURIComponent(CHANNEL)}`, 'pastor', {
+      roles: [
+        ministryRole('r-lead', { lead: true }, ['pastor-uid']),
+        ministryRole('r-deputy', { deputy: true }, ['musician-uid']),
+        ministryRole('r-new', { deputy: true }, ['musician-uid'])
+      ]
+    })
+    expect(changed.body.roles).toEqual([
+      ministryRole('r-lead', { lead: true }, ['pastor-uid']),
+      ministryRole('r-deputy', { deputy: true }, ['leader-uid']),
+      ministryRole('r-new', {}, ['musician-uid'])
+    ])
   })
 })
 
@@ -1458,6 +1577,37 @@ describe('the service bot', () => {
     await start(link.split('start=')[1]!)
     return { ...context, webhook, sent, start, link }
   }
+
+  it('a deputy accepts the duties of a leader by the button in Telegram', async () => {
+    const { call, webhook, sent } = await linked()
+    await call('PUT', '/admin/directories/ministries', 'owner', { items: ['Канал ХХЦ'] })
+    await call('PUT', '/admin/ministry-roles', 'owner', {
+      ministryRoles: {
+        'Канал ХХЦ': [
+          ministryRole('r-lead', { lead: true }, ['pastor-uid']),
+          ministryRole('r-deputy', { deputy: true }, ['leader-uid'])
+        ]
+      }
+    })
+    await call('POST', '/handover', 'pastor', { ministry: 'Канал ХХЦ', toUid: 'leader-uid' })
+    const asked = sent('sendMessage').find(
+      (body) => body.chat_id === 555 && body.reply_markup?.inline_keyboard
+    )!
+    expect(asked.text).toContain('Канал ХХЦ')
+    const buttons = asked.reply_markup!.inline_keyboard![0]!
+    expect(buttons.map((button) => button.text)).toEqual(['✅ Приймаю', '❌ Не можу'])
+
+    await webhook({
+      callback_query: {
+        id: 'cb-handover',
+        data: buttons[0]!.callback_data,
+        from: { id: 555 },
+        message: { chat: { id: 555 }, message_id: 7, text: asked.text, reply_markup: asked.reply_markup }
+      }
+    })
+    expect((await call('GET', '/me', 'leader')).body).toMatchObject({ leads: ['Канал ХХЦ'] })
+    expect(sent('editMessageText').at(-1)!.text).toContain("Обов'язки прийнято")
+  })
 
   it('a minister links Telegram by Start in the bot; the link works once; readers have no bot', async () => {
     const { call, sent, start, link, webhook } = await linked()

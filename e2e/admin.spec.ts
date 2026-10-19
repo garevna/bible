@@ -171,15 +171,39 @@ async function fakeWorker(page: Page, manage: string[], leads: string[] = []) {
                   id: 'r-lead',
                   name: 'Лідер служіння',
                   lead: true,
+                  deputy: false,
                   invite: true,
                   approve: true,
                   publish: false,
                   send: true,
                   uids: ['e2e-uid']
+                },
+                {
+                  id: 'r-deputy',
+                  name: 'Заступник',
+                  lead: false,
+                  deputy: true,
+                  invite: true,
+                  approve: true,
+                  publish: false,
+                  send: true,
+                  uids: ['leader-uid']
                 }
               ]
             ])
           )
+        }
+      })
+    }
+    // the duties of a leader handed over to a deputy
+    if (path === '/handover' || path === '/handover/answer') {
+      const body = request.postDataJSON()
+      requests.push({ method: request.method(), path, body })
+      if (path === '/handover/answer') return route.fulfill({ json: { answered: body.answer } })
+      if (request.method() === 'DELETE') return route.fulfill({ json: { removed: body.ministry } })
+      return route.fulfill({
+        json: {
+          handover: { ...body, fromUid: 'e2e-uid', byUid: 'e2e-uid', status: 'pending', at: Date.now() }
         }
       })
     }
@@ -484,19 +508,81 @@ test('a leader of a ministry gives its roles; the leaders are given by the admin
   await expect(lead.getByRole('textbox', { name: 'Назва ролі' })).toBeDisabled()
   await expect(lead.locator('.mdi-minus-circle-outline')).toHaveCount(0)
 
+  // the deputies too are given by the administrators
+  const deputy = ministry.locator('.role').nth(1)
+  await expect(deputy.getByRole('textbox', { name: 'Назва ролі' })).toBeDisabled()
+
   await ministry.getByRole('textbox', { name: 'Нова роль' }).fill('Музикант')
   await ministry.locator('.new-role .mdi-plus-thick').click()
-  const musician = ministry.locator('.role').nth(1)
+  const musician = ministry.locator('.role').nth(2)
   // no other role leads
   await expect(musician.locator('.v-chip', { hasText: 'Лідер служіння' })).toHaveCount(0)
+  await expect(musician.locator('.v-chip', { hasText: 'Заступник лідера' })).toHaveCount(0)
   await musician.locator('.v-chip', { hasText: 'Запрошує' }).click()
   await expect
     .poll(() => requests.filter((request) => request.path.startsWith('/ministry-roles/')).at(-1))
     .toMatchObject({
       method: 'PUT',
       path: '/ministry-roles/Музичне служіння',
-      body: { roles: [{ id: 'r-lead' }, { name: 'Музикант', invite: true, lead: false }] }
+      body: { roles: [{ id: 'r-lead' }, { id: 'r-deputy' }, { name: 'Музикант', invite: true, lead: false }] }
     })
+
+  // the duties handed over to the deputy, who is asked to accept them
+  await ministry.locator('.handover .v-select').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
+  await ministry.getByRole('button', { name: "Передати обов'язки" }).click()
+  await expect
+    .poll(() => requests.filter((request) => request.path === '/handover').at(-1))
+    .toMatchObject({
+      method: 'POST',
+      body: { ministry: 'Музичне служіння', toUid: 'leader-uid', until: null }
+    })
+  await expect(ministry.locator('.handover')).toContainText('Очікує підтвердження: Лідер')
+  await ministry.getByRole('button', { name: 'Скасувати прохання' }).click()
+  await expect
+    .poll(() => requests.filter((request) => request.path === '/handover').at(-1))
+    .toMatchObject({ method: 'DELETE', body: { ministry: 'Музичне служіння' } })
+})
+
+test('a deputy asked to take the duties over answers on any page', async ({ page }) => {
+  const requests = await fakeWorker(page, [])
+  let answered = false
+  // routes added later are asked first: the user is asked, until they answer
+  await page.route('**/worker-test/me', (route) =>
+    route.fulfill({
+      json: {
+        role: 'servant',
+        telegram: true,
+        canReceive: true,
+        phone: '+380501234567',
+        leads: answered ? ['Канал ХХЦ'] : [],
+        handovers: answered
+          ? []
+          : [
+              {
+                ministry: 'Канал ХХЦ',
+                fromUid: 'leader-uid',
+                toUid: 'e2e-uid',
+                byUid: 'leader-uid',
+                until: null,
+                status: 'pending',
+                at: Date.now()
+              }
+            ]
+      }
+    })
+  )
+  await signIn(page)
+  const banner = page.locator('.handover-banners .v-alert')
+  await expect(banner).toContainText("Вас просять прийняти обов'язки лідера служіння «Канал ХХЦ»")
+  answered = true
+  await banner.getByRole('button', { name: 'Приймаю' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.path === '/handover/answer'))
+    .toMatchObject({ body: { ministry: 'Канал ХХЦ', answer: 'accept' } })
+  await expect(banner).toHaveCount(0)
+  // the deputy leads now: the dashboard has their ministries
+  await expect(page.getByRole('button', { name: 'Адміністрування' })).toBeVisible()
 })
 
 test('a role without functions of an administrator has no dashboard', async ({ page }) => {

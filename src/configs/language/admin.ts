@@ -184,6 +184,86 @@ export const admin = {
     ru: 'Вы лидер этих служений: дайте участникам их роли. Лидеров служения назначает администратор.',
     en: 'You lead these ministries: give their people their roles. The leaders are given by the administrators.'
   },
+  ministryRightDeputy: {
+    ua: 'Заступник лідера',
+    ru: 'Заместитель лидера',
+    en: 'Deputy of the leader'
+  },
+  noDeputy: {
+    ua: 'немає заступника',
+    ru: 'нет заместителя',
+    en: 'no deputy'
+  },
+  handoverTitle: {
+    ua: "Обов'язки лідера",
+    ru: 'Обязанности лидера',
+    en: 'The duties of the leader'
+  },
+  handoverTo: {
+    ua: 'Кому передати',
+    ru: 'Кому передать',
+    en: 'To whom'
+  },
+  handoverUntil: {
+    ua: 'До якої дати (необовʼязково)',
+    ru: 'До какой даты (необязательно)',
+    en: 'Until (optional)'
+  },
+  handoverAsk: {
+    ua: "Передати обов'язки",
+    ru: 'Передать обязанности',
+    en: 'Hand the duties over'
+  },
+  handoverNoDeputies: {
+    ua: 'У служіння немає заступника: його призначає адміністратор.',
+    ru: 'У служения нет заместителя: его назначает администратор.',
+    en: 'The ministry has no deputy: the administrators give one.'
+  },
+  handoverPending: {
+    ua: 'Очікує підтвердження: {name}',
+    ru: 'Ожидает подтверждения: {name}',
+    en: 'Waiting for {name} to accept'
+  },
+  handoverActing: {
+    ua: "Обов'язки виконує {name}",
+    ru: 'Обязанности исполняет {name}',
+    en: '{name} has the duties'
+  },
+  handoverUntilDay: {
+    ua: 'до {day}',
+    ru: 'до {day}',
+    en: 'until {day}'
+  },
+  handoverEnd: {
+    ua: "Повернути обов'язки лідеру",
+    ru: 'Вернуть обязанности лидеру',
+    en: 'Give the duties back to the leader'
+  },
+  handoverCancel: {
+    ua: 'Скасувати прохання',
+    ru: 'Отменить просьбу',
+    en: 'Cancel the request'
+  },
+  handoverYouAct: {
+    ua: "Ви виконуєте обов'язки лідера",
+    ru: 'Вы исполняете обязанности лидера',
+    en: 'You have the duties of the leader'
+  },
+  handoverAsked: {
+    ua: "Вас просять прийняти обов'язки лідера служіння «{ministry}»",
+    ru: 'Вас просят принять обязанности лидера служения «{ministry}»',
+    en: 'You are asked to take over the duties of the leader of “{ministry}”'
+  },
+  handoverAccept: {
+    ua: 'Приймаю',
+    ru: 'Принимаю',
+    en: 'I accept'
+  },
+  handoverDecline: {
+    ua: 'Не можу',
+    ru: 'Не могу',
+    en: 'I cannot'
+  },
   ministryRoles: {
     ua: 'Ролі в служінні',
     ru: 'Роли в служении',

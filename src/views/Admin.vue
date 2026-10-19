@@ -80,6 +80,7 @@
               v-else-if="section === 'ministries'"
               v-model="settings.ministries"
               v-model:roles="settings.ministryRoles"
+              v-model:handovers="settings.handovers"
               v-model:translations="settings.translationMinistries"
               @error="fail"
             />
@@ -118,7 +119,14 @@ import AdminUsers from '@/components/admin/AdminUsers.vue'
 import MyMinistries from '@/components/admin/MyMinistries.vue'
 import { useLanguageStore } from '@/stores/language'
 import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
-import { useWorkerStore, WorkerError, type Manage, type MinistryRoles, type RoleDef } from '@/stores/worker'
+import {
+  useWorkerStore,
+  WorkerError,
+  type Manage,
+  type Handovers,
+  type MinistryRoles,
+  type RoleDef
+} from '@/stores/worker'
 import { format } from '@/utils/format'
 import type { NoteType } from '@/utils/noteTypes'
 
@@ -170,6 +178,7 @@ const settings = ref<{
   eventTypes: EventType[]
   calendar: CalendarSettings
   ministryRoles: MinistryRoles
+  handovers: Handovers
   addresses: Record<string, Place>
   translationMinistries: string[]
 } | null>(null)
@@ -193,6 +202,7 @@ async function load() {
     settings.value = {
       ...loaded,
       ministryRoles: loaded.ministryRoles ?? {},
+      handovers: loaded.handovers ?? {},
       addresses: loaded.addresses ?? {},
       translationMinistries: loaded.translationMinistries ?? []
     }
