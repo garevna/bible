@@ -85,9 +85,9 @@ export const admin = {
     en: 'A new ministry, Enter'
   },
   sectionRoles: {
-    ua: 'Ролі і права',
-    ru: 'Роли и права',
-    en: 'Roles and rights'
+    ua: 'Статуси',
+    ru: 'Статусы',
+    en: 'Statuses'
   },
   sectionUsers: {
     ua: 'Служителі',
@@ -105,14 +105,14 @@ export const admin = {
     en: 'Locations'
   },
   rolesHint: {
-    ua: 'Роль визначає, що можуть люди з нею. Читач — кожен, хто увійшов: прав не має, його не можна видалити.',
-    ru: 'Роль определяет, что могут люди с ней. Читатель — каждый, кто вошёл: прав не имеет, его нельзя удалить.',
-    en: 'A role says what its people may do. The reader is everyone who signed in: no rights, it cannot be removed.'
+    ua: 'Статус — це доступ до застосунку і права всюди. Супервайзер має всі права, читач — жодних (це кожен, хто увійшов). Що служитель робить у служінні, визначають його ролі там: вони задаються в розділі «Служіння».',
+    ru: 'Статус — это доступ к приложению и права везде. Супервайзер имеет все права, читатель — никаких (это каждый, кто вошёл). Что служитель делает в служении, определяют его роли там: они задаются в разделе «Служения».',
+    en: 'A status is the access to the app and the rights everywhere. The supervisor has every right, the reader none (everyone who signed in). What a servant does in a ministry comes from their roles there: they are given in Ministries.'
   },
   roleName: {
-    ua: 'Назва ролі',
-    ru: 'Название роли',
-    en: 'Name of the role'
+    ua: 'Назва статусу',
+    ru: 'Название статуса',
+    en: 'Name of the status'
   },
   rightPublish: {
     ua: 'Публікує нотатки й теми в Telegram-каналі',
@@ -125,14 +125,14 @@ export const admin = {
     en: 'Writes messages to colleagues'
   },
   rightSendToRoles: {
-    ua: 'Кому може писати (ролі)',
-    ru: 'Кому может писать (роли)',
-    en: 'May write to (roles)'
+    ua: 'Кому може писати (статуси)',
+    ru: 'Кому может писать (статусы)',
+    en: 'Whom it may write to (statuses)'
   },
   rightSendToPeople: {
-    ua: 'І будь-якому служителю окремо, незалежно від ролі',
-    ru: 'И любому служителю отдельно, независимо от роли',
-    en: 'And to any minister alone, whatever their role'
+    ua: 'І будь-якому служителю окремо, незалежно від статусу',
+    ru: 'И любому служителю отдельно, независимо от статуса',
+    en: 'And any minister one by one, whatever their status'
   },
   rightMessageDays: {
     ua: 'Скільки днів зберігаються надіслані повідомлення',
@@ -145,9 +145,9 @@ export const admin = {
     en: 'Functions of an administrator'
   },
   manageRoles: {
-    ua: 'Ролі і права',
-    ru: 'Роли и права',
-    en: 'Roles and rights'
+    ua: 'Статуси',
+    ru: 'Статусы',
+    en: 'Statuses'
   },
   manageUsers: {
     ua: 'Служителі: ролі, служіння, телефони',
@@ -169,25 +169,65 @@ export const admin = {
     ru: 'Расписание служений',
     en: 'The schedule of ministries'
   },
-  addRole: {
-    ua: 'Додати роль',
-    ru: 'Добавить роль',
-    en: 'Add a role'
+  supervisorFixed: {
+    ua: 'Супервайзер має всі права. Призначити або зняти супервайзера може лише супервайзер.',
+    ru: 'Супервайзер имеет все права. Назначить или снять супервайзера может только супервайзер.',
+    en: 'The supervisor has every right. Only a supervisor makes or unmakes a supervisor.'
   },
-  newRole: {
+  ministryRoles: {
+    ua: 'Ролі в служінні',
+    ru: 'Роли в служении',
+    en: 'Roles in the ministry'
+  },
+  ministryRolesHint: {
+    ua: 'Роль дає своїм людям права в цьому служінні. Керівники ведуть служіння: події, запрошення, заявки.',
+    ru: 'Роль даёт своим людям права в этом служении. Руководители ведут служение: события, приглашения, заявки.',
+    en: 'A role gives its people rights in this ministry. The leaders lead it: the events, the invitations, the applications.'
+  },
+  ministryRoleName: {
+    ua: 'Назва ролі',
+    ru: 'Название роли',
+    en: 'Name of the role'
+  },
+  ministryRolePeople: {
+    ua: 'Хто має цю роль',
+    ru: 'У кого эта роль',
+    en: 'Who has this role'
+  },
+  newMinistryRole: {
     ua: 'Нова роль',
     ru: 'Новая роль',
-    en: 'New role'
+    en: 'A new role'
   },
-  removeRole: {
+  removeMinistryRole: {
     ua: 'Видалити роль',
     ru: 'Удалить роль',
     en: 'Remove the role'
   },
-  removeRoleHint: {
-    ua: 'люди з цією роллю стануть читачами',
-    ru: 'люди с этой ролью станут читателями',
-    en: 'its people become readers'
+  ministryRightLead: {
+    ua: 'Керує служінням',
+    ru: 'Руководит служением',
+    en: 'Leads the ministry'
+  },
+  ministryRightInvite: {
+    ua: 'Запрошує',
+    ru: 'Приглашает',
+    en: 'Invites'
+  },
+  ministryRightApprove: {
+    ua: 'Розглядає заявки',
+    ru: 'Рассматривает заявки',
+    en: 'Takes the applications'
+  },
+  ministryRightPublish: {
+    ua: 'Публікує в канал',
+    ru: 'Публикует в канал',
+    en: 'Posts to the channel'
+  },
+  ministryRightSend: {
+    ua: 'Пише учасникам служіння',
+    ru: 'Пишет участникам служения',
+    en: 'Writes to the people of the ministry'
   },
   readerFixed: {
     ua: 'Читач не має прав: це кожен, хто увійшов у застосунок.',
@@ -195,9 +235,9 @@ export const admin = {
     en: 'The reader has no rights: it is everyone who signed in.'
   },
   saveRoles: {
-    ua: 'Зберегти ролі',
-    ru: 'Сохранить роли',
-    en: 'Save the roles'
+    ua: 'Зберегти статуси',
+    ru: 'Сохранить статусы',
+    en: 'Save the statuses'
   },
   unsaved: {
     ua: 'Є незбережені зміни',
@@ -260,14 +300,14 @@ export const admin = {
     en: 'Leaders of the ministry'
   },
   filterRole: {
-    ua: 'Роль',
-    ru: 'Роль',
-    en: 'Role'
+    ua: 'Статус',
+    ru: 'Статус',
+    en: 'Status'
   },
   roleColumn: {
-    ua: 'Роль',
-    ru: 'Роль',
-    en: 'Role'
+    ua: 'Статус',
+    ru: 'Статус',
+    en: 'Status'
   },
   userName: {
     ua: 'Ім’я',
@@ -320,9 +360,9 @@ export const admin = {
     en: 'Rows per page:'
   },
   ministriesTableHint: {
-    ua: 'Натисніть на служіння: його керівники, події та найближчі дні з учасниками.',
-    ru: 'Нажмите на служение: его руководители, события и ближайшие дни с участниками.',
-    en: 'Click a ministry: its leaders, events and coming days with their people.'
+    ua: 'Натисніть на служіння: його ролі та люди в них, події та найближчі дні з учасниками.',
+    ru: 'Нажмите на служение: его роли и люди в них, события и ближайшие дни с участниками.',
+    en: 'Click a ministry: its roles and their people, events and coming days with their people.'
   },
   ministryColumn: {
     ua: 'Служіння',
@@ -333,11 +373,6 @@ export const admin = {
     ua: 'Подій',
     ru: 'Событий',
     en: 'Events'
-  },
-  leadersHint: {
-    ua: 'Керівники створюють події цього служіння, запрошують і затверджують учасників',
-    ru: 'Руководители создают события этого служения, приглашают и утверждают участников',
-    en: 'The leaders create the events of the ministry, invite and approve the people'
   },
   ministryEvents: {
     ua: 'Події служіння (найближчий місяць)',

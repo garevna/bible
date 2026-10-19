@@ -139,7 +139,9 @@
                   :model-value="item.role"
                   :items="roleItems"
                   :label="text.roleColumn"
-                  :disabled="item.uid === user.uid || saving === item.uid"
+                  :disabled="
+                    item.uid === user.uid || saving === item.uid || (item.role === SUPERVISOR && !mighty)
+                  "
                   :loading="saving === item.uid"
                   density="compact"
                   hide-details
@@ -159,6 +161,11 @@
                   class="field field--wide"
                   @update:model-value="change(item, { ministries: $event })"
                 />
+              </div>
+
+              <!-- the roles in the ministries: given in the ministries -->
+              <div v-if="rolesOf(item).length" class="info">
+                <span>{{ text.ministryRoles }}: {{ rolesOf(item).join(', ') }}</span>
               </div>
 
               <div class="d-flex flex-wrap ga-2 align-center">
@@ -204,15 +211,24 @@ import ConfirmButton from '@/components/ConfirmButton.vue'
 import PhoneDialog from '@/components/PhoneDialog.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
-import { READER, useWorkerStore, type Role, type RoleDef, type UserView } from '@/stores/worker'
+import {
+  READER,
+  SUPERVISOR,
+  useWorkerStore,
+  type MinistryRoles,
+  type Role,
+  type RoleDef,
+  type UserView
+} from '@/stores/worker'
 import { formatDate, localeOf } from '@/utils/dates'
 import { format } from '@/utils/format'
 
 /**
- * The people of the app as a table: the words, a role and a ministry filter it (the readers on request);
- * a row opens the details, where the name, the role, the ministries and the phone are changed.
+ * The people of the app as a table: the words, a status and a ministry filter it (the readers on request);
+ * a row opens the details, where the name, the status, the ministries and the phone are changed, and
+ * their roles in the ministries are shown (they are given in the ministries).
  */
-const props = defineProps<{ roles: RoleDef[]; ministries: string[] }>()
+const props = defineProps<{ roles: RoleDef[]; ministries: string[]; ministryRoles?: MinistryRoles }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
 
 const worker = useWorkerStore()
@@ -248,7 +264,19 @@ const headers = computed(() => {
   return phone.value ? all.filter((item) => item.key === 'name') : all
 })
 
-const roleItems = computed(() => props.roles.map((role) => ({ value: role.id, title: role.name })))
+/** only a supervisor (or an owner) makes or unmakes a supervisor */
+const mighty = computed(() => worker.role === 'owner' || worker.role === SUPERVISOR)
+const roleItems = computed(() =>
+  props.roles
+    .filter((role) => mighty.value || role.id !== SUPERVISOR)
+    .map((role) => ({ value: role.id, title: role.name }))
+)
+
+/** 'Керівник (Музичне служіння)', … */
+const rolesOf = (item: UserView) =>
+  Object.entries(props.ministryRoles ?? {}).flatMap(([ministry, list]) =>
+    list.filter((role) => role.uids.includes(item.uid)).map((role) => `${role.name} (${ministry})`)
+  )
 const roleName = (id: Role) =>
   props.roles.find((role) => role.id === id)?.name ?? (id === 'owner' ? text.value.owner : id)
 

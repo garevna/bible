@@ -3,7 +3,7 @@
     <h2 class="admin-title">{{ text.sectionRoles }}</h2>
     <p class="hint">{{ text.rolesHint }}</p>
 
-    <!-- each role opens its rights -->
+    <!-- each status opens its rights; there are four of them, none is added or removed -->
     <v-expansion-panels v-model="opened" variant="accordion" class="mb-4">
       <v-expansion-panel
         v-for="role of draft"
@@ -13,20 +13,15 @@
         class="role-panel"
       >
         <v-expansion-panel-title>
-          <span class="flex-grow-1 font-weight-bold">{{ role.name || text.newRole }}</span>
-          <ConfirmButton
-            v-if="role.id !== READER"
-            icon="$unlink"
-            :text="`${text.removeRole}: ${text.removeRoleHint}`"
-            class="mr-2"
-            @confirm="remove(role)"
-          />
+          <span class="flex-grow-1 font-weight-bold">{{ role.name }}</span>
         </v-expansion-panel-title>
 
         <v-expansion-panel-text>
+          <!-- the reader and the supervisor: their rights are fixed, their names are not -->
+          <v-text-field v-model="role.name" :label="text.roleName" density="compact" class="mb-2" />
           <p v-if="role.id === READER" class="hint">{{ text.readerFixed }}</p>
+          <p v-else-if="role.id === SUPERVISOR" class="hint">{{ text.supervisorFixed }}</p>
           <template v-else>
-            <v-text-field v-model="role.name" :label="text.roleName" density="compact" class="mb-2" />
             <v-switch
               v-model="role.publish"
               :label="text.rightPublish"
@@ -123,9 +118,6 @@
     </v-expansion-panels>
 
     <div class="d-flex flex-wrap align-center ga-2">
-      <v-btn variant="tonal" color="buttons" class="text-none" prepend-icon="$link" @click="add">
-        {{ text.addRole }}
-      </v-btn>
       <v-spacer />
       <span v-if="dirty" class="text-warning text-body-2">{{ text.unsaved }}</span>
       <v-btn
@@ -146,11 +138,21 @@
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
-import ConfirmButton from '@/components/ConfirmButton.vue'
 import { useLanguageStore } from '@/stores/language'
-import { ANY_MINISTRY, MANAGE, READER, useWorkerStore, type Manage, type RoleDef } from '@/stores/worker'
+import {
+  ANY_MINISTRY,
+  MANAGE,
+  READER,
+  SUPERVISOR,
+  useWorkerStore,
+  type Manage,
+  type RoleDef
+} from '@/stores/worker'
 
-/** The roles and what their people may do; the changes are saved together */
+/**
+ * The statuses (supervisor, administrator, servant, reader) and what their people may do everywhere;
+ * the changes are saved together. What a servant does in a ministry comes from their roles there.
+ */
 const roles = defineModel<RoleDef[]>({ required: true })
 defineProps<{ ministries: string[] }>()
 const emit = defineEmits<{ error: [cause: unknown] }>()
@@ -172,7 +174,7 @@ const opened = ref<string | null>(null)
 const busy = ref(false)
 const dirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(roles.value))
 
-/** the roles one may write to: all but the reader */
+/** the statuses one may write to: all but the reader */
 const targets = computed(() => draft.value.filter((role) => role.id !== READER))
 
 const manageLabels: Record<Manage, keyof typeof text.value> = {
@@ -183,29 +185,6 @@ const manageLabels: Record<Manage, keyof typeof text.value> = {
   schedule: 'manageSchedule'
 }
 const manageItems = computed(() => MANAGE.map((value) => ({ value, title: text.value[manageLabels[value]] })))
-
-function add() {
-  const id = `role-${Date.now().toString(36)}`
-  draft.value.push({
-    id,
-    name: text.value.newRole,
-    publish: false,
-    send: false,
-    sendToRoles: [],
-    sendToPeople: false,
-    messageDays: 1,
-    approve: false,
-    invite: [],
-    manage: []
-  })
-  opened.value = id
-}
-
-function remove(role: RoleDef) {
-  draft.value = draft.value
-    .filter((item) => item.id !== role.id)
-    .map((item) => ({ ...item, sendToRoles: item.sendToRoles.filter((id) => id !== role.id) }))
-}
 
 async function save() {
   busy.value = true

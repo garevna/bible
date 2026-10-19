@@ -1,3 +1,4 @@
+import type { MinistryRights } from './ministryRoles'
 import type { UsersStore } from './users'
 
 /** The functions of administrators: each is given to a role on its own */
@@ -5,8 +6,10 @@ export const MANAGE = ['roles', 'users', 'directories', 'types', 'schedule'] as 
 export type Manage = (typeof MANAGE)[number]
 
 /**
- * A role, kept by the administrators: what its people may do.
- * The reader (everyone who signed in) is built in: no rights, cannot be removed.
+ * A status, kept by the administrators: the access to the app and what its people may do everywhere.
+ * There are four of them, built in: the supervisor (every right), the administrator, the servant and
+ * the reader (everyone who signed in: no rights). What a servant does in a ministry comes from their
+ * roles there (see ministryRoles.ts). The type keeps its old name: the statuses were the roles once.
  */
 export interface RoleDef {
   /** 'admin', 'publisher', … */
@@ -31,6 +34,17 @@ export interface RoleDef {
 }
 
 export const READER = 'reader'
+export const SUPERVISOR = 'supervisor'
+
+/** the statuses, the highest first */
+export const STATUSES = [SUPERVISOR, 'admin', 'servant', READER] as const
+
+/**
+ * The status of a role id: the roles of the old version that are no statuses (e.g. 'publisher')
+ * serve; the owners keep 'owner' (the rights of the supervisor, whatever the list says)
+ */
+export const statusOf = (id: string) =>
+  id === 'owner' || (STATUSES as readonly string[]).includes(id) ? id : 'servant'
 
 /** in the ministries a role invites to: every ministry */
 export const ANY_MINISTRY = '*'
@@ -61,39 +75,77 @@ export const DEFAULT_ROLES: RoleDef[] = [
     manage: []
   },
   {
-    id: 'publisher',
-    name: 'Публікатор',
-    publish: true,
-    send: true,
-    sendToRoles: ['servant', 'publisher', 'admin'],
-    sendToPeople: true,
-    messageDays: 1,
-    approve: true,
-    invite: [ANY_MINISTRY],
-    manage: []
-  },
-  {
     id: 'admin',
     name: 'Адміністратор',
     publish: true,
     send: true,
-    sendToRoles: ['servant', 'publisher', 'admin'],
+    sendToRoles: ['servant', 'admin', SUPERVISOR],
     sendToPeople: true,
     messageDays: 1,
+    approve: true,
+    invite: [ANY_MINISTRY],
+    manage: [...MANAGE]
+  },
+  {
+    id: SUPERVISOR,
+    name: 'Супервайзер',
+    publish: true,
+    send: true,
+    sendToRoles: ['servant', 'admin', SUPERVISOR],
+    sendToPeople: true,
+    messageDays: 7,
     approve: true,
     invite: [ANY_MINISTRY],
     manage: [...MANAGE]
   }
 ]
 
-/** the owners: every right, whatever the list of roles says */
-export const OWNER_ROLE: RoleDef = { ...DEFAULT_ROLES[3]!, id: 'owner', name: 'Власник' }
+const defaultOf = (id: string) => DEFAULT_ROLES.find((role) => role.id === id)!
+
+/** the owners: every right of the supervisor, whatever the list of statuses says */
+export const OWNER_ROLE: RoleDef = { ...defaultOf(SUPERVISOR), id: 'owner', name: 'Власник' }
+
+/** what a user may do: their status, and their roles in the ministries */
+export interface Rights extends RoleDef {
+  /** the ministries whose applications the user takes (the status may approve everywhere) */
+  approveIn: string[]
+  /** the ministries whose people the user writes to (besides the statuses the status writes to) */
+  sendToMinistries: string[]
+}
+
+export function effectiveRights(status: RoleDef, ministry: MinistryRights): Rights {
+  return {
+    ...status,
+    publish: status.publish || ministry.publish,
+    send: status.send || ministry.send.length > 0,
+    invite: status.invite.includes(ANY_MINISTRY)
+      ? [ANY_MINISTRY]
+      : [...new Set([...status.invite, ...ministry.invite])],
+    approveIn: ministry.approve,
+    sendToMinistries: ministry.send
+  }
+}
+
+/** The four statuses: the reader has no rights, the supervisor has all of them */
+function statusesOf(list: RoleDef[]): RoleDef[] {
+  return STATUSES.map((id) => {
+    // the supervisor of the old version was a role of its own, known by its name
+    const kept =
+      list.find((role) => role.id === id) ??
+      (id === SUPERVISOR ? list.find((role) => role.name.trim() === 'Супервайзер') : undefined)
+    const name = kept?.name ?? defaultOf(id).name
+    if (id === SUPERVISOR || id === READER) return { ...defaultOf(id), name }
+    return kept
+      ? { ...kept, id, sendToRoles: kept.sendToRoles.filter((item) => item !== 'publisher') }
+      : defaultOf(id)
+  })
+}
 
 const ROLES_KEY = 'settings:roles'
 
 export async function getRoles(store: UsersStore): Promise<RoleDef[]> {
   const kept = await store.get<RoleDef[]>(ROLES_KEY, 'json')
-  if (!kept) return DEFAULT_ROLES
+  if (!kept) return statusesOf(DEFAULT_ROLES)
   // roles saved before approving was a right of its own: the planners of the schedule approve
   const saved = kept.map((role) => ({
     ...role,
@@ -101,15 +153,14 @@ export async function getRoles(store: UsersStore): Promise<RoleDef[]> {
     // the publishers (pastors) and the planners invited to every ministry before it was a right
     invite: role.invite ?? (role.publish || role.manage.includes('schedule') ? [ANY_MINISTRY] : [])
   }))
-  // the reader is always there and has no rights
-  return saved.some((role) => role.id === READER) ? saved : [DEFAULT_ROLES[0]!, ...saved]
+  return statusesOf(saved)
 }
 
 export const setRoles = (store: UsersStore, roles: RoleDef[]) => store.put(ROLES_KEY, JSON.stringify(roles))
 
-/** The role of a role id; an unknown or removed role counts as the reader */
+/** The status of a role id (see statusOf) */
 export const roleDefOf = (roles: RoleDef[], id: string): RoleDef =>
-  roles.find((role) => role.id === id) ?? roles.find((role) => role.id === READER) ?? DEFAULT_ROLES[0]!
+  roles.find((role) => role.id === statusOf(id)) ?? defaultOf(READER)
 
 const isRoleDef = (value: unknown): value is RoleDef => {
   const role = value as RoleDef
@@ -139,7 +190,7 @@ const isRoleDef = (value: unknown): value is RoleDef => {
   )
 }
 
-/** Up to thirty roles with distinct ids; the reader stays without rights. Null when it is not a list of roles */
+/** The four statuses (others are left out); the reader stays without rights, the supervisor with all. Null when it is not a list of them */
 export function parseRoles(value: unknown): RoleDef[] | null {
   if (!Array.isArray(value) || value.length > 30 || !value.every(isRoleDef)) return null
   const ids = value.map((role) => role.id)
@@ -158,7 +209,5 @@ export function parseRoles(value: unknown): RoleDef[] | null {
     invite: role.invite?.includes(ANY_MINISTRY) ? [ANY_MINISTRY] : [...new Set(role.invite ?? [])],
     manage: [...new Set(role.manage)]
   }))
-  const reader = roles.find((role) => role.id === READER)
-  const fixedReader = { ...DEFAULT_ROLES[0]!, name: reader?.name ?? DEFAULT_ROLES[0]!.name }
-  return [fixedReader, ...roles.filter((role) => role.id !== READER)]
+  return statusesOf(roles)
 }

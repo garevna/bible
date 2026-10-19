@@ -17,7 +17,10 @@ import {
   roleDefOf,
   setRoles,
   type Manage,
-  type RoleDef
+  effectiveRights,
+  SUPERVISOR,
+  type RoleDef,
+  type Rights
 } from './roles'
 import { d1Schedule, localDay, type ScheduleStore } from './schedule'
 import { cached, remoteBooks, remoteChapter, REMOTE_BIBLES, RemoteError } from './remoteBible'
@@ -39,20 +42,27 @@ import {
   type ButtonsMessage,
   type ServiceBot
 } from './serviceBot'
+import {
+  getMinistryRoles,
+  leadersOf,
+  ministryRightsOf,
+  parseMinistryRoles,
+  renameMinistry,
+  setMinistryRoles,
+  type MinistryRoles
+} from './ministryRoles'
 import { escape, formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
 import { getTypes, parseTypes, setTypes } from './types'
 import {
   DIRECTORIES,
   getAddresses,
   getDirectory,
-  getLeaders,
   getTranslationMinistries,
   getUser,
   getMinistries,
   isPhone,
   listUsers,
   parseAddresses,
-  parseLeaders,
   parseMinistries,
   removeUser,
   renameUsersMinistry,
@@ -60,7 +70,6 @@ import {
   roleOf,
   setAddresses,
   setDirectory,
-  setLeaders,
   setTranslationMinistries,
   setOwnPhone,
   setTelegramChat,
@@ -88,13 +97,14 @@ import {
  *   POST   /messages                { to?, ministries?, roles?, text, attachment?, replyTo? }
  *   POST   /messages/:id/read       marks a message read
  *   DELETE /messages                { ids }: the messages are hidden from the user (the other side keeps them)
- * The dashboard, each part for the roles that have its function (the owners have all):
- *   GET    /admin/settings          the roles, types, ministries and locations
- *   PUT    /admin/roles             { roles }                                        roles
+ * The dashboard, each part for the statuses that have its function (the owners have all):
+ *   GET    /admin/settings          the statuses, types, ministries and their roles, locations
+ *   PUT    /admin/roles             { roles }: the four statuses                     roles
  *   GET    /admin/users             the users who signed in                          users
- *   PUT    /admin/users/:uid        { role?, ministries?, phone?, name? }            users
+ *   PUT    /admin/users/:uid        { role?, ministries?, phone?, name? }            users (a supervisor: by a supervisor)
  *   DELETE /admin/users/:uid        takes a user off the list                        users
  *   PUT    /admin/directories/:name { items }: 'ministries' or 'locations'           directories
+ *   PUT    /admin/ministry-roles    { ministryRoles }: the roles in the ministries    directories
  *   PUT    /admin/types             { types }                                        types
  * Every request carries the Firebase ID token: Authorization: Bearer <token>.
  */
@@ -156,7 +166,7 @@ const ROUTES = [
   /^DELETE \/messages$/,
   /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
   /^GET \/admin\/(settings|users)$/,
-  /^PUT \/admin\/(roles|types|event-types|calendar|leaders|addresses|translation-ministries)$/,
+  /^PUT \/admin\/(roles|types|event-types|calendar|ministry-roles|addresses|translation-ministries)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
   /^GET \/schedule(\/people|\/materials)?$/,
@@ -176,6 +186,10 @@ const nameOf = (record: UserRecord) => record.name ?? record.email ?? record.uid
 /** what the people of a role may do; the owners may do everything */
 const rightsOf = (roles: RoleDef[], roleId: string) =>
   roleId === 'owner' ? OWNER_ROLE : roleDefOf(roles, roleId)
+
+/** what a user may do: their status, and their roles in the ministries */
+const rightsFor = (roles: RoleDef[], ministryRoles: MinistryRoles, roleId: string, uid: string): Rights =>
+  effectiveRights(rightsOf(roles, roleId), ministryRightsOf(ministryRoles, uid))
 
 /** everyone but the readers serves: they get messages and see the ministries (a removed role is a reader) */
 const serves = (roles: RoleDef[], roleId: string) =>
@@ -207,9 +221,10 @@ async function scheduleContext(
   if (reader && !readers) return null
   // the owners serve too: they are invited, and get the notices
   const users = await listUsers(env.USERS, env.OWNERS, true)
+  const ministryRoles = await getMinistryRoles(env.USERS)
   return {
     me,
-    rights: rightsOf(roles, roleId),
+    rights: rightsFor(roles, ministryRoles, roleId, me.uid),
     servants: users.filter((user) => serves(roles, user.role)),
     planners: users
       .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
@@ -219,7 +234,7 @@ async function scheduleContext(
     schedule: deps.schedule ?? d1Schedule(env.DB),
     messages: deps.messages ?? d1Store(env.DB),
     bot: botFor(env, deps, users),
-    leaders: await getLeaders(env.USERS),
+    leaders: leadersOf(ministryRoles),
     addresses: await getAddresses(env.USERS),
     reader,
     now: deps.now?.() ?? Date.now()
@@ -250,7 +265,7 @@ async function renameEverywhere(env: Env, deps: Deps, directory: Directory, from
     await setAddresses(store, swap(await getAddresses(store)))
     return
   }
-  await setLeaders(store, swap(await getLeaders(store)))
+  await setMinistryRoles(store, renameMinistry(await getMinistryRoles(store), from, to))
   await setTranslationMinistries(
     store,
     (await getTranslationMinistries(store)).map((item) => (item === from ? to : item))
@@ -537,7 +552,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   const me = await touchUser(env.USERS, authUser)
   const roles = await getRoles(env.USERS)
   const roleId = roleOf(me, env.OWNERS)
-  const rights = rightsOf(roles, roleId)
+  const ministryRoles = await getMinistryRoles(env.USERS)
+  const rights = rightsFor(roles, ministryRoles, roleId, me.uid)
   const can = (function_: Manage) => rights.manage.includes(function_)
   const telegram = Boolean(env.TELEGRAM_BOT_TOKEN && env.TELEGRAM_CHAT_ID)
   const body = async () => (await request.json().catch(() => null)) as unknown
@@ -555,9 +571,20 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         sendToPeople: rights.sendToPeople,
         sendToRoles: rights.sendToRoles,
         approve: rights.approve,
+        approveIn: rights.approveIn,
         invite: rights.invite,
+        sendToMinistries: rights.sendToMinistries,
         manage: rights.manage
       },
+      // the roles of the user in the ministries: { ministry: ['Музикант', …] }
+      ministryRoles: Object.fromEntries(
+        Object.entries(ministryRoles)
+          .map(([ministry, list]) => [
+            ministry,
+            list.filter((role) => role.uids.includes(me.uid)).map((role) => role.name)
+          ])
+          .filter(([, names]) => names!.length)
+      ),
       canSend: rights.send,
       canReceive: serves(roles, roleId),
       phone: me.phone ?? null,
@@ -569,9 +596,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         rights.manage.length > 0 ||
         (me.ministries ?? []).some((ministry) => translationMinistries.includes(ministry)),
       // the ministries the user leads (plans their events)
-      leads: Object.entries(await getLeaders(env.USERS))
-        .filter(([, uids]) => uids.includes(me.uid))
-        .map(([ministry]) => ministry),
+      leads: ministryRightsOf(ministryRoles, me.uid).leads,
       telegramLinked: Boolean(me.telegramChatId),
       // ministers are asked for their mobile number until they give it
       needsPhone: serves(roles, roleId) && !me.phone
@@ -663,7 +688,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       locations: await getDirectory(env.USERS, 'locations'),
       eventTypes: await getEventTypes(env.USERS),
       calendar: await getCalendar(env.USERS),
-      leaders: await getLeaders(env.USERS),
+      leaders: leadersOf(ministryRoles),
+      ministryRoles,
       addresses: await getAddresses(env.USERS),
       translationMinistries: await getTranslationMinistries(env.USERS)
     })
@@ -692,16 +718,16 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     return json({ addresses })
   }
 
-  // the leaders of the ministries: kept with the list of the ministries
-  if (route === 'PUT /admin/leaders') {
+  // the roles inside the ministries, and their people (the leaders are the people of the roles that lead)
+  if (route === 'PUT /admin/ministry-roles') {
     if (!can('directories')) return json({ error: 'forbidden' }, 403)
-    const leaders = parseLeaders(
-      ((await body()) as { leaders?: unknown } | null)?.leaders,
+    const parsed = parseMinistryRoles(
+      ((await body()) as { ministryRoles?: unknown } | null)?.ministryRoles,
       await getDirectory(env.USERS, 'ministries')
     )
-    if (!leaders) return json({ error: 'bad-request' }, 400)
-    await setLeaders(env.USERS, leaders)
-    return json({ leaders })
+    if (!parsed) return json({ error: 'bad-request' }, 400)
+    await setMinistryRoles(env.USERS, parsed)
+    return json({ ministryRoles: parsed, leaders: leadersOf(parsed) })
   }
 
   // the types of events and the settings of the calendar: the ones who plan the schedule
@@ -772,6 +798,10 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   }
 
   const uid = decodeURIComponent(pathname.slice('/admin/users/'.length))
+  // only a supervisor (or an owner) makes, unmakes or removes a supervisor
+  const mighty = roleId === 'owner' || roleId === SUPERVISOR
+  const target = await getUser(env.USERS, uid)
+  if (!mighty && target && roleOf(target, env.OWNERS) === SUPERVISOR) return json({ error: 'forbidden' }, 403)
   try {
     if (request.method === 'DELETE') {
       await removeUser(env.USERS, env.OWNERS, me, uid)
@@ -796,6 +826,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       typeof change.role === 'string' && roles.some((item) => item.id === change.role) ? change.role : null
     const ministries = change.ministries === undefined ? undefined : parseMinistries(change.ministries)
     const badPhone = change.phone !== undefined && change.phone !== null && !isPhone(change.phone)
+    if (role === SUPERVISOR && !mighty) return json({ error: 'forbidden' }, 403)
     if ((change.role !== undefined && !role) || ministries === null || badPhone || name === false) {
       return json({ error: 'bad-request' }, 400)
     }
@@ -826,7 +857,7 @@ async function handleMessages(
   deps: Deps,
   me: UserRecord,
   roles: RoleDef[],
-  rights: RoleDef,
+  rights: Rights,
   json: (body: unknown, status?: number) => Response,
   body: () => Promise<unknown>
 ): Promise<Response> {
@@ -856,10 +887,20 @@ async function handleMessages(
 
   // whom the role of the user may write to: anyone who serves, or the people of its roles
   const users = await listUsers(env.USERS, env.OWNERS)
+  const ministryRoles = await getMinistryRoles(env.USERS)
+  /** the people of a ministry: who serves in it, and who has a role there */
+  const inMinistry = (user: (typeof users)[number], ministry: string) =>
+    Boolean(user.ministries?.includes(ministry)) ||
+    Boolean(ministryRoles[ministry]?.some((role) => role.uids.includes(user.uid)))
+  // the status writes to its statuses (or anyone); a role of a ministry, to the people of the ministry
+  const allMinistries = rights.sendToPeople || rights.sendToRoles.length > 0
+  const writesTo = allMinistries ? await getMinistries(env.USERS) : rights.sendToMinistries
   const reachable = (user: (typeof users)[number]) =>
     user.uid !== me.uid &&
     serves(roles, user.role) &&
-    (rights.sendToPeople || rights.sendToRoles.includes(user.role))
+    (rights.sendToPeople ||
+      rights.sendToRoles.includes(user.role) ||
+      rights.sendToMinistries.some((ministry) => inMinistry(user, ministry)))
   const receivers = rights.send ? users.filter(reachable) : []
 
   if (pathname === '/messages/recipients') {
@@ -871,7 +912,7 @@ async function handleMessages(
         ministries: ministries ?? [],
         phone: phone ?? null
       })),
-      ministries: rights.send ? await getMinistries(env.USERS) : [],
+      ministries: rights.send ? writesTo : [],
       roles: roles
         .filter((role) => rights.sendToRoles.includes(role.id))
         .map(({ id, name }) => ({ id, name }))
@@ -890,7 +931,7 @@ async function handleMessages(
     receivers
       .filter(
         (user) =>
-          user.ministries?.some((ministry) => draft.ministries.includes(ministry)) ||
+          draft.ministries.some((ministry) => writesTo.includes(ministry) && inMinistry(user, ministry)) ||
           (draft.roles.includes(user.role) && rights.sendToRoles.includes(user.role))
       )
       .forEach((user) => chosen.add(user.uid))

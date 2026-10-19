@@ -2,7 +2,7 @@ import type { CalendarSettings, EventType } from './eventTypes'
 import { MESSAGE_LIFE, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
 import { escape } from './telegram'
-import { ANY_MINISTRY, type RoleDef } from './roles'
+import { ANY_MINISTRY, type Rights } from './roles'
 import type { Ask, ServiceBot } from './serviceBot'
 import {
   atLocal,
@@ -51,7 +51,7 @@ import type { Addresses, UserRecord, UserView } from './users'
  */
 export interface ScheduleContext {
   me: UserRecord
-  rights: RoleDef
+  rights: Rights
   /** the people who serve (not the readers), with their resolved roles */
   servants: UserView[]
   /** the people whose role plans the schedule: they get the emergencies too */
@@ -154,7 +154,8 @@ export async function handleSchedule(
   const leads = (ministry: string) => Boolean(leaders[ministry]?.includes(me.uid))
   const manages = (event: ScheduleEvent) =>
     plans || leads(event.ministry) || me.uid === event.responsibleUid || me.uid === event.deputyUid
-  const approves = (event: ScheduleEvent) => manages(event) || rights.approve
+  const approves = (event: ScheduleEvent) =>
+    manages(event) || rights.approve || rights.approveIn.includes(event.ministry)
   const invites = (event: ScheduleEvent) =>
     manages(event) || rights.invite.includes(ANY_MINISTRY) || rights.invite.includes(event.ministry)
   const servant = (uid: unknown) =>

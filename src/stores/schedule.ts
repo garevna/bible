@@ -400,8 +400,9 @@ export const useScheduleStore = defineStore('schedule', () => {
     event.responsibleUid === user.uid ||
     event.deputyUid === user.uid
 
-  /** the user takes applications and gives roles: a manager of the event, or a role with that right */
-  const approves = (event: ScheduleEvent) => manages(event) || worker.rights.approve
+  /** the user takes applications and gives roles: a manager of the event, its status, or a role in its ministry */
+  const approves = (event: ScheduleEvent) =>
+    manages(event) || worker.rights.approve || worker.rights.approveIn.includes(event.ministry)
 
   /** the user invites people to the event: a manager of it, or a role that invites to its ministry */
   const invites = (event: Pick<ScheduleEvent, 'ministry' | 'responsibleUid' | 'deputyUid'>) =>

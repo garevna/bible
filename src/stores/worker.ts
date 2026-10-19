@@ -11,15 +11,14 @@ import { useUserStore } from './user'
 /** The Cloudflare Worker (worker/); without it publishing and the dashboard are not offered */
 const workerUrl = (import.meta.env.VITE_WORKER_URL ?? '').replace(/\/$/, '')
 
-/** reader: the app; publisher: also posts to Telegram; admin: also gives the roles */
-/** the id of a role of the list kept by the administrators; 'owner' for the owners (every right) */
+/** the status of a user: 'supervisor', 'admin', 'servant' or 'reader'; 'owner' for the owners (every right) */
 export type Role = string
 
 /** The functions of administrators, each given to a role on its own (see worker/src/roles.ts) */
 export const MANAGE = ['roles', 'users', 'directories', 'types', 'schedule'] as const
 export type Manage = (typeof MANAGE)[number]
 
-/** A role and what its people may do */
+/** A status and what its people may do everywhere (the type keeps its old name: see worker/src/roles.ts) */
 export interface RoleDef {
   id: string
   name: string
@@ -38,8 +37,30 @@ export interface RoleDef {
 /** in the ministries a role invites to: every ministry */
 export const ANY_MINISTRY = '*'
 
-/** the reader: everyone who signed in, no rights; it cannot be removed */
+/** the reader: everyone who signed in, no rights */
 export const READER = 'reader'
+/** the supervisor: every right; only a supervisor (or an owner) makes one */
+export const SUPERVISOR = 'supervisor'
+
+/**
+ * A role inside a ministry ("Керівник", "Музикант", "Публікатор"…) and its people: it gives them rights
+ * there (see worker/src/ministryRoles.ts)
+ */
+export interface MinistryRole {
+  id: string
+  name: string
+  /** leads the ministry: its events, the invitations, the applications */
+  lead: boolean
+  invite: boolean
+  approve: boolean
+  /** posts notes and topics to the Telegram channel */
+  publish: boolean
+  /** writes messages to the people of the ministry */
+  send: boolean
+  uids: string[]
+}
+
+export type MinistryRoles = Record<string, MinistryRole[]>
 
 export interface Rights {
   publish: boolean
@@ -47,7 +68,11 @@ export interface Rights {
   sendToPeople: boolean
   sendToRoles: string[]
   approve: boolean
+  /** the ministries whose applications the user takes (by a role there) */
+  approveIn: string[]
   invite: string[]
+  /** the ministries whose people the user writes to (by a role there) */
+  sendToMinistries: string[]
   manage: Manage[]
 }
 
@@ -57,7 +82,9 @@ const NO_RIGHTS: Rights = {
   sendToPeople: false,
   sendToRoles: [],
   approve: false,
+  approveIn: [],
   invite: [],
+  sendToMinistries: [],
   manage: []
 }
 
@@ -160,6 +187,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const serviceBot = ref(false)
   /** the ministries the user leads: they plan their events */
   const leads = ref<string[]>([])
+  /** the roles of the user in the ministries: { ministry: ['Музикант', …] } */
+  const ministryRoles = ref<Record<string, string[]>>({})
   /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
   const calendar = ref(false)
   /** the translations that need a permission: the owners, the administrators, some ministries */
@@ -210,6 +239,7 @@ export const useWorkerStore = defineStore('worker', () => {
     canSend.value = canReceive.value = needsPhone.value = false
     serviceBot.value = telegramLinked.value = false
     leads.value = []
+    ministryRoles.value = {}
     calendar.value = false
     allTranslations.value = false
     phone.value = null
@@ -227,6 +257,7 @@ export const useWorkerStore = defineStore('worker', () => {
         needsPhone?: boolean
         serviceBot?: boolean
         leads?: string[]
+        ministryRoles?: Record<string, string[]>
         allTranslations?: boolean
         telegramLinked?: boolean
       }>('GET', '/me')
@@ -241,6 +272,7 @@ export const useWorkerStore = defineStore('worker', () => {
       needsPhone.value = Boolean(me.needsPhone)
       serviceBot.value = Boolean(me.serviceBot)
       leads.value = me.leads ?? []
+      ministryRoles.value = me.ministryRoles ?? {}
       calendar.value = true
       allTranslations.value = Boolean(me.allTranslations)
       telegramLinked.value = Boolean(me.telegramLinked)
@@ -323,6 +355,7 @@ export const useWorkerStore = defineStore('worker', () => {
       eventTypes: EventType[]
       calendar: CalendarSettings
       leaders: Record<string, string[]>
+      ministryRoles?: MinistryRoles
       addresses: Record<string, Place>
       translationMinistries: string[]
     }>('GET', '/admin/settings')
@@ -335,9 +368,15 @@ export const useWorkerStore = defineStore('worker', () => {
   const setAddresses = async (addresses: Record<string, Place>) =>
     (await call<{ addresses: Record<string, Place> }>('PUT', '/admin/addresses', { addresses })).addresses
 
-  /** the leaders of the ministries: they plan the events of their own ministry */
-  const setLeaders = async (leaders: Record<string, string[]>) =>
-    (await call<{ leaders: Record<string, string[]> }>('PUT', '/admin/leaders', { leaders })).leaders
+  /** the roles inside the ministries and their people; the leaders are the people of the roles that lead */
+  const setMinistryRoles = (ministryRoles: MinistryRoles) =>
+    call<{ ministryRoles: MinistryRoles; leaders: Record<string, string[]> }>(
+      'PUT',
+      '/admin/ministry-roles',
+      {
+        ministryRoles
+      }
+    )
 
   const setEventTypes = async (list: EventType[]) =>
     (await call<{ eventTypes: EventType[] }>('PUT', '/admin/event-types', { eventTypes: list })).eventTypes
@@ -407,6 +446,7 @@ export const useWorkerStore = defineStore('worker', () => {
     phone,
     needsPhone,
     serviceBot,
+    ministryRoles,
     leads,
     calendar,
     allTranslations,
@@ -428,7 +468,7 @@ export const useWorkerStore = defineStore('worker', () => {
     getSettings,
     setEventTypes,
     setCalendar,
-    setLeaders,
+    setMinistryRoles,
     setAddresses,
     setTranslationMinistries,
     setRoles,

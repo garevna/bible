@@ -16,14 +16,15 @@ const role = (id: string, name: string, change: Record<string, unknown> = {}) =>
   ...change
 })
 
+/** the four statuses */
 const ROLES = [
-  role('reader', 'Читач'),
-  role('servant', 'Служитель'),
-  role('publisher', 'Публікатор', { publish: true, send: true, sendToRoles: ['servant'] }),
-  role('admin', 'Адміністратор', {
+  role('supervisor', 'Супервайзер', {
     publish: true,
     manage: ['roles', 'users', 'directories', 'types', 'schedule']
-  })
+  }),
+  role('admin', 'Адміністратор', { publish: true, send: true, sendToRoles: ['servant'] }),
+  role('servant', 'Служитель'),
+  role('reader', 'Читач')
 ]
 
 /** today in the time zone of the browser: the coming days of the events */
@@ -165,7 +166,7 @@ async function fakeWorker(page: Page, manage: string[]) {
         '/admin/roles',
         '/admin/event-types',
         '/admin/calendar',
-        '/admin/leaders',
+        '/admin/ministry-roles',
         '/admin/addresses'
       ].includes(path) ||
       path.startsWith('/admin/directories/')
@@ -208,7 +209,7 @@ test('the sections on the left; ministers get roles, the readers are shown on re
   await openDashboard(page)
 
   const nav = page.locator('.admin-nav')
-  await expect(nav.locator('.v-list-item')).toHaveText(['Ролі і права', 'Служителі', 'Служіння', 'Локації'])
+  await expect(nav.locator('.v-list-item')).toHaveText(['Статуси', 'Служителі', 'Служіння', 'Локації'])
 
   await nav.getByText('Служителі').click()
   const rows = page.locator('.users-table tbody tr:not(.details-row)')
@@ -235,10 +236,12 @@ test('the sections on the left; ministers get roles, the readers are shown on re
     .click()
   await expect(rows).toHaveCount(3)
 
-  // a row opens its details: the role, the name
+  // a row opens its details: the status, the name
   await rows.filter({ hasText: 'pastor@example.com' }).click()
   const details = page.locator('.details-row')
-  await details.locator('.v-select', { hasText: 'Роль' }).click()
+  await details.locator('.v-select', { hasText: 'Статус' }).click()
+  // an administrator does not make a supervisor
+  await expect(page.locator('.v-overlay--active .v-list-item', { hasText: 'Супервайзер' })).toHaveCount(0)
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Служитель' }).click()
   await expect
     .poll(() => requests)
@@ -253,44 +256,39 @@ test('the sections on the left; ministers get roles, the readers are shown on re
   await rows.filter({ hasText: 'pastor@example.com' }).click()
   await expect(details).toHaveCount(0)
   await rows.filter({ hasText: 'це ви' }).click()
-  await expect(details.locator('.v-select', { hasText: 'Роль' })).toHaveClass(/v-input--disabled/)
+  await expect(details.locator('.v-select', { hasText: 'Статус' })).toHaveClass(/v-input--disabled/)
 })
 
-test('roles: rights are changed, a role is added and the roles are saved together', async ({ page }) => {
+test('statuses: four of them, their rights changed and saved together', async ({ page }) => {
   const requests = await fakeWorker(page, ['roles', 'users', 'directories'])
   await openDashboard(page)
 
   const panels = page.locator('.role-panel')
   await expect(panels).toHaveCount(4)
-  const publisher = panels.filter({ hasText: 'Публікатор' })
-  await publisher.locator('.v-expansion-panel-title').click()
-  await publisher.getByLabel('Публікує нотатки й теми в Telegram-каналі').uncheck()
-  await publisher.getByLabel('Адміністратор', { exact: true }).check()
+  // none is added or removed; the supervisor has every right
+  await expect(page.getByRole('button', { name: 'Додати роль' })).toHaveCount(0)
+  const supervisor = panels.filter({ hasText: 'Супервайзер' })
+  await supervisor.locator('.v-expansion-panel-title').click()
+  await expect(supervisor).toContainText('Супервайзер має всі права')
 
-  await page.getByRole('button', { name: 'Додати роль' }).click()
-  await expect(panels).toHaveCount(5)
-  await panels.last().getByLabel('Назва ролі').fill('Координатор молитви')
-  await panels.last().getByLabel('Розклад служінь').check()
-  await panels.last().getByLabel('Затверджувати учасників служінь і давати їм ролі').check()
-  // invitations: to the prayer ministry only
-  await panels.last().getByLabel('Молитовне служіння').check()
+  const admin = panels.filter({ hasText: 'Адміністратор' })
+  await admin.locator('.v-expansion-panel-title').click()
+  await admin.getByLabel('Назва статусу').fill('Координатор')
+  await admin.getByLabel('Публікує нотатки й теми в Telegram-каналі').uncheck()
+  await admin.getByLabel('Розклад служінь').check()
 
   await expect(page.getByText('Є незбережені зміни')).toBeVisible()
-  await page.getByRole('button', { name: 'Зберегти ролі' }).click()
+  await page.getByRole('button', { name: 'Зберегти статуси' }).click()
 
   await expect.poll(() => requests.find((request) => request.path === '/admin/roles')).toBeTruthy()
   const saved = requests.find((request) => request.path === '/admin/roles')!.body as {
-    roles: { id: string; name: string; publish: boolean; sendToRoles: string[]; manage: string[] }[]
+    roles: { id: string; name: string; publish: boolean; manage: string[] }[]
   }
-  expect(saved.roles.find((item) => item.id === 'publisher')).toMatchObject({
+  expect(saved.roles.map((item) => item.id)).toEqual(['supervisor', 'admin', 'servant', 'reader'])
+  expect(saved.roles.find((item) => item.id === 'admin')).toMatchObject({
+    name: 'Координатор',
     publish: false,
-    sendToRoles: ['servant', 'admin']
-  })
-  expect(saved.roles.at(-1)).toMatchObject({
-    name: 'Координатор молитви',
-    manage: ['schedule'],
-    approve: true,
-    invite: ['Молитовне служіння']
+    manage: ['schedule']
   })
 })
 
@@ -354,22 +352,31 @@ test('the lists of ministries and locations', async ({ page }) => {
       body: { items: ['Музичне служіння', 'Молитовне служіння', 'Дитяче служіння'] }
     })
 
-  // a ministry opens: its leaders, its events and their coming days
+  // a ministry opens: its roles, its events and their coming days
   await page.locator('.ministries-table tbody tr', { hasText: 'Молитовне служіння' }).click()
   const details = page.locator('.details-row')
   await expect(details.locator('.event')).toContainText('Ранкова молитва')
   await expect(details.locator('.event')).toContainText('Онлайн')
   await expect(details.locator('.day')).toContainText('1 / 2')
-  await details.locator('.v-autocomplete', { hasText: 'Керівники служіння' }).click()
+  // a role of the ministry: added by the icon of its field, its rights by the chips, its people chosen
+  await details.getByRole('textbox', { name: 'Нова роль' }).fill('Керівник')
+  await details.locator('.new-role .mdi-plus-thick').click()
+  await expect(details.locator('.role')).toHaveCount(1)
+  await details.locator('.role .v-chip', { hasText: 'Керує служінням' }).click()
+  await details.locator('.role .v-autocomplete', { hasText: 'Хто має цю роль' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
   await expect
-    .poll(() => requests)
-    .toContainEqual({
-      method: 'PUT',
-      path: '/admin/leaders',
-      body: { leaders: { 'Молитовне служіння': ['leader-uid'] } }
+    .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
+    .toMatchObject({
+      ministryRoles: {
+        'Молитовне служіння': [{ name: 'Керівник', lead: true, invite: false, uids: ['leader-uid'] }]
+      }
     })
   await page.keyboard.press('Escape')
+  // the leaders: the people of the roles that lead
+  await expect(
+    page.locator('.ministries-table tbody tr', { hasText: 'Молитовне служіння' }).first()
+  ).toContainText('Лідер')
 
   await page.locator('.admin-nav').getByText('Локації').click()
   await add.fill('Філія на Салтівці')

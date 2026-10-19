@@ -3,7 +3,7 @@
     <h2 class="admin-title">{{ text.sectionMinistries }}</h2>
     <p class="hint">{{ text.ministriesTableHint }}</p>
 
-    <!-- a ministry opens by a click: its leaders, its events and their coming days -->
+    <!-- a ministry opens by a click: its roles and their people, its events and their coming days -->
     <v-data-table
       v-model:expanded="expanded"
       :headers="headers"
@@ -50,24 +50,13 @@
                 @click:append-inner="rename(item.name)"
                 @keydown.enter="rename(item.name)"
               />
-              <!-- the leaders plan the events of the ministry -->
-              <v-autocomplete
-                :model-value="leaders?.[item.name] ?? []"
-                :items="schedule.people"
-                item-title="name"
-                item-value="uid"
-                :label="text.leaders"
-                :hint="text.leadersHint"
-                persistent-hint
+              <!-- the roles inside the ministry: the leaders are the people of the roles that lead -->
+              <MinistryRolesEditor
+                :roles="roles?.[item.name] ?? []"
+                :people="schedule.people"
                 :disabled="saving"
-                multiple
-                chips
-                closable-chips
-                density="compact"
-                class="leaders"
-                @update:model-value="(uids: string[]) => saveLeaders(item.name, uids)"
+                @save="(list: MinistryRole[]) => saveRoles(item.name, list)"
               />
-
               <!-- the translations of the Bible that need a permission (the menu warns of them) -->
               <v-switch
                 :model-value="translations?.includes(item.name) ?? false"
@@ -183,17 +172,19 @@ import ConfirmButton from '@/components/ConfirmButton.vue'
 import EventDialog from '@/components/calendar/EventDialog.vue'
 import InvitationsDialog from '@/components/calendar/InvitationsDialog.vue'
 import LocationLink from '@/components/calendar/LocationLink.vue'
+import MinistryRolesEditor from '@/components/admin/MinistryRolesEditor.vue'
 import { useLanguageStore } from '@/stores/language'
 import { scheduleText, useScheduleStore, type Occurrence, type ScheduleEvent } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
-import { useWorkerStore } from '@/stores/worker'
+import { useWorkerStore, type MinistryRole, type MinistryRoles } from '@/stores/worker'
 
 /**
- * The ministries as a table: a ministry opens its leaders, its events (when, where, who leads them)
+ * The ministries as a table: a ministry opens its roles and their people, its events (when, where, who leads them)
  * and their coming days with the people confirmed; events are added and changed here too.
  */
 const ministries = defineModel<string[]>({ required: true })
-const leaders = defineModel<Record<string, string[]> | null>('leaders', { default: null })
+/** the roles inside the ministries and their people */
+const roles = defineModel<MinistryRoles | null>('roles', { default: null })
 /** the ministries whose people see the translations that need a permission */
 const translations = defineModel<string[] | null>('translations', { default: null })
 const emit = defineEmits<{ error: [cause: unknown] }>()
@@ -223,9 +214,9 @@ const rename = (ministry: string) =>
   run(async () => {
     const name = names[ministry]!.trim()
     ministries.value = await worker.renameItem('ministries', ministry, name)
-    if (leaders.value?.[ministry]) {
-      const { [ministry]: uids, ...rest } = leaders.value
-      leaders.value = { ...rest, [name]: uids! }
+    if (roles.value?.[ministry]) {
+      const { [ministry]: list, ...rest } = roles.value
+      roles.value = { ...rest, [name]: list! }
     }
     delete names[ministry]
     expanded.value = expanded.value.map((item) => (item === ministry ? name : item))
@@ -247,7 +238,11 @@ const nameOfPerson = (uid: string) => schedule.people.find((person) => person.ui
 const rows = computed(() =>
   ministries.value.map((name) => ({
     name,
-    leaderNames: (leaders.value?.[name] ?? []).map(nameOfPerson).filter(Boolean),
+    leaderNames: [
+      ...new Set((roles.value?.[name] ?? []).filter((role) => role.lead).flatMap((role) => role.uids))
+    ]
+      .map(nameOfPerson)
+      .filter(Boolean),
     events: schedule.events.filter((event) => event.ministry === name)
   }))
 )
@@ -292,9 +287,9 @@ onMounted(async () => {
   }
 })
 
-const saveLeaders = (ministry: string, uids: string[]) =>
+const saveRoles = (ministry: string, list: MinistryRole[]) =>
   run(async () => {
-    leaders.value = await worker.setLeaders({ ...leaders.value, [ministry]: uids })
+    roles.value = (await worker.setMinistryRoles({ ...roles.value, [ministry]: list })).ministryRoles
   })
 
 const saveTranslations = (ministry: string, on: boolean) =>

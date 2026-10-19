@@ -72,12 +72,13 @@
               v-else-if="section === 'users'"
               :roles="settings.roles"
               :ministries="settings.ministries"
+              :ministry-roles="settings.ministryRoles"
               @error="fail"
             />
             <AdminMinistries
               v-else-if="section === 'ministries'"
               v-model="settings.ministries"
-              v-model:leaders="settings.leaders"
+              v-model:roles="settings.ministryRoles"
               v-model:translations="settings.translationMinistries"
               @error="fail"
             />
@@ -115,7 +116,7 @@ import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
 import { useLanguageStore } from '@/stores/language'
 import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
-import { useWorkerStore, WorkerError, type Manage, type RoleDef } from '@/stores/worker'
+import { useWorkerStore, WorkerError, type Manage, type MinistryRoles, type RoleDef } from '@/stores/worker'
 import { format } from '@/utils/format'
 import type { NoteType } from '@/utils/noteTypes'
 
@@ -162,7 +163,7 @@ const settings = ref<{
   locations: string[]
   eventTypes: EventType[]
   calendar: CalendarSettings
-  leaders: Record<string, string[]>
+  ministryRoles: MinistryRoles
   addresses: Record<string, Place>
   translationMinistries: string[]
 } | null>(null)
@@ -182,10 +183,10 @@ async function load() {
   busy.value = true
   try {
     const loaded = await worker.getSettings()
-    // a worker of an older version has no leaders and no addresses yet
+    // a worker of an older version has no roles of the ministries and no addresses yet
     settings.value = {
       ...loaded,
-      leaders: loaded.leaders ?? {},
+      ministryRoles: loaded.ministryRoles ?? {},
       addresses: loaded.addresses ?? {},
       translationMinistries: loaded.translationMinistries ?? []
     }

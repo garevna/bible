@@ -1,4 +1,5 @@
 import { isOwner, type AuthUser } from './auth'
+import { statusOf } from './roles'
 
 /** the id of a role of the list kept by the administrators (see roles.ts); 'owner' for the owners */
 export type Role = string
@@ -73,7 +74,8 @@ export async function touchUser(store: UsersStore, user: AuthUser, now = Date.no
  */
 export function roleOf(record: UserRecord, owners: string): Role {
   if (isOwner(record, owners)) return 'owner'
-  return record.role === 'reader' && record.ministries?.length ? 'servant' : record.role
+  // a reader put into a ministry serves; a role of the old version is a status now (see roles.ts)
+  return record.role === 'reader' && record.ministries?.length ? 'servant' : statusOf(record.role)
 }
 
 export const view = (record: UserRecord, owners: string): UserView => ({
