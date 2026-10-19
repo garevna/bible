@@ -1,6 +1,6 @@
 <template>
   <button type="button" class="group-row" @click="emit('open', group)">
-    <span class="group-name">{{ group.name }}</span>
+    <span class="group-name">{{ groupTitle(group) }}</span>
     <span class="facts">
       <span v-if="withDay || group.time">
         <v-icon icon="mdi-clock-outline" size="x-small" />
@@ -9,7 +9,6 @@
       <span v-if="group.address"
         ><v-icon icon="mdi-map-marker-outline" size="x-small" /> {{ group.address }}</span
       >
-      <span><v-icon icon="mdi-account-star-outline" size="x-small" /> {{ group.leaderName }}</span>
     </span>
   </button>
 </template>
@@ -18,7 +17,7 @@
 import { computed } from 'vue'
 import { storeToRefs } from 'pinia'
 
-import type { HomeGroup } from '@/stores/groups'
+import { groupTitle, meetsText, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
 import { localeOf } from '@/utils/dates'
@@ -30,14 +29,7 @@ const emit = defineEmits<{ open: [group: HomeGroup] }>()
 const user = useUserStore()
 const { groups: text } = storeToRefs(useLanguageStore())
 
-const meets = computed(() => {
-  if (props.group.weekday === null) return text.value.notSet
-  // 2024-01-07 was a Sunday
-  const name = new Intl.DateTimeFormat(localeOf(user.lang), { weekday: 'long' }).format(
-    new Date(2024, 0, 7 + props.group.weekday)
-  )
-  return `${name}${props.group.time ? `, ${props.group.time}` : ''}`
-})
+const meets = computed(() => meetsText(props.group, localeOf(user.lang), text.value.notSet))
 </script>
 
 <style scoped>

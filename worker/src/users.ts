@@ -19,6 +19,8 @@ export interface UserRecord {
   nameSet?: boolean
   /** the private chat with the service bot, once the user linked Telegram */
   telegramChatId?: number
+  /** the home group the user belongs to (see groups.ts), chosen by the user */
+  homeGroupId?: string
   /** ms */
   lastSeen: number
   /** who gave the role and when */
@@ -162,6 +164,18 @@ export async function renameUsersMinistry(store: UsersStore, owners: string, fro
 /** '+380501234567' (E.164); the app checks the number with libphonenumber-js, the worker its form */
 export const isPhone = (value: unknown): value is string =>
   typeof value === 'string' && /^\+[1-9]\d{7,14}$/.test(value)
+
+/** The user chooses their own home group (or none with null) */
+export async function setOwnHomeGroup(
+  store: UsersStore,
+  me: UserRecord,
+  id: string | null
+): Promise<UserRecord> {
+  const { homeGroupId: _old, ...rest } = me
+  const updated: UserRecord = id ? { ...rest, homeGroupId: id } : rest
+  await save(store, updated)
+  return updated
+}
 
 /** The user sets their own number (or takes it away with null) */
 export async function setOwnPhone(

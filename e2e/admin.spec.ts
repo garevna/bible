@@ -262,7 +262,13 @@ test('the sections on the left; ministers get roles, the readers are shown on re
   await openDashboard(page)
 
   const nav = page.locator('.admin-nav')
-  await expect(nav.locator('.v-list-item')).toHaveText(['Статуси', 'Служителі', 'Служіння', 'Локації'])
+  await expect(nav.locator('.v-list-item')).toHaveText([
+    'Статуси',
+    'Служителі',
+    'Служіння',
+    'Домашні групи',
+    'Локації'
+  ])
 
   await nav.getByText('Служителі').click()
   const rows = page.locator('.users-table tbody tr:not(.details-row)')
@@ -392,7 +398,7 @@ test('the lists of ministries and locations', async ({ page }) => {
   await openDashboard(page)
 
   // only the sections of its functions
-  await expect(page.locator('.admin-nav .v-list-item')).toHaveText(['Служіння', 'Локації'])
+  await expect(page.locator('.admin-nav .v-list-item')).toHaveText(['Служіння', 'Домашні групи', 'Локації'])
   // a new one: added by the icon at the end of the field
   const add = page.getByRole('textbox', { name: 'Додати: нова назва' })
   await add.fill('Дитяче служіння')

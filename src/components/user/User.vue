@@ -72,6 +72,13 @@
           v-bind="here('groups')"
           @click="app.setPage('groups')"
         />
+        <!-- the home group of the user: an administrator or a servant -->
+        <v-list-item
+          v-if="worker.canReceive"
+          prepend-icon="mdi-home-account"
+          :title="groupsText.myGroup"
+          @click="homeGroupDialog = true"
+        />
         <v-list-item
           v-if="worker.canReceive"
           prepend-icon="mdi-cellphone"
@@ -110,6 +117,7 @@
     </v-snackbar>
 
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
+    <HomeGroupDialog v-model="homeGroupDialog" />
 
     <!-- ministers: the schedule of ministries -->
     <v-tooltip v-if="!compact && worker.calendar" :text="calendarText.title">
@@ -164,6 +172,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import PhoneDialog from '@/components/PhoneDialog.vue'
+import HomeGroupDialog from '@/components/groups/HomeGroupDialog.vue'
 import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
@@ -180,6 +189,7 @@ const worker = useWorkerStore()
 const {
   admin,
   calendar: calendarText,
+  groups: groupsText,
   header,
   messages: messagesText,
   pages
@@ -202,6 +212,7 @@ const failed = ref(false)
 
 /** a minister without a mobile number is asked for it once a session, the mark on the avatar stays */
 const phoneDialog = ref(false)
+const homeGroupDialog = ref(false)
 let asked = false
 watch(
   () => worker.needsPhone,

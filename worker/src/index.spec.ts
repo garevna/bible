@@ -714,6 +714,22 @@ describe('home groups', () => {
     expect((await call('DELETE', path, 'pastor')).body).toEqual({ removed: id })
   })
 
+  it('a group needs no name; a servant chooses their own home group', async () => {
+    const { call } = await church()
+    const created = await call('POST', '/groups', 'owner', { leaderUid: 'leader-uid' })
+    const id = (created.body.group as { id: string }).id
+    expect(created.body.group).toMatchObject({ name: '', leaderName: 'Лідер' })
+
+    expect((await call('PUT', '/me', 'musician', { homeGroupId: 'g-nothing' })).status).toBe(400)
+    expect((await call('PUT', '/me', 'musician', { homeGroupId: id })).body).toEqual({ homeGroupId: id })
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({ homeGroupId: id })
+    expect((await call('PUT', '/me', 'musician', { homeGroupId: null })).body).toEqual({ homeGroupId: null })
+    // the number of the phone stays as it was
+    expect((await call('PUT', '/me', 'musician', { phone: '+380501234567' })).body).toEqual({
+      phone: '+380501234567'
+    })
+  })
+
   it('who sees the groups: the servants or the administrators only; a reader none', async () => {
     const { call } = await church()
     await call('POST', '/groups', 'owner', { name: 'Центр', leaderUid: 'leader-uid' })

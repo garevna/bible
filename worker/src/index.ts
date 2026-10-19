@@ -87,6 +87,7 @@ import {
   setAddresses,
   setDirectory,
   setTranslationMinistries,
+  setOwnHomeGroup,
   setOwnPhone,
   setTelegramChat,
   touchUser,
@@ -751,13 +752,21 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         ((await getGroupsVisibility(env.USERS)) === 'servants' && serves(roles, roleId)) ||
         (await getGroups(env.USERS)).some((group) => group.leaderUid === me.uid),
       telegramLinked: Boolean(me.telegramChatId),
+      homeGroupId: me.homeGroupId ?? null,
       // ministers are asked for their mobile number until they give it
       needsPhone: serves(roles, roleId) && !me.phone
     })
   }
 
   if (route === 'PUT /me') {
-    const { phone } = ((await body()) ?? {}) as { phone?: unknown }
+    const { phone, homeGroupId } = ((await body()) ?? {}) as { phone?: unknown; homeGroupId?: unknown }
+    // the home group of the user: one of the groups, or none
+    if (homeGroupId !== undefined) {
+      const known = (await getGroups(env.USERS)).some((group) => group.id === homeGroupId)
+      if (homeGroupId !== null && !known) return json({ error: 'bad-request' }, 400)
+      const updated = await setOwnHomeGroup(env.USERS, me, homeGroupId as string | null)
+      return json({ homeGroupId: updated.homeGroupId ?? null })
+    }
     if (phone !== null && !isPhone(phone)) return json({ error: 'bad-request' }, 400)
     const updated = await setOwnPhone(env.USERS, me, phone)
     return json({ phone: updated.phone ?? null })
@@ -839,9 +848,10 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     if (route === 'POST /groups') {
       if (!manage) return json({ error: 'forbidden' }, 403)
       const head = parseGroupHead(await body())
-      if (!head?.name || !head.leaderUid || !users.some((user) => user.uid === head.leaderUid))
+      // a group is known by its leader; a name is not needed
+      if (!head?.leaderUid || !users.some((user) => user.uid === head.leaderUid))
         return json({ error: 'bad-request' }, 400)
-      const group = newGroup(head.name, head.leaderUid)
+      const group = newGroup(head.name ?? '', head.leaderUid)
       await setGroups(env.USERS, [...groups, group])
       return json({ group: show(group) })
     }
@@ -864,7 +874,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const head = parseGroupHead(change)
     const rest = parseLeaderChange(change)
     if (!head || !rest) return json({ error: 'bad-request' }, 400)
-    if ((head.name || head.leaderUid) && !manage) return json({ error: 'forbidden' }, 403)
+    if ((head.name !== undefined || head.leaderUid) && !manage) return json({ error: 'forbidden' }, 403)
     if (head.leaderUid && !users.some((user) => user.uid === head.leaderUid))
       return json({ error: 'bad-request' }, 400)
     if (Object.keys(rest).length && !leads && !manage) return json({ error: 'forbidden' }, 403)

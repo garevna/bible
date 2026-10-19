@@ -46,6 +46,7 @@ import type { Map as MapLibre, Marker } from 'maplibre-gl'
 import AppDialog from '@/components/AppDialog.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
+import { findPlaces, KHARKIV, shortAddress } from '@/utils/geo'
 import type { Place } from '@/stores/schedule'
 
 /**
@@ -58,8 +59,7 @@ const emit = defineEmits<{ picked: [place: Place] }>()
 
 const { admin: text, common } = storeToRefs(useLanguageStore())
 
-/** Kharkiv: where the map starts, and what the search prefers */
-const KHARKIV = { lng: 36.2304, lat: 49.9935 }
+/** the reverse search: the address of a point */
 const NOMINATIM = 'https://nominatim.openstreetmap.org'
 
 const query = ref('')
@@ -72,16 +72,6 @@ const noMap = ref(false)
 const mapBox = ref<HTMLDivElement | null>(null)
 let map: MapLibre | null = null
 let marker: Marker | null = null
-
-/** "вулиця Сумська, 1, Харків" of an answer of Nominatim, or all its words */
-function shortAddress(item: { display_name: string; address?: Record<string, string> }) {
-  const parts = item.address ?? {}
-  const street = [parts.road ?? parts.pedestrian ?? parts.square, parts.house_number]
-    .filter(Boolean)
-    .join(', ')
-  const city = parts.city ?? parts.town ?? parts.village
-  return street && city ? `${street}, ${city}` : item.display_name
-}
 
 /** the marker at a point, and the map around it */
 function placeMarker(lng: number, lat: number) {
@@ -177,25 +167,8 @@ watch(query, (words) => {
 async function search(words: string) {
   searching.value = true
   try {
-    const answer = await fetch(
-      `${NOMINATIM}/search?format=jsonv2&addressdetails=1&limit=6&accept-language=uk` +
-        `&viewbox=${KHARKIV.lng - 0.4},${KHARKIV.lat + 0.2},${KHARKIV.lng + 0.4},${KHARKIV.lat - 0.2}` +
-        `&q=${encodeURIComponent(words)}`
-    )
-    const items = (await answer.json()) as {
-      place_id: number
-      display_name: string
-      lat: string
-      lon: string
-      address?: Record<string, string>
-    }[]
-    found.value = items.map((item) => ({
-      key: String(item.place_id),
-      title: shortAddress(item),
-      lat: Number(item.lat),
-      lng: Number(item.lon)
-    }))
-    nothing.value = !items.length
+    found.value = await findPlaces(words)
+    nothing.value = !found.value.length
   } catch {
     nothing.value = true
   } finally {

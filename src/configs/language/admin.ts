@@ -99,6 +99,11 @@ export const admin = {
     ru: 'Служения',
     en: 'Ministries'
   },
+  sectionGroups: {
+    ua: 'Домашні групи',
+    ru: 'Домашние группы',
+    en: 'Home groups'
+  },
   sectionLocations: {
     ua: 'Локації',
     ru: 'Локации',

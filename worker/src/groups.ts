@@ -19,6 +19,7 @@ export interface GroupMember {
 
 export interface HomeGroup {
   id: string
+  /** optional: a group is known by its leader, its place and its people */
   name: string
   leaderUid: string
   /** the place where the group meets, and its point on the map when it was chosen there */
@@ -144,7 +145,7 @@ export function parseGroupHead(value: unknown): { name?: string; leaderUid?: str
   const head: { name?: string; leaderUid?: string } = {}
   if (body.name !== undefined) {
     const name = text(body.name, 80)
-    if (!name) return null
+    if (name === null) return null
     head.name = name
   }
   if (body.leaderUid !== undefined) {

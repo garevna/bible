@@ -33,6 +33,27 @@ export interface HomeGroup {
 
 export type GroupsVisibility = 'servants' | 'admins'
 
+/** the days of the week, Monday first (0 is Sunday) */
+export const WEEK = [1, 2, 3, 4, 5, 6, 0]
+
+/** "понеділок" (or "пн") of 0 Sunday … 6 Saturday */
+export const weekdayName = (day: number, locale: string, style: 'long' | 'short' = 'long') =>
+  // 2024-01-07 was a Sunday
+  new Intl.DateTimeFormat(locale, { weekday: style }).format(new Date(2024, 0, 7 + day))
+
+/** a group is known by its leader; its name, when it has one */
+export const groupTitle = (group: Pick<HomeGroup, 'name' | 'leaderName'>) =>
+  group.name ? `${group.name} · ${group.leaderName}` : group.leaderName
+
+/** "понеділок, 18:30", or the words for no day */
+export const meetsText = (group: Pick<HomeGroup, 'weekday' | 'time'>, locale: string, notSet: string) =>
+  group.weekday === null
+    ? notSet
+    : `${weekdayName(group.weekday, locale)}${group.time ? `, ${group.time}` : ''}`
+
+/** the hour a group meets at: 18 of '18:30' */
+export const hourOf = (group: Pick<HomeGroup, 'time'>) => (group.time ? Number(group.time.slice(0, 2)) : null)
+
 /** what the leader of a group changes */
 export type GroupChange = Partial<
   Pick<

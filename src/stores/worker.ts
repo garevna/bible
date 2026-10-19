@@ -207,6 +207,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const ministryRoles = ref<Record<string, string[]>>({})
   /** the home groups: the user may see them, or leads one */
   const groups = ref(false)
+  /** the home group the user belongs to */
+  const homeGroupId = ref<string | null>(null)
   /** the duties of leaders asked of the user, taken over by the user, or handed over by the user */
   const handovers = ref<(Handover & { ministry: string })[]>([])
   /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
@@ -263,6 +265,7 @@ export const useWorkerStore = defineStore('worker', () => {
     leads.value = []
     ministryRoles.value = {}
     groups.value = false
+    homeGroupId.value = null
     handovers.value = []
     calendar.value = false
     allTranslations.value = false
@@ -283,6 +286,7 @@ export const useWorkerStore = defineStore('worker', () => {
         leads?: string[]
         ministryRoles?: Record<string, string[]>
         groups?: boolean
+        homeGroupId?: string | null
         handovers?: (Handover & { ministry: string })[]
         allTranslations?: boolean
         telegramLinked?: boolean
@@ -300,6 +304,7 @@ export const useWorkerStore = defineStore('worker', () => {
       leads.value = me.leads ?? []
       ministryRoles.value = me.ministryRoles ?? {}
       groups.value = Boolean(me.groups)
+      homeGroupId.value = me.homeGroupId ?? null
       handovers.value = me.handovers ?? []
       calendar.value = true
       allTranslations.value = Boolean(me.allTranslations)
@@ -422,6 +427,13 @@ export const useWorkerStore = defineStore('worker', () => {
     await loadRole()
   }
 
+  /** the user chooses their home group (or none) */
+  async function setHomeGroup(id: string | null) {
+    homeGroupId.value = (
+      await call<{ homeGroupId: string | null }>('PUT', '/me', { homeGroupId: id })
+    ).homeGroupId
+  }
+
   /** the duties go back to the leader */
   const endHandover = (ministry: string) => call('DELETE', '/handover', { ministry })
 
@@ -515,6 +527,8 @@ export const useWorkerStore = defineStore('worker', () => {
     needsPhone,
     serviceBot,
     groups,
+    homeGroupId,
+    setHomeGroup,
     handovers,
     askHandover,
     answerHandover,

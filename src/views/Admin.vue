@@ -62,6 +62,10 @@
         <div class="admin-section">
           <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
           <MyMinistries v-if="section === 'my-ministries'" @error="fail" />
+          <section v-else-if="section === 'groups'">
+            <h2 class="admin-title">{{ text.sectionGroups }}</h2>
+            <GroupsBoard />
+          </section>
           <template v-else-if="settings">
             <AdminRoles
               v-if="section === 'roles'"
@@ -117,6 +121,7 @@ import AdminMinistries from '@/components/admin/AdminMinistries.vue'
 import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
 import MyMinistries from '@/components/admin/MyMinistries.vue'
+import GroupsBoard from '@/components/groups/GroupsBoard.vue'
 import { useLanguageStore } from '@/stores/language'
 import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
 import {
@@ -135,12 +140,13 @@ const worker = useWorkerStore()
 const { admin: text, publish } = storeToRefs(useLanguageStore())
 const { smAndDown: compact } = useDisplay()
 
-type Section = 'roles' | 'users' | 'ministries' | 'locations' | 'events' | 'my-ministries'
+type Section = 'roles' | 'users' | 'ministries' | 'groups' | 'locations' | 'events' | 'my-ministries'
 
 const all: { value: Section; icon: string; manage?: Manage; label: keyof typeof text.value }[] = [
   { value: 'roles', icon: 'mdi-shield-key-outline', manage: 'roles', label: 'sectionRoles' },
   { value: 'users', icon: 'mdi-account-group-outline', manage: 'users', label: 'sectionUsers' },
   { value: 'ministries', icon: 'mdi-hand-heart-outline', manage: 'directories', label: 'sectionMinistries' },
+  { value: 'groups', icon: 'mdi-home-group', manage: 'directories', label: 'sectionGroups' },
   { value: 'locations', icon: 'mdi-map-marker-outline', manage: 'directories', label: 'sectionLocations' },
   { value: 'events', icon: 'mdi-calendar-edit-outline', manage: 'schedule', label: 'sectionEvents' },
   // a leader of ministries gives the roles there; the keepers of the directories do it in the ministries

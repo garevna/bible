@@ -3,7 +3,7 @@
     <div ref="mapBox" class="map" :aria-label="text.tabMap" />
     <p v-if="noMap" class="muted mt-1">{{ admin.noMap }}</p>
     <p v-if="unplaced.length" class="muted mt-1">
-      {{ format(text.notOnMap, { names: unplaced.map((group) => group.name).join(', ') }) }}
+      {{ format(text.notOnMap, { names: unplaced.map(groupTitle).join(', ') }) }}
     </p>
   </div>
 </template>
@@ -13,9 +13,12 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import type { Map as MapLibre, Marker, Popup } from 'maplibre-gl'
 
-import { useGroupsStore, type HomeGroup } from '@/stores/groups'
+import { groupTitle, meetsText, useGroupsStore, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
+import { useUserStore } from '@/stores/user'
+import { localeOf } from '@/utils/dates'
 import { format } from '@/utils/format'
+import { KHARKIV } from '@/utils/geo'
 
 /**
  * The home groups on the map (MapLibre and the tiles of OpenStreetMap, loaded when it opens): a marker
@@ -24,10 +27,8 @@ import { format } from '@/utils/format'
 const emit = defineEmits<{ open: [group: HomeGroup] }>()
 
 const groups = useGroupsStore()
+const user = useUserStore()
 const { groups: text, admin } = storeToRefs(useLanguageStore())
-
-/** Kharkiv: where the map starts when no group has a point */
-const KHARKIV = { lng: 36.2304, lat: 49.9935 }
 
 const mapBox = ref<HTMLDivElement | null>(null)
 const noMap = ref(false)
@@ -43,16 +44,17 @@ const unplaced = computed(() =>
   groups.groups.filter((group) => group.lat === undefined || group.lng === undefined)
 )
 
-/** the words of the hint: put as text, never as HTML (the names are people's) */
+/** the words of the hint: when the group meets, and its leader; put as text, never as HTML */
 function hintOf(group: HomeGroup) {
   const box = document.createElement('div')
   box.className = 'group-hint'
-  const address = document.createElement('div')
-  address.textContent = group.address || group.name
+  const when = document.createElement('div')
+  when.className = 'group-hint__when'
+  when.textContent = meetsText(group, localeOf(user.lang), text.value.notSet)
   const leader = document.createElement('div')
   leader.className = 'group-hint__leader'
-  leader.textContent = group.leaderName
-  box.append(address, leader)
+  leader.textContent = groupTitle(group)
+  box.append(when, leader)
   return box
 }
 
@@ -63,7 +65,7 @@ function drawMarkers() {
     const marker = new lib!.Marker({ color: '#0090B0' }).setLngLat([group.lng!, group.lat!]).addTo(map!)
     const element = marker.getElement()
     element.style.cursor = 'pointer'
-    element.setAttribute('aria-label', `${group.name}: ${group.address}`)
+    element.setAttribute('aria-label', `${groupTitle(group)}: ${group.address}`)
     element.dataset.group = group.id
     element.addEventListener('mouseenter', () => {
       hint?.remove()
@@ -145,6 +147,10 @@ onBeforeUnmount(() => {
 :global(.group-hint) {
   font-size: 13px;
   color: #222;
+}
+
+:global(.group-hint__when) {
+  font-weight: 600;
 }
 
 :global(.group-hint__leader) {

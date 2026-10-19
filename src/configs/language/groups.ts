@@ -9,10 +9,70 @@ export const groups = {
     ru: 'Карта',
     en: 'Map'
   },
-  tabCalendar: {
-    ua: 'Календар',
-    ru: 'Календарь',
-    en: 'Calendar'
+  tabWeek: {
+    ua: 'Тиждень',
+    ru: 'Неделя',
+    en: 'Week'
+  },
+  tabSearch: {
+    ua: 'Пошук групи',
+    ru: 'Поиск группы',
+    en: 'Find a group'
+  },
+  groupNameOptional: {
+    ua: 'Назва (необов’язково)',
+    ru: 'Название (необязательно)',
+    en: 'Name (optional)'
+  },
+  searchHint: {
+    ua: 'Група для нового члена церкви: дні й години, що йому підходять, і найближчі до дому групи першими.',
+    ru: 'Группа для нового члена церкви: дни и часы, которые ему подходят, и ближайшие к дому группы первыми.',
+    en: 'A group for a new member: the days and hours that suit them, and the nearest groups first.'
+  },
+  searchDays: {
+    ua: 'Дні, що підходять',
+    ru: 'Подходящие дни',
+    en: 'The days that suit'
+  },
+  searchFrom: {
+    ua: 'Не раніше',
+    ru: 'Не раньше',
+    en: 'Not before'
+  },
+  searchTo: {
+    ua: 'Не пізніше',
+    ru: 'Не позже',
+    en: 'Not after'
+  },
+  searchNear: {
+    ua: 'Адреса біля дому',
+    ru: 'Адрес рядом с домом',
+    en: 'An address near the home'
+  },
+  searchFromPlace: {
+    ua: 'Відстань від: {name}',
+    ru: 'Расстояние от: {name}',
+    en: 'The distance from: {name}'
+  },
+  searchFound: {
+    ua: 'Знайдено груп: {count}',
+    ru: 'Найдено групп: {count}',
+    en: 'Groups found: {count}'
+  },
+  km: {
+    ua: 'км',
+    ru: 'км',
+    en: 'km'
+  },
+  myGroup: {
+    ua: 'Моя домашня група',
+    ru: 'Моя домашняя группа',
+    en: 'My home group'
+  },
+  myGroupHint: {
+    ua: 'Знайдіть свою групу за лідером, днем зустрічі або адресою.',
+    ru: 'Найдите свою группу по лидеру, дню встречи или адресу.',
+    en: 'Find your group by its leader, its day or its address.'
   },
   tabList: {
     ua: 'Список',
@@ -23,11 +83,6 @@ export const groups = {
     ua: 'Домашніх груп ще немає',
     ru: 'Домашних групп ещё нет',
     en: 'No home groups yet'
-  },
-  noneOnDay: {
-    ua: 'Цього дня групи не збираються',
-    ru: 'В этот день группы не собираются',
-    en: 'No group meets on this day'
   },
   notOnMap: {
     ua: 'Без точки на карті: {names}',
@@ -158,10 +213,5 @@ export const groups = {
     ua: 'Відкрити на Google Maps',
     ru: 'Открыть на Google Maps',
     en: 'Open in Google Maps'
-  },
-  groupsOnDay: {
-    ua: 'Груп: {count}',
-    ru: 'Групп: {count}',
-    en: 'Groups: {count}'
   }
 }

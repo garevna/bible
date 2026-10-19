@@ -1,5 +1,5 @@
 <template>
-  <AppDialog v-model="open" :title="group?.name ?? ''" icon="mdi-home-group" max-width="680">
+  <AppDialog v-model="open" :title="group ? groupTitle(group) : ''" icon="mdi-home-group" max-width="680">
     <template v-if="group && canEdit && !editing" #header>
       <v-btn variant="text" color="secondary" class="text-none" prepend-icon="$editNote" @click="startEdit">
         {{ text.edit }}
@@ -42,7 +42,7 @@
     <!-- the leader keeps the group; the administrators give its name and its leader -->
     <div v-else-if="group && editing" class="form">
       <template v-if="groups.manage">
-        <v-text-field v-model="draft.name" :label="text.groupName" density="compact" hide-details />
+        <v-text-field v-model="draft.name" :label="text.groupNameOptional" density="compact" hide-details />
         <v-autocomplete
           v-model="draft.leaderUid"
           :items="schedule.people"
@@ -146,7 +146,11 @@
       </template>
 
       <div v-if="groups.manage" class="d-flex justify-end">
-        <ConfirmButton icon="$unlink" :text="`${text.removeGroup}: ${group.name}`" @confirm="removeGroup" />
+        <ConfirmButton
+          icon="$unlink"
+          :text="`${text.removeGroup}: ${groupTitle(group)}`"
+          @confirm="removeGroup"
+        />
       </div>
     </div>
 
@@ -157,7 +161,7 @@
     <PlacePicker
       v-if="group"
       v-model="picker"
-      :location="group.name"
+      :location="groupTitle(group)"
       :place="draft.address ? { address: draft.address, lat: draft.lat, lng: draft.lng } : null"
       @picked="picked"
     />
@@ -175,7 +179,13 @@ import DateField from '@/components/DateField.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
 import TimeField from '@/components/TimeField.vue'
-import { useGroupsStore, type GroupChange, type GroupMember, type HomeGroup } from '@/stores/groups'
+import {
+  groupTitle,
+  useGroupsStore,
+  type GroupChange,
+  type GroupMember,
+  type HomeGroup
+} from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { mapUrl, useScheduleStore, type Place } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
@@ -302,7 +312,7 @@ async function save() {
     change.meetingNote = (draft.meetingNote ?? '').trim()
   }
   if (groups.manage) {
-    if (draft.name.trim() && draft.name.trim() !== item.name) change.name = draft.name.trim()
+    if ((draft.name ?? '').trim() !== item.name) change.name = (draft.name ?? '').trim()
     if (draft.leaderUid && draft.leaderUid !== item.leaderUid) change.leaderUid = draft.leaderUid
   }
   busy.value = true

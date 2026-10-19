@@ -41,6 +41,10 @@ export const defaultTheme = {
     'calendar-orange': '#FF5500',
     /** then amber */
     'calendar-amber': '#FFAA00',
+    /** the home groups: a day of the week with groups, an hour with groups, an hour without */
+    'groups-day': '#20731C',
+    'groups-hour': '#4CAF50',
+    'groups-empty': '#A5D6A7',
     /** search: found words */
     mark: '#FFFF0077',
     /** tooltips */
