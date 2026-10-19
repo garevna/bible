@@ -272,7 +272,7 @@ const roleItems = computed(() =>
     .map((role) => ({ value: role.id, title: role.name }))
 )
 
-/** 'Керівник (Музичне служіння)', … */
+/** 'Лідер служіння (Музичне служіння)', … */
 const rolesOf = (item: UserView) =>
   Object.entries(props.ministryRoles ?? {}).flatMap(([ministry, list]) =>
     list.filter((role) => role.uids.includes(item.uid)).map((role) => `${role.name} (${ministry})`)

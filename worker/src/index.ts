@@ -43,6 +43,7 @@ import {
   type ServiceBot
 } from './serviceBot'
 import {
+  byLeader,
   getMinistryRoles,
   leadersOf,
   ministryRightsOf,
@@ -97,6 +98,8 @@ import {
  *   POST   /messages                { to?, ministries?, roles?, text, attachment?, replyTo? }
  *   POST   /messages/:id/read       marks a message read
  *   DELETE /messages                { ids }: the messages are hidden from the user (the other side keeps them)
+ *   GET    /ministry-roles          the roles of the ministries the user leads (all: the keepers of the directories)
+ *   PUT    /ministry-roles/:name    { roles }: a leader gives the roles of the ministry, not the leaders
  * The dashboard, each part for the statuses that have its function (the owners have all):
  *   GET    /admin/settings          the statuses, types, ministries and their roles, locations
  *   PUT    /admin/roles             { roles }: the four statuses                     roles
@@ -164,6 +167,8 @@ const ROUTES = [
   /^POST \/messages$/,
   /^POST \/messages\/[^/]+\/read$/,
   /^DELETE \/messages$/,
+  /^GET \/ministry-roles$/,
+  /^PUT \/ministry-roles\/[^/]+$/,
   /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
   /^GET \/admin\/(settings|users)$/,
   /^PUT \/admin\/(roles|types|event-types|calendar|ministry-roles|addresses|translation-ministries)$/,
@@ -644,6 +649,34 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
       return json({ error: 'telegram', message }, 502)
     }
+  }
+
+  // the roles of the ministries the user leads (all of them for the keepers of the directories)
+  if (pathname.startsWith('/ministry-roles')) {
+    const leads = ministryRightsOf(ministryRoles, me.uid).leads
+    const all = can('directories')
+    if (route === 'GET /ministry-roles') {
+      if (!all && !leads.length) return json({ error: 'forbidden' }, 403)
+      const ministries = all ? await getDirectory(env.USERS, 'ministries') : leads
+      return json({
+        ministryRoles: Object.fromEntries(
+          ministries.map((ministry) => [ministry, ministryRoles[ministry] ?? []])
+        )
+      })
+    }
+    // a leader gives the other roles of the ministry; the leaders themselves are given by the administrators
+    const ministry = decodeURIComponent(pathname.slice('/ministry-roles/'.length))
+    if (!all && !leads.includes(ministry)) return json({ error: 'forbidden' }, 403)
+    const parsed = parseMinistryRoles(
+      { [ministry]: ((await body()) as { roles?: unknown } | null)?.roles },
+      await getDirectory(env.USERS, 'ministries')
+    )
+    if (!parsed) return json({ error: 'bad-request' }, 400)
+    const old = ministryRoles[ministry] ?? []
+    const roles = all ? parsed[ministry]! : byLeader(old, parsed[ministry]!)
+    const next = { ...ministryRoles, [ministry]: roles }
+    await setMinistryRoles(env.USERS, next)
+    return json({ roles, leaders: leadersOf(next) })
   }
 
   if (pathname.startsWith('/schedule')) {

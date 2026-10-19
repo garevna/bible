@@ -174,15 +174,25 @@ export const admin = {
     ru: 'Супервайзер имеет все права. Назначить или снять супервайзера может только супервайзер.',
     en: 'The supervisor has every right. Only a supervisor makes or unmakes a supervisor.'
   },
+  sectionMyMinistries: {
+    ua: 'Мої служіння',
+    ru: 'Мои служения',
+    en: 'My ministries'
+  },
+  myMinistriesHint: {
+    ua: 'Ви лідер цих служінь: дайте учасникам їхні ролі. Лідерів служіння призначає адміністратор.',
+    ru: 'Вы лидер этих служений: дайте участникам их роли. Лидеров служения назначает администратор.',
+    en: 'You lead these ministries: give their people their roles. The leaders are given by the administrators.'
+  },
   ministryRoles: {
     ua: 'Ролі в служінні',
     ru: 'Роли в служении',
     en: 'Roles in the ministry'
   },
   ministryRolesHint: {
-    ua: 'Роль дає своїм людям права в цьому служінні. Керівники ведуть служіння: події, запрошення, заявки.',
-    ru: 'Роль даёт своим людям права в этом служении. Руководители ведут служение: события, приглашения, заявки.',
-    en: 'A role gives its people rights in this ministry. The leaders lead it: the events, the invitations, the applications.'
+    ua: 'Роль дає своїм людям права в цьому служінні. Лідерів служіння призначає адміністратор; вони ведуть служіння (події, запрошення, заявки) і дають інші ролі.',
+    ru: 'Роль даёт своим людям права в этом служении. Лидеров служения назначает администратор; они ведут служение (события, приглашения, заявки) и дают другие роли.',
+    en: 'A role gives its people rights in this ministry. The leaders of the ministry are given by the administrators; they lead it (the events, the invitations, the applications) and give the other roles.'
   },
   ministryRoleName: {
     ua: 'Назва ролі',
@@ -205,9 +215,9 @@ export const admin = {
     en: 'Remove the role'
   },
   ministryRightLead: {
-    ua: 'Керує служінням',
-    ru: 'Руководит служением',
-    en: 'Leads the ministry'
+    ua: 'Лідер служіння',
+    ru: 'Лидер служения',
+    en: 'Leader of the ministry'
   },
   ministryRightInvite: {
     ua: 'Запрошує',
@@ -295,8 +305,8 @@ export const admin = {
     en: 'To any ministry'
   },
   leaders: {
-    ua: 'Керівники служіння',
-    ru: 'Руководители служения',
+    ua: 'Лідери служіння',
+    ru: 'Лидеры служения',
     en: 'Leaders of the ministry'
   },
   filterRole: {

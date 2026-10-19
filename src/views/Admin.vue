@@ -1,6 +1,6 @@
 <template>
   <div class="page mx-auto admin-panel" style="max-width: 1100px">
-    <p v-if="!worker.isAdmin" class="text-medium-emphasis">{{ text.noAccess }}</p>
+    <p v-if="!worker.hasDashboard" class="text-medium-emphasis">{{ text.noAccess }}</p>
 
     <template v-else>
       <v-alert
@@ -61,7 +61,8 @@
 
         <div class="admin-section">
           <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
-          <template v-if="settings">
+          <MyMinistries v-if="section === 'my-ministries'" @error="fail" />
+          <template v-else-if="settings">
             <AdminRoles
               v-if="section === 'roles'"
               v-model="settings.roles"
@@ -114,6 +115,7 @@ import AdminEvents from '@/components/admin/AdminEvents.vue'
 import AdminMinistries from '@/components/admin/AdminMinistries.vue'
 import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
+import MyMinistries from '@/components/admin/MyMinistries.vue'
 import { useLanguageStore } from '@/stores/language'
 import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
 import { useWorkerStore, WorkerError, type Manage, type MinistryRoles, type RoleDef } from '@/stores/worker'
@@ -125,19 +127,23 @@ const worker = useWorkerStore()
 const { admin: text, publish } = storeToRefs(useLanguageStore())
 const { smAndDown: compact } = useDisplay()
 
-type Section = 'roles' | 'users' | 'ministries' | 'locations' | 'events'
+type Section = 'roles' | 'users' | 'ministries' | 'locations' | 'events' | 'my-ministries'
 
-const all: { value: Section; icon: string; manage: Manage; label: keyof typeof text.value }[] = [
+const all: { value: Section; icon: string; manage?: Manage; label: keyof typeof text.value }[] = [
   { value: 'roles', icon: 'mdi-shield-key-outline', manage: 'roles', label: 'sectionRoles' },
   { value: 'users', icon: 'mdi-account-group-outline', manage: 'users', label: 'sectionUsers' },
   { value: 'ministries', icon: 'mdi-hand-heart-outline', manage: 'directories', label: 'sectionMinistries' },
   { value: 'locations', icon: 'mdi-map-marker-outline', manage: 'directories', label: 'sectionLocations' },
-  { value: 'events', icon: 'mdi-calendar-edit-outline', manage: 'schedule', label: 'sectionEvents' }
+  { value: 'events', icon: 'mdi-calendar-edit-outline', manage: 'schedule', label: 'sectionEvents' },
+  // a leader of ministries gives the roles there; the keepers of the directories do it in the ministries
+  { value: 'my-ministries', icon: 'mdi-account-star-outline', label: 'sectionMyMinistries' }
 ]
 
 const sections = computed(() =>
   all
-    .filter((item) => worker.manages(item.manage))
+    .filter((item) =>
+      item.manage ? worker.manages(item.manage) : worker.leads.length > 0 && !worker.manages('directories')
+    )
     .map((item) => ({ ...item, title: text.value[item.label] }))
 )
 

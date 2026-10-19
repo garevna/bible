@@ -79,7 +79,7 @@ const SCHEDULE = {
 }
 
 /** The worker (see playwright.config.ts); signInLocally signs in as e2e-uid with the given functions */
-async function fakeWorker(page: Page, manage: string[]) {
+async function fakeWorker(page: Page, manage: string[], leads: string[] = []) {
   const users = [
     {
       uid: 'e2e-uid',
@@ -120,7 +120,7 @@ async function fakeWorker(page: Page, manage: string[]) {
     const rights = { publish: true, send: false, sendToPeople: false, sendToRoles: [], manage }
     if (path === '/me') {
       return route.fulfill({
-        json: { role: 'admin', telegram: true, rights, canReceive: true, phone: '+380501234567' }
+        json: { role: 'admin', telegram: true, rights, canReceive: true, phone: '+380501234567', leads }
       })
     }
     if (path === '/types') return route.fulfill({ json: { types: [] } })
@@ -159,6 +159,35 @@ async function fakeWorker(page: Page, manage: string[]) {
         json: { ministries: ['Музичне служіння', 'Молитовне служіння'], locations: ['Церква'] }
       })
     if (path === '/schedule') return route.fulfill({ json: SCHEDULE })
+    // the roles of the ministries the user leads
+    if (path === '/ministry-roles') {
+      return route.fulfill({
+        json: {
+          ministryRoles: Object.fromEntries(
+            leads.map((ministry) => [
+              ministry,
+              [
+                {
+                  id: 'r-lead',
+                  name: 'Лідер служіння',
+                  lead: true,
+                  invite: true,
+                  approve: true,
+                  publish: false,
+                  send: true,
+                  uids: ['e2e-uid']
+                }
+              ]
+            ])
+          )
+        }
+      })
+    }
+    if (path.startsWith('/ministry-roles/')) {
+      const body = request.postDataJSON()
+      requests.push({ method: request.method(), path: decodeURIComponent(path), body })
+      return route.fulfill({ json: { roles: body.roles } })
+    }
     const body = request.postData() ? request.postDataJSON() : null
     requests.push({ method: request.method(), path, body })
     if (
@@ -359,17 +388,17 @@ test('the lists of ministries and locations', async ({ page }) => {
   await expect(details.locator('.event')).toContainText('Онлайн')
   await expect(details.locator('.day')).toContainText('1 / 2')
   // a role of the ministry: added by the icon of its field, its rights by the chips, its people chosen
-  await details.getByRole('textbox', { name: 'Нова роль' }).fill('Керівник')
+  await details.getByRole('textbox', { name: 'Нова роль' }).fill('Лідер служіння')
   await details.locator('.new-role .mdi-plus-thick').click()
   await expect(details.locator('.role')).toHaveCount(1)
-  await details.locator('.role .v-chip', { hasText: 'Керує служінням' }).click()
+  await details.locator('.role .v-chip', { hasText: 'Лідер служіння' }).click()
   await details.locator('.role .v-autocomplete', { hasText: 'Хто має цю роль' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
   await expect
     .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
     .toMatchObject({
       ministryRoles: {
-        'Молитовне служіння': [{ name: 'Керівник', lead: true, invite: false, uids: ['leader-uid'] }]
+        'Молитовне служіння': [{ name: 'Лідер служіння', lead: true, invite: false, uids: ['leader-uid'] }]
       }
     })
   await page.keyboard.press('Escape')
@@ -439,6 +468,34 @@ test('the lists of ministries and locations', async ({ page }) => {
       method: 'PUT',
       path: '/admin/addresses',
       body: { addresses: { Церква: { address: 'Сумська вулиця, 1, Харків', lat: 49.9935, lng: 36.2304 } } }
+    })
+})
+
+test('a leader of a ministry gives its roles; the leaders are given by the administrators', async ({
+  page
+}) => {
+  const requests = await fakeWorker(page, [], ['Музичне служіння'])
+  await openDashboard(page)
+
+  await expect(page.locator('.admin-nav .v-list-item')).toHaveText(['Мої служіння'])
+  const ministry = page.locator('.ministry', { hasText: 'Музичне служіння' })
+  // the role that leads: as the administrators gave it
+  const lead = ministry.locator('.role', { hasText: 'Хто має цю роль' }).first()
+  await expect(lead.getByRole('textbox', { name: 'Назва ролі' })).toBeDisabled()
+  await expect(lead.locator('.mdi-minus-circle-outline')).toHaveCount(0)
+
+  await ministry.getByRole('textbox', { name: 'Нова роль' }).fill('Музикант')
+  await ministry.locator('.new-role .mdi-plus-thick').click()
+  const musician = ministry.locator('.role').nth(1)
+  // no other role leads
+  await expect(musician.locator('.v-chip', { hasText: 'Лідер служіння' })).toHaveCount(0)
+  await musician.locator('.v-chip', { hasText: 'Запрошує' }).click()
+  await expect
+    .poll(() => requests.filter((request) => request.path.startsWith('/ministry-roles/')).at(-1))
+    .toMatchObject({
+      method: 'PUT',
+      path: '/ministry-roles/Музичне служіння',
+      body: { roles: [{ id: 'r-lead' }, { name: 'Музикант', invite: true, lead: false }] }
     })
 })
 

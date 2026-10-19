@@ -461,14 +461,59 @@ describe('roles kept by the administrators', () => {
     expect((await call('GET', '/me', 'pastor')).body).toMatchObject({ leads: ['Прославлення'] })
   })
 
-  it('the leaders of the old version are the role "Керівник"', async () => {
+  it('a leader gives the roles of the ministry, not its leaders; the administrators give the leaders', async () => {
+    const { call } = setup()
+    for (const user of ['owner', 'pastor', 'musician', 'leader']) await call('GET', '/me', user)
+    await call('PUT', '/admin/directories/ministries', 'owner', { items: ['Музичне служіння', 'Інше'] })
+    for (const uid of ['pastor-uid', 'leader-uid', 'musician-uid'])
+      await call('PUT', `/admin/users/${uid}`, 'owner', { role: 'servant' })
+    await call('PUT', '/admin/ministry-roles', 'owner', {
+      ministryRoles: {
+        'Музичне служіння': [ministryRole('r-lead', { lead: true }, ['pastor-uid'])],
+        Інше: [ministryRole('r-lead', { lead: true }, ['leader-uid'])]
+      }
+    })
+
+    // the leader sees the roles of their own ministry only
+    expect((await call('GET', '/ministry-roles', 'pastor')).body.ministryRoles).toEqual({
+      'Музичне служіння': [ministryRole('r-lead', { lead: true }, ['pastor-uid'])]
+    })
+    expect((await call('GET', '/ministry-roles', 'musician')).status).toBe(403)
+
+    // a new role with a musician; the leader's own role and a new leader are not theirs to give
+    const changed = await call('PUT', `/ministry-roles/${encodeURIComponent('Музичне служіння')}`, 'pastor', {
+      roles: [
+        ministryRole('r-lead', { lead: true }, ['musician-uid']),
+        ministryRole('r-music', { lead: true, invite: true }, ['musician-uid'])
+      ]
+    })
+    expect(changed.body.roles).toEqual([
+      ministryRole('r-lead', { lead: true }, ['pastor-uid']),
+      ministryRole('r-music', { invite: true }, ['musician-uid'])
+    ])
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({
+      leads: [],
+      rights: { invite: ['Музичне служіння'] }
+    })
+    // not another ministry
+    expect(
+      (await call('PUT', `/ministry-roles/${encodeURIComponent('Інше')}`, 'pastor', { roles: [] })).status
+    ).toBe(403)
+    // an administrator gives the leaders there too
+    const given = await call('PUT', `/ministry-roles/${encodeURIComponent('Інше')}`, 'owner', {
+      roles: [ministryRole('r-lead', { lead: true }, ['musician-uid'])]
+    })
+    expect(given.body.leaders).toMatchObject({ Інше: ['musician-uid'] })
+  })
+
+  it('the leaders of the old version are the role "Лідер служіння"', async () => {
     const { call, env } = setup()
     await call('GET', '/me', 'pastor')
     await call('PUT', '/admin/directories/ministries', 'owner', { items: ['Молитовне служіння'] })
     await env.USERS.put('settings:leaders', JSON.stringify({ 'Молитовне служіння': ['pastor-uid'] }))
     const settings = (await call('GET', '/admin/settings', 'owner')).body
     expect(settings.ministryRoles).toMatchObject({
-      'Молитовне служіння': [{ name: 'Керівник', lead: true, uids: ['pastor-uid'] }]
+      'Молитовне служіння': [{ name: 'Лідер служіння', lead: true, uids: ['pastor-uid'] }]
     })
     expect(settings.leaders).toEqual({ 'Молитовне служіння': ['pastor-uid'] })
   })

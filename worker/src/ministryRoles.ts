@@ -1,11 +1,13 @@
 import { getLeaders, type Leaders, type UsersStore } from './users'
 
 /**
- * The roles inside a ministry: each ministry has roles of its own ("Керівник", "Музикант",
+ * The roles inside a ministry: each ministry has roles of its own ("Лідер служіння", "Музикант",
  * "Публікатор" in the ministry of the posts of the channel…), and a role gives its people rights
  * there. The status of a user (supervisor, admin, servant, reader: see roles.ts) is the access to
  * the app; what a servant does in a ministry comes from their roles in it.
- *   { 'Музичне служіння': [{ id, name: 'Керівник', lead: true, …, uids: [uid, …] }, …] }
+ * The leaders of a ministry (the roles that lead) are given by the administrators; the leaders give
+ * the other roles of their ministry.
+ *   { 'Музичне служіння': [{ id, name: 'Лідер служіння', lead: true, …, uids: [uid, …] }, …] }
  */
 export interface MinistryRole {
   /** 'r-…', kept when the role is renamed */
@@ -45,7 +47,7 @@ const KEY = 'settings:ministryRoles'
 /** the role of a new ministry, and the one the leaders of the old version get */
 export const leaderRole = (uids: string[] = []): MinistryRole => ({
   id: 'r-lead',
-  name: 'Керівник',
+  name: 'Лідер служіння',
   lead: true,
   invite: true,
   approve: true,
@@ -54,7 +56,7 @@ export const leaderRole = (uids: string[] = []): MinistryRole => ({
   uids
 })
 
-/** The roles of the ministries; the first time, the leaders of the old version become "Керівник" */
+/** The roles of the ministries; the first time, the leaders of the old version become "Лідер служіння" */
 export async function getMinistryRoles(store: UsersStore): Promise<MinistryRoles> {
   const kept = await store.get<MinistryRoles>(KEY, 'json')
   if (kept) return kept
@@ -88,6 +90,20 @@ export function ministryRightsOf(roles: MinistryRoles, uid: string): MinistryRig
     if (mine.some((role) => role.publish)) rights.publish = true
   }
   return rights
+}
+
+/**
+ * The roles of a ministry as its leader changes them: the roles that lead stay as the administrators
+ * gave them, and no other role leads
+ */
+export function byLeader(old: MinistryRole[], changed: MinistryRole[]): MinistryRole[] {
+  const leading = old.filter((role) => role.lead)
+  return [
+    ...leading,
+    ...changed
+      .filter((role) => !leading.some((item) => item.id === role.id))
+      .map((role) => ({ ...role, lead: false }))
+  ]
 }
 
 /** the ministry got another name: its roles go with it */

@@ -136,7 +136,7 @@
     </v-tooltip>
 
     <!-- administrators: the dashboard of the roles -->
-    <v-tooltip v-if="worker.isAdmin" :text="admin.openDashboard">
+    <v-tooltip v-if="worker.hasDashboard" :text="admin.openDashboard">
       <template #activator="{ props: tooltip }">
         <v-btn
           v-bind="tooltip"

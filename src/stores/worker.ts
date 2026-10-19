@@ -43,7 +43,7 @@ export const READER = 'reader'
 export const SUPERVISOR = 'supervisor'
 
 /**
- * A role inside a ministry ("Керівник", "Музикант", "Публікатор"…) and its people: it gives them rights
+ * A role inside a ministry ("Лідер служіння", "Музикант", "Публікатор"…) and its people: it gives them rights
  * there (see worker/src/ministryRoles.ts)
  */
 export interface MinistryRole {
@@ -200,6 +200,8 @@ export const useWorkerStore = defineStore('worker', () => {
   const canPublish = computed(() => telegram.value && rights.value.publish)
   /** the dashboard: for the roles with any function of an administrator */
   const isAdmin = computed(() => rights.value.manage.length > 0)
+  /** the dashboard: the administrators, and the leaders of ministries (the roles of their ministries) */
+  const hasDashboard = computed(() => isAdmin.value || leads.value.length > 0)
   const manages = (function_: Manage) => rights.value.manage.includes(function_)
 
   async function call<T>(
@@ -368,6 +370,18 @@ export const useWorkerStore = defineStore('worker', () => {
   const setAddresses = async (addresses: Record<string, Place>) =>
     (await call<{ addresses: Record<string, Place> }>('PUT', '/admin/addresses', { addresses })).addresses
 
+  /** the roles of the ministries the user leads */
+  const getLeaderRoles = async () =>
+    (await call<{ ministryRoles: MinistryRoles }>('GET', '/ministry-roles')).ministryRoles
+
+  /** a leader gives the roles of their ministry (the roles that lead stay as the administrators gave them) */
+  const setRolesOf = async (ministry: string, roles: MinistryRole[]) =>
+    (
+      await call<{ roles: MinistryRole[] }>('PUT', `/ministry-roles/${encodeURIComponent(ministry)}`, {
+        roles
+      })
+    ).roles
+
   /** the roles inside the ministries and their people; the leaders are the people of the roles that lead */
   const setMinistryRoles = (ministryRoles: MinistryRoles) =>
     call<{ ministryRoles: MinistryRoles; leaders: Record<string, string[]> }>(
@@ -440,6 +454,9 @@ export const useWorkerStore = defineStore('worker', () => {
     telegram,
     canPublish,
     isAdmin,
+    hasDashboard,
+    getLeaderRoles,
+    setRolesOf,
     ministries,
     canSend,
     canReceive,
