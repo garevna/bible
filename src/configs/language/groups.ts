@@ -74,6 +74,51 @@ export const groups = {
     ru: 'Найдите свою группу по лидеру, дню встречи или адресу.',
     en: 'Find your group by its leader, its day or its address.'
   },
+  leaderHint: {
+    ua: 'Виберіть зі списку або впишіть ПІБ лідера, який не користується застосунком',
+    ru: 'Выберите из списка или впишите ФИО лидера, который не пользуется приложением',
+    en: 'Choose from the list, or type the full name of a leader without the app'
+  },
+  pointChosen: {
+    ua: 'Точку на карті вибрано',
+    ru: 'Точка на карте выбрана',
+    en: 'The point on the map is chosen'
+  },
+  myGroupNow: {
+    ua: 'Ваша група',
+    ru: 'Ваша группа',
+    en: 'Your group'
+  },
+  myGroupNone: {
+    ua: 'Групу ще не вибрано',
+    ru: 'Группа ещё не выбрана',
+    en: 'No group chosen yet'
+  },
+  myGroupChange: {
+    ua: 'Вибрати групу',
+    ru: 'Выбрать группу',
+    en: 'Choose a group'
+  },
+  groupILead: {
+    ua: 'Група, яку я веду',
+    ru: 'Группа, которую я веду',
+    en: 'The group I lead'
+  },
+  byTime: {
+    ua: 'За днем і часом',
+    ru: 'По дню и времени',
+    en: 'By the day and time'
+  },
+  byLeader: {
+    ua: 'За лідером',
+    ru: 'По лидеру',
+    en: 'By the leader'
+  },
+  byPlace: {
+    ua: 'За адресою',
+    ru: 'По адресу',
+    en: 'By the place'
+  },
   tabList: {
     ua: 'Список',
     ru: 'Список',

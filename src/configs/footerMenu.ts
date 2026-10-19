@@ -20,7 +20,5 @@ export const footerMenu: FooterMenuItem[] = [
   // opened from the header, ministers only
   { icon: '', value: 'messages', component: 'Messages', menu: 'messages' },
   // ministers: the first page they see
-  { icon: '', value: 'calendar', component: 'Calendar', menu: 'calendar' },
-  // the home groups: from the menu of the avatar
-  { icon: '', value: 'groups', component: 'Groups', menu: 'groups' }
+  { icon: '', value: 'calendar', component: 'Calendar', menu: 'calendar' }
 ]

@@ -38,8 +38,7 @@ const views = {
   Search: defineAsyncComponent(() => import('@/views/Search.vue')),
   Admin: defineAsyncComponent(() => import('@/views/Admin.vue')),
   Messages: defineAsyncComponent(() => import('@/views/Messages.vue')),
-  Calendar: defineAsyncComponent(() => import('@/views/Calendar.vue')),
-  Groups: defineAsyncComponent(() => import('@/views/Groups.vue'))
+  Calendar: defineAsyncComponent(() => import('@/views/Calendar.vue'))
 }
 
 const app = useAppStore()

@@ -815,24 +815,26 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const mighty = roleId === 'owner' || roleId === SUPERVISOR
     const seesAll = mighty || rights.manage.length > 0 || (visibility === 'servants' && serves(roles, roleId))
     /** the private part of a group: its leader and the supervisors */
-    const own = (group: HomeGroup) => mighty || group.leaderUid === me.uid
+    const own = (group: HomeGroup) => mighty || (Boolean(group.leaderUid) && group.leaderUid === me.uid)
     const users = await listUsers(env.USERS, env.OWNERS, true)
+    /** the leader: a user of the app, or the name of one without it */
+    const leaderNameOf = (group: HomeGroup) => {
+      const user = group.leaderUid ? users.find((item) => item.uid === group.leaderUid) : null
+      return user ? nameOf(user) : (group.leaderName ?? '')
+    }
     const show = (group: HomeGroup) => ({
-      ...(own(group) ? group : publicGroup(group)),
-      leaderName: nameOf(
-        users.find((user) => user.uid === group.leaderUid) ?? {
-          ...me,
-          uid: group.leaderUid,
-          name: null,
-          email: null
-        }
-      ),
+      ...(own(group) ? group : publicGroup(group, seesAll)),
+      leaderName: leaderNameOf(group),
       own: own(group)
     })
+    /** a user given as the leader is a user of the app */
+    const knownLeader = (head: { leaderUid?: string }) =>
+      !head.leaderUid || users.some((user) => user.uid === head.leaderUid)
 
+    // the servants choose their own group: they get the groups (without their people unless they may see them)
     if (route === 'GET /groups')
       return json({
-        groups: groups.filter((group) => seesAll || group.leaderUid === me.uid).map(show),
+        groups: serves(roles, roleId) ? groups.map(show) : groups.filter(own).map(show),
         visibility,
         manage
       })
@@ -847,11 +849,13 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
 
     if (route === 'POST /groups') {
       if (!manage) return json({ error: 'forbidden' }, 403)
-      const head = parseGroupHead(await body())
-      // a group is known by its leader; a name is not needed
-      if (!head?.leaderUid || !users.some((user) => user.uid === head.leaderUid))
+      // a group is known by its leader; a name is not needed; the day, the time and the place come too
+      const payload = await body()
+      const head = parseGroupHead(payload)
+      const rest = parseLeaderChange(payload)
+      if (!head || !rest || (!head.leaderUid && !head.leaderName) || !knownLeader(head))
         return json({ error: 'bad-request' }, 400)
-      const group = newGroup(head.name ?? '', head.leaderUid)
+      const group: HomeGroup = { ...newGroup(head), ...rest, members: [], meetingNote: '' }
       await setGroups(env.USERS, [...groups, group])
       return json({ group: show(group) })
     }
@@ -874,14 +878,16 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const head = parseGroupHead(change)
     const rest = parseLeaderChange(change)
     if (!head || !rest) return json({ error: 'bad-request' }, 400)
-    if ((head.name !== undefined || head.leaderUid) && !manage) return json({ error: 'forbidden' }, 403)
-    if (head.leaderUid && !users.some((user) => user.uid === head.leaderUid))
-      return json({ error: 'bad-request' }, 400)
+    const leaderChanged = head.leaderUid !== undefined || head.leaderName !== undefined
+    if ((head.name !== undefined || leaderChanged) && !manage) return json({ error: 'forbidden' }, 403)
+    if (!knownLeader(head)) return json({ error: 'bad-request' }, 400)
     if (Object.keys(rest).length && !leads && !manage) return json({ error: 'forbidden' }, 403)
     // the members and the notes are the leader's (the others do not even see them whole)
     if ((rest.members || rest.meetingNote !== undefined) && !own(group))
       return json({ error: 'forbidden' }, 403)
     const updated: HomeGroup = { ...group, ...head, ...rest }
+    // a user of the app as the leader: no name of its own
+    if (updated.leaderUid) delete updated.leaderName
     await setGroups(
       env.USERS,
       groups.map((item) => (item.id === id ? updated : item))

@@ -730,6 +730,39 @@ describe('home groups', () => {
     })
   })
 
+  it('a group with its day, time and place; a leader without the app is given by name', async () => {
+    const { call } = await church()
+    const created = await call('POST', '/groups', 'owner', {
+      leaderUid: '',
+      leaderName: 'Петренко Петро Петрович',
+      weekday: 4,
+      time: '19:00',
+      address: 'вул. Сумська, 1',
+      lat: 50,
+      lng: 36.2
+    })
+    expect(created.body.group).toMatchObject({
+      leaderUid: '',
+      leaderName: 'Петренко Петро Петрович',
+      weekday: 4,
+      time: '19:00',
+      address: 'вул. Сумська, 1',
+      own: true
+    })
+    // a leader: a user of the app or a name
+    expect((await call('POST', '/groups', 'owner', { leaderUid: '', weekday: 1 })).status).toBe(400)
+    expect((await call('POST', '/groups', 'owner', { leaderUid: 'nobody' })).status).toBe(400)
+    // then a user of the app leads it
+    const id = (created.body.group as { id: string }).id
+    expect(
+      (await call('PUT', `/groups/${id}`, 'owner', { leaderUid: 'leader-uid' })).body.group
+    ).toMatchObject({
+      leaderUid: 'leader-uid',
+      leaderName: 'Лідер'
+    })
+    expect((await call('GET', '/groups', 'leader')).body.groups).toMatchObject([{ id, own: true }])
+  })
+
   it('who sees the groups: the servants or the administrators only; a reader none', async () => {
     const { call } = await church()
     await call('POST', '/groups', 'owner', { name: 'Центр', leaderUid: 'leader-uid' })
@@ -741,7 +774,18 @@ describe('home groups', () => {
     expect((await call('PUT', '/groups-visibility', 'musician', { visibility: 'admins' })).status).toBe(403)
     expect((await call('PUT', '/groups-visibility', 'owner', { visibility: 'everyone' })).status).toBe(400)
     await call('PUT', '/groups-visibility', 'owner', { visibility: 'admins' })
-    expect((await call('GET', '/groups', 'musician')).body.groups).toHaveLength(0)
+    // a servant still chooses their own group: the groups come without their people
+    await call(
+      'PUT',
+      `/groups/${((await call('GET', '/groups', 'owner')).body.groups as { id: string }[])[0]!.id}`,
+      'leader',
+      {
+        members: [{ id: 'm1', name: 'Ганна', birthday: null, note: '' }]
+      }
+    )
+    expect((await call('GET', '/groups', 'musician')).body.groups).toMatchObject([
+      { name: 'Центр', members: [] }
+    ])
     expect((await call('GET', '/me', 'musician')).body).toMatchObject({ groups: false })
     // the leader sees their own group
     expect((await call('GET', '/groups', 'leader')).body).toMatchObject({

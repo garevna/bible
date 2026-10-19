@@ -95,16 +95,7 @@ export interface User extends Profile {
 }
 
 export type Page =
-  | 'bible'
-  | 'notes'
-  | 'keywords'
-  | 'topics'
-  | 'topic'
-  | 'search'
-  | 'admin'
-  | 'messages'
-  | 'calendar'
-  | 'groups'
+  'bible' | 'notes' | 'keywords' | 'topics' | 'topic' | 'search' | 'admin' | 'messages' | 'calendar'
 
 export interface MenuItem {
   value: string

@@ -21,7 +21,10 @@ export interface HomeGroup {
   id: string
   /** optional: a group is known by its leader, its place and its people */
   name: string
+  /** the leader, a user of the app (who keeps the group); '' for a leader without the app */
   leaderUid: string
+  /** the full name of a leader without the app */
+  leaderName?: string
   /** the place where the group meets, and its point on the map when it was chosen there */
   address: string
   lat?: number
@@ -53,10 +56,13 @@ export const getGroupsVisibility = async (store: UsersStore): Promise<GroupsVisi
 export const setGroupsVisibility = (store: UsersStore, visibility: GroupsVisibility) =>
   store.put(VISIBILITY_KEY, visibility)
 
-/** a group as others see it: the birthdays and the notes stay with its leader */
-export const publicGroup = (group: HomeGroup): HomeGroup => ({
+/**
+ * a group as others see it: the birthdays and the notes stay with its leader; without the names of
+ * the members, for the people who choose their own group but do not see the groups
+ */
+export const publicGroup = (group: HomeGroup, members = true): HomeGroup => ({
   ...group,
-  members: group.members.map((member) => ({ ...member, birthday: null, note: '' })),
+  members: members ? group.members.map((member) => ({ ...member, birthday: null, note: '' })) : [],
   meetingNote: ''
 })
 
@@ -139,10 +145,21 @@ export function parseLeaderChange(
 }
 
 /** the name and the leader of a group, as the administrators give them; null when it is not that */
-export function parseGroupHead(value: unknown): { name?: string; leaderUid?: string } | null {
+export interface GroupHead {
+  name?: string
+  leaderUid?: string
+  leaderName?: string
+}
+
+/**
+ * the name and the leader of a group, as the administrators give them: the leader is a user of the
+ * app (leaderUid), or the full name of one without it (leaderName, with leaderUid ''); null when it
+ * is not that
+ */
+export function parseGroupHead(value: unknown): GroupHead | null {
   if (!value || typeof value !== 'object') return null
   const body = value as Record<string, unknown>
-  const head: { name?: string; leaderUid?: string } = {}
+  const head: GroupHead = {}
   if (body.name !== undefined) {
     const name = text(body.name, 80)
     if (name === null) return null
@@ -150,16 +167,25 @@ export function parseGroupHead(value: unknown): { name?: string; leaderUid?: str
   }
   if (body.leaderUid !== undefined) {
     const uid = text(body.leaderUid, 200)
-    if (!uid) return null
+    if (uid === null) return null
     head.leaderUid = uid
   }
+  if (body.leaderName !== undefined) {
+    const name = text(body.leaderName, 120)
+    if (name === null) return null
+    head.leaderName = name
+  }
+  // a user of the app, or a name: one of them
+  if (head.leaderUid === '' && !head.leaderName) return null
+  if (head.leaderUid) head.leaderName = ''
   return head
 }
 
-export const newGroup = (name: string, leaderUid: string): HomeGroup => ({
+export const newGroup = (head: GroupHead): HomeGroup => ({
   id: `g-${crypto.randomUUID().slice(0, 8)}`,
-  name,
-  leaderUid,
+  name: head.name ?? '',
+  leaderUid: head.leaderUid ?? '',
+  ...(head.leaderUid ? {} : { leaderName: head.leaderName ?? '' }),
   address: '',
   weekday: null,
   time: '',

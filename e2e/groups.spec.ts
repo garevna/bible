@@ -36,17 +36,43 @@ const GROUPS = [
   }
 ]
 
-/** The worker (see playwright.config.ts): a servant who leads one home group and sees the others */
-async function fakeWorker(page: Page) {
+/**
+ * The worker (see playwright.config.ts): a user who leads one home group; an administrator (the
+ * directories) keeps all of them in the dashboard
+ */
+async function fakeWorker(page: Page, admin = false) {
   const requests: { method: string; path: string; body: unknown }[] = []
   await page.route('**/worker-test/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
     if (path === '/me' && request.method() === 'GET') {
       return route.fulfill({
-        json: { role: 'servant', telegram: false, canReceive: true, phone: '+380501234567', groups: true }
+        json: {
+          role: admin ? 'admin' : 'servant',
+          telegram: false,
+          canReceive: true,
+          phone: '+380501234567',
+          rights: { manage: admin ? ['directories'] : [] }
+        }
       })
     }
+    if (path === '/admin/settings')
+      return route.fulfill({
+        json: {
+          roles: [],
+          types: [],
+          ministries: [],
+          locations: [],
+          eventTypes: [],
+          calendar: { redDays: 2, orangeDays: 5, filters: [] }
+        }
+      })
+    if (path === '/schedule/people')
+      return route.fulfill({
+        json: { people: [{ uid: 'leader-uid', name: 'Лідер', ministries: [], phone: null }] }
+      })
+    if (path === '/schedule')
+      return route.fulfill({ json: { events: [], days: [], participants: [], changes: [] } })
     if (path === '/types') return route.fulfill({ json: { types: [] } })
     if (path === '/me' && request.method() === 'PUT') {
       const body = request.postDataJSON()
@@ -54,8 +80,25 @@ async function fakeWorker(page: Page) {
       return route.fulfill({ json: body })
     }
     if (path === '/messages') return route.fulfill({ json: { messages: [], unread: 0 } })
-    if (path === '/groups')
-      return route.fulfill({ json: { groups: GROUPS, visibility: 'servants', manage: false } })
+    if (path === '/groups' && request.method() === 'GET')
+      return route.fulfill({ json: { groups: GROUPS, visibility: 'servants', manage: admin } })
+    if (path === '/groups') {
+      const body = request.postDataJSON()
+      requests.push({ method: 'POST', path, body })
+      return route.fulfill({
+        json: {
+          group: {
+            ...body,
+            id: 'g-new',
+            leaderName: body.leaderName,
+            description: '',
+            members: [],
+            meetingNote: '',
+            own: true
+          }
+        }
+      })
+    }
     if (path.startsWith('/groups/')) {
       const body = request.postDataJSON()
       requests.push({ method: request.method(), path, body })
@@ -66,21 +109,26 @@ async function fakeWorker(page: Page) {
   return requests
 }
 
-async function openGroups(page: Page) {
+async function signIn(page: Page) {
   await openBible(page)
   await signInLocally(page)
   await withStores(page, async (stores) => {
     stores.firebase.authUser = { getIdToken: async () => 'test-token' }
     await stores.worker.loadRole()
   })
-  await page.getByRole('button', { name: 'E2E', exact: true }).click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Домашні групи' }).click()
+}
+
+/** the home groups are kept in the dashboard */
+async function openGroups(page: Page) {
+  await signIn(page)
+  await page.getByRole('button', { name: 'Адміністрування' }).click()
+  await page.locator('.admin-nav').getByText('Домашні групи').click()
 }
 
 test('the home groups: by the week, on the map and as a list; the leader keeps their group', async ({
   page
 }) => {
-  const requests = await fakeWorker(page)
+  const requests = await fakeWorker(page, true)
   await openGroups(page)
 
   // the week: the days with their numbers of groups; a day opens its hours, an hour its groups
@@ -164,18 +212,53 @@ test('the home groups: by the week, on the map and as a list; the leader keeps t
     })
   await page.keyboard.press('Escape')
 
-  // the list: another's group (no name: its leader) shows the names only, and no button to change it
+  // the list: another's group (no name: its leader); an administrator changes its day, time and leader
   await page.getByRole('tab', { name: 'Список' }).click()
   await expect(page.locator('.group-row')).toHaveCount(2)
   await page.locator('.group-row', { hasText: 'Лідер' }).click()
-  await expect(dialog(page)).toContainText('Петро')
-  await expect(dialog(page).getByRole('button', { name: 'Змінити' })).toHaveCount(0)
+  const other = dialog(page)
+  await expect(other).toContainText('Петро')
+  await other.getByRole('button', { name: 'Змінити' }).click()
+  // the people and the notes stay the leader's
+  await expect(other.getByText('Члени групи', { exact: true })).toHaveCount(0)
+  await other.getByRole('textbox', { name: 'Час' }).fill('1930')
+  await other.locator('.v-combobox input').fill('Іваненко Іван')
+  await other.getByRole('textbox', { name: 'Час' }).click()
+  await other.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => requests.at(-1))
+    .toMatchObject({
+      method: 'PUT',
+      path: '/groups/g-other',
+      body: { time: '19:30', leaderUid: '', leaderName: 'Іваненко Іван' }
+    })
+  await page.keyboard.press('Escape')
+
+  // a new group: its leader (a name typed in), the day, the time and the place
+  await page.getByRole('button', { name: 'Нова група' }).click()
+  const fresh = dialog(page)
+  await fresh.locator('.v-combobox input').fill('Коваленко Олена')
+  await fresh.locator('.v-select', { hasText: 'День тижня' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'четвер' }).click()
+  await fresh.getByRole('textbox', { name: 'Час' }).fill('1800')
+  await fresh.getByRole('textbox', { name: 'Де збирається' }).fill('вул. Пушкінська, 5')
+  await fresh.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.method === 'POST'))
+    .toMatchObject({
+      path: '/groups',
+      body: {
+        leaderUid: '',
+        leaderName: 'Коваленко Олена',
+        weekday: 4,
+        time: '18:00',
+        address: 'вул. Пушкінська, 5'
+      }
+    })
 })
 
-test('a group for a new member: the days and hours that suit, the nearest first; my own group', async ({
-  page
-}) => {
-  const requests = await fakeWorker(page)
+test('a group for a new member: the days and hours that suit, the nearest first', async ({ page }) => {
+  await fakeWorker(page, true)
   // the address is found by OpenStreetMap: near the Saltivka group
   await page.route('**/nominatim.openstreetmap.org/**', (route) =>
     route.fulfill({
@@ -209,15 +292,50 @@ test('a group for a new member: the days and hours that suit, the nearest first;
   await page.getByRole('textbox', { name: 'Адреса біля дому' }).press('Enter')
   await page.locator('.places .v-list-item', { hasText: 'Академіка Павлова' }).click()
   await expect(page.locator('.result .distance')).toHaveText('0,6 км')
+})
 
-  // my own home group, found by its leader
+test('my home group: chosen by the day and the time, by the leader or by the place; the one I lead', async ({
+  page
+}) => {
+  const requests = await fakeWorker(page)
+  await signIn(page)
+  // a servant has no page of the groups: their own group is in the menu of the avatar
   await page.getByRole('button', { name: 'E2E', exact: true }).click()
+  await expect(page.locator('.v-overlay--active .v-list-item', { hasText: /^Домашні групи$/ })).toHaveCount(0)
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Моя домашня група' }).click()
   const choose = dialog(page)
+  await expect(choose).toContainText('Групу ще не вибрано')
+
+  // by the day and the time, then from the list
+  const tomorrow = new Intl.DateTimeFormat('uk', { weekday: 'long' }).format(
+    new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+  )
+  await choose.locator('.v-select', { hasText: 'День тижня' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: tomorrow }).click()
+  await choose.locator('.v-select', { hasText: 'Час' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: '19:00' }).click()
+  await expect(choose.locator('.choice')).toHaveCount(1)
+  await expect(choose.locator('.choice')).toContainText('вул. Сумська, 1')
+
+  // by the place
+  await choose.getByRole('button', { name: 'За адресою' }).click()
+  await choose.locator('.v-autocomplete').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'вул. Героїв Праці, 10' }).click()
+  await expect(choose.locator('.choice')).toContainText('Салтівка · E2E')
+
+  // by the leader
+  await choose.getByRole('button', { name: 'За лідером' }).click()
   await choose.locator('.v-autocomplete').click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
   await choose.getByRole('button', { name: 'Зберегти' }).click()
   await expect
     .poll(() => requests.find((request) => request.path === '/me'))
     .toMatchObject({ method: 'PUT', body: { homeGroupId: 'g-other' } })
+
+  // the leader opens the group they lead
+  await page.getByRole('button', { name: 'E2E', exact: true }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Моя домашня група' }).click()
+  await dialog(page).getByRole('button', { name: 'Група, яку я веду' }).click()
+  await expect(dialog(page)).toContainText('Тема: молитва')
+  await expect(dialog(page).getByRole('button', { name: 'Змінити' })).toBeVisible()
 })

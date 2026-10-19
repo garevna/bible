@@ -64,14 +64,6 @@
           </v-list-item>
         </template>
         <v-divider v-if="compact && worker.calendar" />
-        <!-- the home groups: here on every screen (the header keeps few buttons) -->
-        <v-list-item
-          v-if="worker.groups"
-          prepend-icon="mdi-home-group"
-          :title="pages.groups"
-          v-bind="here('groups')"
-          @click="app.setPage('groups')"
-        />
         <!-- the home group of the user: an administrator or a servant -->
         <v-list-item
           v-if="worker.canReceive"
@@ -191,8 +183,7 @@ const {
   calendar: calendarText,
   groups: groupsText,
   header,
-  messages: messagesText,
-  pages
+  messages: messagesText
 } = storeToRefs(useLanguageStore())
 
 /** the number of unread messages on the avatar: a phone, where the messages are in its menu */

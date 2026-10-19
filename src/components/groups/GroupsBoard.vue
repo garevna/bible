@@ -12,28 +12,17 @@
       {{ error }}
     </v-alert>
 
-    <!-- the administrators: a new group (its leader; a name is not needed), and who sees the groups -->
+    <!-- the administrators: a new group, and who sees the groups -->
     <div v-if="groups.manage" class="manage d-flex flex-wrap align-center ga-2 mb-4">
-      <v-autocomplete
-        v-model="newLeader"
-        :items="schedule.people"
-        item-title="name"
-        item-value="uid"
-        :label="text.leader"
-        density="compact"
-        hide-details
-        class="field"
-      />
-      <v-text-field
-        v-model="newName"
-        :label="text.groupNameOptional"
-        density="compact"
-        hide-details
-        class="field"
-        append-inner-icon="mdi-plus-thick"
-        @click:append-inner="create"
-        @keydown.enter="create"
-      />
+      <v-btn
+        variant="tonal"
+        color="buttons"
+        class="text-none"
+        prepend-icon="mdi-plus-thick"
+        @click="newDialog = true"
+      >
+        {{ text.addGroup }}
+      </v-btn>
       <v-spacer />
       <v-select
         :model-value="groups.visibility"
@@ -64,6 +53,7 @@
     </template>
 
     <GroupDialog v-model="dialog" :group-id="openedId" />
+    <NewGroupDialog v-model="newDialog" @created="openGroup" />
   </div>
 </template>
 
@@ -76,6 +66,7 @@ import GroupRow from '@/components/groups/GroupRow.vue'
 import GroupsMap from '@/components/groups/GroupsMap.vue'
 import GroupsSearch from '@/components/groups/GroupsSearch.vue'
 import GroupsWeek from '@/components/groups/GroupsWeek.vue'
+import NewGroupDialog from '@/components/groups/NewGroupDialog.vue'
 import { useGroupsStore, type GroupsVisibility, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore } from '@/stores/schedule'
@@ -136,16 +127,7 @@ onMounted(async () => {
   busy.value = false
 })
 
-const newName = ref('')
-const newLeader = ref<string | null>(null)
-const create = () =>
-  newLeader.value &&
-  run(async () => {
-    const group = await groups.create((newName.value ?? '').trim(), newLeader.value!)
-    newName.value = ''
-    newLeader.value = null
-    openGroup(group)
-  })
+const newDialog = ref(false)
 
 const setVisibility = (value: GroupsVisibility) => run(() => groups.setVisibility(value))
 </script>

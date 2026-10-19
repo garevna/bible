@@ -16,6 +16,7 @@ export interface GroupMember {
 export interface HomeGroup {
   id: string
   name: string
+  /** a user of the app (who keeps the group), or '' for a leader without the app */
   leaderUid: string
   leaderName: string
   address: string
@@ -58,7 +59,15 @@ export const hourOf = (group: Pick<HomeGroup, 'time'>) => (group.time ? Number(g
 export type GroupChange = Partial<
   Pick<
     HomeGroup,
-    'address' | 'weekday' | 'time' | 'description' | 'members' | 'meetingNote' | 'name' | 'leaderUid'
+    | 'address'
+    | 'weekday'
+    | 'time'
+    | 'description'
+    | 'members'
+    | 'meetingNote'
+    | 'name'
+    | 'leaderUid'
+    | 'leaderName'
   >
 > & {
   /** null: the point on the map is taken away */
@@ -94,8 +103,9 @@ export const useGroupsStore = defineStore('groups', () => {
     return group
   }
 
-  const create = async (name: string, leaderUid: string) =>
-    put((await worker.request<{ group: HomeGroup }>('POST', '/groups', { name, leaderUid })).group)
+  /** a new group: its leader (a user of the app, or a name), the day, the time and the place */
+  const create = async (fields: GroupChange) =>
+    put((await worker.request<{ group: HomeGroup }>('POST', '/groups', fields)).group)
 
   const update = async (id: string, change: GroupChange) =>
     put(

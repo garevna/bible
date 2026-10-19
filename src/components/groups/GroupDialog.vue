@@ -43,15 +43,7 @@
     <div v-else-if="group && editing" class="form">
       <template v-if="groups.manage">
         <v-text-field v-model="draft.name" :label="text.groupNameOptional" density="compact" hide-details />
-        <v-autocomplete
-          v-model="draft.leaderUid"
-          :items="schedule.people"
-          item-title="name"
-          item-value="uid"
-          :label="text.leader"
-          density="compact"
-          hide-details
-        />
+        <LeaderField v-model="leader" density="compact" />
       </template>
 
       <div class="d-flex flex-wrap ga-2">
@@ -178,6 +170,7 @@ import ConfirmButton from '@/components/ConfirmButton.vue'
 import DateField from '@/components/DateField.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
+import LeaderField from '@/components/groups/LeaderField.vue'
 import TimeField from '@/components/TimeField.vue'
 import {
   groupTitle,
@@ -214,6 +207,8 @@ const busy = ref(false)
 const error = ref('')
 const picker = ref(false)
 const newMember = ref('')
+/** the leader as the administrators change it */
+const leader = ref({ leaderUid: '', leaderName: '' })
 
 const draft = reactive({
   name: '',
@@ -271,6 +266,7 @@ function startEdit() {
     members: item.members.map((member) => ({ ...member })),
     meetingNote: item.meetingNote
   })
+  leader.value = { leaderUid: item.leaderUid, leaderName: item.leaderName }
   editing.value = true
   if (groups.manage) schedule.loadChoices().catch(() => undefined)
 }
@@ -313,7 +309,9 @@ async function save() {
   }
   if (groups.manage) {
     if ((draft.name ?? '').trim() !== item.name) change.name = (draft.name ?? '').trim()
-    if (draft.leaderUid && draft.leaderUid !== item.leaderUid) change.leaderUid = draft.leaderUid
+    const { leaderUid, leaderName } = leader.value
+    if (leaderUid ? leaderUid !== item.leaderUid : leaderName && leaderName !== item.leaderName)
+      Object.assign(change, { leaderUid, leaderName })
   }
   busy.value = true
   error.value = ''
