@@ -94,6 +94,14 @@ test('the home groups: on the map, in the calendar and as a list; the leader kee
 
   // a new member, saved with the rest
   await card.getByRole('button', { name: 'Змінити' }).click()
+  // the 24-hour clock: the digits only, made whole when the field is left
+  const time = card.getByRole('textbox', { name: 'Час' })
+  await expect(time).toHaveValue('18:30')
+  await time.fill('930')
+  await time.press('Tab')
+  await expect(time).toHaveValue('09:30')
+  await time.fill('2015')
+  await expect(time).toHaveValue('20:15')
   await card.getByRole('textbox', { name: 'Новий член групи: ім’я' }).fill('Олена')
   await card.locator('.new-member .mdi-plus-thick').click()
   await card.getByRole('button', { name: 'Зберегти' }).click()
@@ -104,7 +112,7 @@ test('the home groups: on the map, in the calendar and as a list; the leader kee
       path: '/groups/g-mine',
       body: {
         weekday: today.getDay(),
-        time: '18:30',
+        time: '20:15',
         members: [{ name: 'Ганна' }, { name: 'Олена', birthday: null }],
         meetingNote: 'Тема: молитва'
       }

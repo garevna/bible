@@ -54,7 +54,7 @@
         density="compact"
         class="field"
       />
-      <v-text-field v-model="draft.time" :label="text.time" type="time" density="compact" class="field" />
+      <TimeField v-model="draft.time" :label="text.time" density="compact" class="field" />
       <v-text-field
         v-if="kind === 'repeated'"
         v-model="until"
@@ -82,13 +82,12 @@
         class="mt-1"
       />
       <div v-if="perDay" class="d-flex flex-wrap ga-2 mt-1">
-        <v-text-field
+        <TimeField
           v-for="item of weekdayItems.filter((weekday) => weekdays.includes(weekday.value))"
           :key="item.value"
           v-model="times[item.value]"
           :label="item.title"
           :placeholder="draft.time"
-          type="time"
           density="compact"
           hide-details
           class="day-time"
@@ -188,6 +187,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
+import TimeField from '@/components/TimeField.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import SlotsEditor from '@/components/calendar/SlotsEditor.vue'

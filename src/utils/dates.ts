@@ -33,7 +33,9 @@ export const formatDateTime = (ms: number, locale: string) =>
     day: 'numeric',
     month: 'long',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    // the 24-hour clock in every language (English would say PM)
+    hourCycle: 'h23'
   }).format(new Date(ms))
 
 /** a day of the calendar: "пт, 16 жовт." */

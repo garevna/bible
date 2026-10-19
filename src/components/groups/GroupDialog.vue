@@ -64,14 +64,7 @@
           clearable
           class="field"
         />
-        <v-text-field
-          v-model="draft.time"
-          :label="text.time"
-          type="time"
-          density="compact"
-          hide-details
-          class="field"
-        />
+        <TimeField v-model="draft.time" :label="text.time" density="compact" hide-details class="field" />
       </div>
 
       <div class="d-flex align-center ga-2">
@@ -179,6 +172,7 @@ import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
+import TimeField from '@/components/TimeField.vue'
 import { useGroupsStore, type GroupChange, type GroupMember, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { mapUrl, useScheduleStore, type Place } from '@/stores/schedule'

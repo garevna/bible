@@ -13,12 +13,11 @@
     />
     <template v-if="!cancelled">
       <div class="d-flex flex-wrap ga-2">
-        <v-text-field
+        <TimeField
           v-model="time"
           :label="text.time"
           :placeholder="usual.time"
           persistent-placeholder
-          type="time"
           density="compact"
           clearable
           class="field"
@@ -63,6 +62,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
+import TimeField from '@/components/TimeField.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
 import { timeOf, useScheduleStore, type Occurrence } from '@/stores/schedule'
