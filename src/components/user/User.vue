@@ -64,6 +64,13 @@
           </v-list-item>
         </template>
         <v-divider v-if="compact && worker.calendar" />
+        <!-- the app on the home screen of the phone, until it is there -->
+        <v-list-item
+          v-if="!installed"
+          prepend-icon="mdi-cellphone-arrow-down"
+          :title="header.installTitle"
+          @click="installDialog = true"
+        />
         <!-- a reader asks for the status of a servant -->
         <v-list-item
           v-if="worker.calendar && worker.role === READER"
@@ -118,6 +125,7 @@
 
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
     <HomeGroupDialog v-model="homeGroupDialog" />
+    <InstallDialog v-model="installDialog" />
 
     <!-- ministers: the schedule of ministries -->
     <v-tooltip v-if="!compact && worker.calendar" :text="calendarText.title">
@@ -173,6 +181,8 @@ import { storeToRefs } from 'pinia'
 
 import PhoneDialog from '@/components/PhoneDialog.vue'
 import HomeGroupDialog from '@/components/groups/HomeGroupDialog.vue'
+import InstallDialog from '@/components/user/InstallDialog.vue'
+import { installed } from '@/utils/install'
 import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
@@ -212,6 +222,7 @@ const failed = ref(false)
 /** a minister without a mobile number is asked for it once a session, the mark on the avatar stays */
 const phoneDialog = ref(false)
 const homeGroupDialog = ref(false)
+const installDialog = ref(false)
 let asked = false
 watch(
   () => worker.needsPhone,

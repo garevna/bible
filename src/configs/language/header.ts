@@ -6,6 +6,51 @@ const [ohienko, asv] = [
 ]
 
 export const header = {
+  installTitle: {
+    ua: 'Встановити на телефон',
+    ru: 'Установить на телефон',
+    en: 'Install on the phone'
+  },
+  installLead: {
+    ua: 'Застосунок можна поставити на телефон, як звичайну програму: на екрані з’явиться значок, і Біблія відкриватиметься одним дотиком, навіть без інтернету.',
+    ru: 'Приложение можно поставить на телефон как обычную программу: на экране появится значок, и Библия будет открываться одним касанием, даже без интернета.',
+    en: 'Put the app on the phone like any app: an icon appears on the screen, and the Bible opens with one tap, even offline.'
+  },
+  installButton: {
+    ua: 'Встановити',
+    ru: 'Установить',
+    en: 'Install'
+  },
+  installAppleShare: {
+    ua: 'Унизу екрана в Safari натисніть кнопку «Поділитися»',
+    ru: 'Внизу экрана в Safari нажмите кнопку «Поделиться»',
+    en: 'At the bottom of Safari, tap “Share”'
+  },
+  installAppleHome: {
+    ua: 'Прогорніть і виберіть «На початковий екран»',
+    ru: 'Пролистайте и выберите «На экран “Домой”»',
+    en: 'Scroll and choose “Add to Home Screen”'
+  },
+  installAppleAdd: {
+    ua: 'Натисніть «Додати» вгорі праворуч',
+    ru: 'Нажмите «Добавить» вверху справа',
+    en: 'Tap “Add” at the top right'
+  },
+  installMenu: {
+    ua: 'Відкрийте меню браузера (три крапки вгорі праворуч)',
+    ru: 'Откройте меню браузера (три точки вверху справа)',
+    en: 'Open the menu of the browser (three dots at the top right)'
+  },
+  installMenuItem: {
+    ua: 'Виберіть «Встановити застосунок» або «Додати на головний екран»',
+    ru: 'Выберите «Установить приложение» или «Добавить на главный экран»',
+    en: 'Choose “Install app” or “Add to Home screen”'
+  },
+  installSignedIn: {
+    ua: 'Після встановлення ви залишитеся в застосунку з тим самим акаунтом. На iPhone першого разу, можливо, доведеться увійти ще раз — далі вхід буде автоматичним.',
+    ru: 'После установки вы останетесь в приложении с тем же аккаунтом. На iPhone в первый раз, возможно, придётся войти ещё раз — дальше вход будет автоматическим.',
+    en: 'After installing you stay signed in with the same account. On an iPhone you may need to sign in once more the first time; then it is automatic.'
+  },
   requestTitle: {
     ua: 'Стати служителем',
     ru: 'Стать служителем',

@@ -150,3 +150,14 @@ test('an administrator gives the status asked for in one click', async ({ page }
     .poll(() => requests.find((request) => request.path === '/admin/users/new-uid'))
     .toMatchObject({ method: 'PUT', body: { role: 'servant' } })
 })
+
+test('the app on the phone: the menu of the avatar explains it in simple steps', async ({ page }) => {
+  await fakeWorker(page, { role: 'servant' })
+  await signIn(page)
+  await page.getByRole('button', { name: 'E2E', exact: true }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Встановити на телефон' }).click()
+  const steps = dialog(page)
+  await expect(steps).toContainText('на екрані з’явиться значок')
+  // a desktop browser of the tests: through its menu
+  await expect(steps).toContainText('Відкрийте меню браузера')
+})
