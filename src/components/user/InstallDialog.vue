@@ -1,8 +1,13 @@
 <template>
-  <AppDialog v-model="open" :title="text.installTitle" icon="mdi-cellphone-arrow-down" max-width="520">
-    <p class="lead">{{ text.installLead }}</p>
+  <AppDialog
+    v-model="open"
+    :title="phone ? text.installTitle : text.installTitleDesktop"
+    :icon="phone ? 'mdi-cellphone-arrow-down' : 'mdi-monitor-arrow-down'"
+    max-width="520"
+  >
+    <p class="lead">{{ phone ? text.installLead : text.installLeadDesktop }}</p>
 
-    <!-- Android: the browser installs by one button -->
+    <!-- Chrome or Edge (a phone or a computer): the browser installs by one button -->
     <div v-if="installPrompt" class="text-center my-4">
       <v-btn
         variant="flat"
@@ -17,7 +22,7 @@
     </div>
 
     <!-- an iPhone: three steps in Safari -->
-    <ol v-else-if="apple" class="steps">
+    <ol v-else-if="place === 'iphone'" class="steps">
       <li>
         {{ text.installAppleShare }}
         <v-icon icon="mdi-export-variant" size="small" class="ml-1" />
@@ -26,16 +31,26 @@
       <li>{{ text.installAppleAdd }}</li>
     </ol>
 
-    <!-- another phone or browser: through the menu of the browser -->
-    <ol v-else class="steps">
-      <li>
-        {{ text.installMenu }}
-        <v-icon icon="mdi-dots-vertical" size="small" class="ml-1" />
-      </li>
-      <li>{{ text.installMenuItem }}</li>
+    <!-- a Mac with Safari: the menu "File" -->
+    <ol v-else-if="place === 'safari-mac'" class="steps">
+      <li>{{ text.installMacFile }}</li>
     </ol>
 
-    <p class="muted">{{ text.installSignedIn }}</p>
+    <!-- Firefox on a computer does not install: another browser does -->
+    <v-alert v-else-if="place === 'firefox-desktop'" type="info" variant="tonal" class="my-3">
+      {{ text.installFirefox }}
+    </v-alert>
+
+    <!-- another phone or computer: through the menu of the browser -->
+    <ol v-else class="steps">
+      <li>
+        {{ phone ? text.installMenu : text.installMenuDesktop }}
+        <v-icon icon="mdi-dots-vertical" size="small" class="ml-1" />
+      </li>
+      <li>{{ phone ? text.installMenuItem : text.installMenuItemDesktop }}</li>
+    </ol>
+
+    <p class="muted">{{ phone ? text.installSignedIn : text.installAfterDesktop }}</p>
 
     <template #actions>
       <v-spacer />
@@ -51,13 +66,17 @@ import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
 import { useLanguageStore } from '@/stores/language'
-import { install, installPrompt, isApple } from '@/utils/install'
+import { install, installPlace, installPrompt, onPhone } from '@/utils/install'
 
-/** How to put the app on the home screen of the phone: one button on Android, simple steps elsewhere */
+/**
+ * How to install the app: on the home screen of a phone, or on a computer (its own window, the Start
+ * menu, the taskbar): one button in Chrome and Edge, simple steps elsewhere
+ */
 const open = defineModel<boolean>({ default: false })
 
 const { header: text, common } = storeToRefs(useLanguageStore())
-const apple = isApple()
+const place = installPlace()
+const phone = onPhone()
 
 async function installNow() {
   if (await install()) open.value = false

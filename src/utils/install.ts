@@ -24,6 +24,25 @@ export const isApple = () =>
   /iPhone|iPad|iPod/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
 
+/**
+ * Where the app is installed and how: an iPhone (Safari: "Share"), another phone, a Mac with Safari
+ * ("File" → "Add to Dock"), Firefox on a computer (it does not install), another computer (Chrome, Edge)
+ */
+export type InstallPlace = 'iphone' | 'phone' | 'safari-mac' | 'firefox-desktop' | 'desktop'
+
+export function installPlace(): InstallPlace {
+  const agent = navigator.userAgent
+  if (isApple()) return 'iphone'
+  if (/Android|Mobi/i.test(agent)) return 'phone'
+  if (/Firefox\//.test(agent)) return 'firefox-desktop'
+  if (/Macintosh/.test(agent) && /Safari\//.test(agent) && !/Chrome|Chromium|Edg\//.test(agent))
+    return 'safari-mac'
+  return 'desktop'
+}
+
+/** a phone or a tablet: the app goes onto its home screen */
+export const onPhone = () => ['iphone', 'phone'].includes(installPlace())
+
 export function listenForInstall() {
   window.addEventListener('beforeinstallprompt', (event) => {
     // the app asks when the user wants it, not the browser at once

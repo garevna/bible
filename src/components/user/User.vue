@@ -79,8 +79,8 @@
         <!-- the app on the home screen of the phone, until it is there -->
         <v-list-item
           v-if="!installed"
-          prepend-icon="mdi-cellphone-arrow-down"
-          :title="header.installTitle"
+          :prepend-icon="phone ? 'mdi-cellphone-arrow-down' : 'mdi-monitor-arrow-down'"
+          :title="phone ? header.installTitle : header.installTitleDesktop"
           @click="installDialog = true"
         />
         <!-- a reader asks for the status of a servant -->
@@ -195,7 +195,7 @@ import PhoneDialog from '@/components/PhoneDialog.vue'
 import HomeGroupDialog from '@/components/groups/HomeGroupDialog.vue'
 import InstallDialog from '@/components/user/InstallDialog.vue'
 import { usePostsStore } from '@/stores/posts'
-import { installed } from '@/utils/install'
+import { installed, onPhone } from '@/utils/install'
 import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
@@ -237,6 +237,8 @@ const failed = ref(false)
 const phoneDialog = ref(false)
 const homeGroupDialog = ref(false)
 const installDialog = ref(false)
+/** a phone: the app goes onto its home screen; a computer: into its own window */
+const phone = onPhone()
 
 /** the posts of the channel: what waits for the user (to approve, to publish, to prepare) */
 const posts = usePostsStore()

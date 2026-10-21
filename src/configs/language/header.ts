@@ -6,6 +6,41 @@ const [ohienko, asv] = [
 ]
 
 export const header = {
+  installTitleDesktop: {
+    ua: 'Встановити на комп’ютер',
+    ru: 'Установить на компьютер',
+    en: 'Install on the computer'
+  },
+  installLeadDesktop: {
+    ua: 'Застосунок можна встановити на комп’ютер, як звичайну програму: він відкриватиметься в окремому вікні, його можна закріпити на панелі завдань або винести на робочий стіл.',
+    ru: 'Приложение можно установить на компьютер как обычную программу: оно будет открываться в отдельном окне, его можно закрепить на панели задач или вынести на рабочий стол.',
+    en: 'Install the app on the computer like any program: it opens in a window of its own, and can be pinned to the taskbar or put on the desktop.'
+  },
+  installMenuDesktop: {
+    ua: 'Праворуч в адресному рядку натисніть значок встановлення (монітор зі стрілкою) або відкрийте меню браузера (три крапки)',
+    ru: 'Справа в адресной строке нажмите значок установки (монитор со стрелкой) или откройте меню браузера (три точки)',
+    en: 'At the right of the address bar click the install icon (a screen with an arrow), or open the menu of the browser (three dots)'
+  },
+  installMenuItemDesktop: {
+    ua: 'Виберіть «Встановити ХХЦ» (у Edge: «Програми» → «Установити цей сайт як програму»)',
+    ru: 'Выберите «Установить ХХЦ» (в Edge: «Приложения» → «Установить этот сайт как приложение»)',
+    en: 'Choose “Install ХХЦ” (in Edge: “Apps” → “Install this site as an app”)'
+  },
+  installMacFile: {
+    ua: 'У меню «Файл» вгорі екрана виберіть «Додати в Dock»',
+    ru: 'В меню «Файл» вверху экрана выберите «Добавить в Dock»',
+    en: 'In the menu “File” at the top of the screen choose “Add to Dock”'
+  },
+  installFirefox: {
+    ua: 'Firefox на комп’ютері не вміє встановлювати застосунки. Відкрийте kcc-bible.pp.ua у Chrome або Edge і натисніть там «Встановити на комп’ютер».',
+    ru: 'Firefox на компьютере не умеет устанавливать приложения. Откройте kcc-bible.pp.ua в Chrome или Edge и нажмите там «Установить на компьютер».',
+    en: 'Firefox on a computer does not install apps. Open kcc-bible.pp.ua in Chrome or Edge and choose “Install on the computer” there.'
+  },
+  installAfterDesktop: {
+    ua: 'Після встановлення застосунок «ХХЦ» з’явиться в меню «Пуск» (на Mac — у Launchpad), і ви залишитеся в ньому з тим самим акаунтом. Ярлик можна закріпити на панелі завдань або перетягти на робочий стіл.',
+    ru: 'После установки приложение «ХХЦ» появится в меню «Пуск» (на Mac — в Launchpad), и вы останетесь в нём с тем же аккаунтом. Ярлык можно закрепить на панели задач или перетащить на рабочий стол.',
+    en: 'After installing, “ХХЦ” is in the Start menu (Launchpad on a Mac), signed in with the same account. Pin it to the taskbar or drag it to the desktop.'
+  },
   installTitle: {
     ua: 'Встановити на телефон',
     ru: 'Установить на телефон',

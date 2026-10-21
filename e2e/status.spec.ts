@@ -151,13 +151,38 @@ test('an administrator gives the status asked for in one click', async ({ page }
     .toMatchObject({ method: 'PUT', body: { role: 'servant' } })
 })
 
-test('the app on the phone: the menu of the avatar explains it in simple steps', async ({ page }) => {
+test('the app on the computer: the menu of the avatar says the computer, with its steps', async ({
+  page
+}) => {
   await fakeWorker(page, { role: 'servant' })
   await signIn(page)
   await page.getByRole('button', { name: 'E2E', exact: true }).click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Встановити на телефон' }).click()
+  await expect(
+    page.locator('.v-overlay--active .v-list-item', { hasText: 'Встановити на телефон' })
+  ).toHaveCount(0)
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Встановити на комп’ютер' }).click()
   const steps = dialog(page)
-  await expect(steps).toContainText('на екрані з’явиться значок')
-  // a desktop browser of the tests: through its menu
-  await expect(steps).toContainText('Відкрийте меню браузера')
+  await expect(steps).toContainText('відкриватиметься в окремому вікні')
+  // the browser of the tests: through the address bar or its menu
+  await expect(steps).toContainText('значок встановлення')
+  await expect(steps).toContainText('меню «Пуск»')
+})
+
+test.describe('an iPhone', () => {
+  test.use({
+    viewport: { width: 390, height: 800 },
+    userAgent:
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+  })
+
+  test('the app on the phone: three steps in Safari', async ({ page }) => {
+    await fakeWorker(page, { role: 'servant' })
+    await signIn(page)
+    await page.getByRole('button', { name: 'E2E', exact: true }).click()
+    await page.locator('.v-overlay--active .v-list-item', { hasText: 'Встановити на телефон' }).click()
+    const steps = dialog(page)
+    await expect(steps).toContainText('на екрані з’явиться значок')
+    await expect(steps).toContainText('«Поділитися»')
+    await expect(steps).toContainText('«На початковий екран»')
+  })
 })
