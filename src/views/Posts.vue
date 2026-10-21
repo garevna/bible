@@ -70,7 +70,8 @@
 
     <template v-else>
       <!-- the tasks of the user: prepared as a note or a topic, then sent with this task chosen -->
-      <p v-if="!posts.myTasks.length" class="muted">{{ text.noneTasks }}</p>
+      <p v-if="!posts.myTasks.length && !posts.canApprove" class="muted">{{ text.noneTasks }}</p>
+      <h3 v-if="posts.myTasks.length" class="label mb-2">{{ text.tasksForMe }}</h3>
       <article v-for="task of posts.myTasks" :key="task.id" class="task">
         <p class="task__text">{{ task.text }}</p>
         <p v-if="task.due" class="due" :class="{ 'due--late': task.due <= today }">
@@ -85,53 +86,22 @@
         <p class="hint mb-0">{{ text.taskHow }}</p>
       </article>
 
-      <!-- a pastor asks a servant to prepare a post -->
+      <!-- a pastor: the tasks given, and a new one by its own button -->
       <template v-if="posts.canApprove">
-        <h3 class="label mt-4">{{ text.giveTask }}</h3>
-        <div class="d-flex flex-wrap ga-2">
-          <v-autocomplete
-            v-model="assigneeUid"
-            :items="posts.people"
-            item-title="name"
-            item-value="uid"
-            :label="text.assignee"
-            density="compact"
-            hide-details
-            class="field"
-          />
-          <v-select
-            v-model="taskApprover"
-            :items="taskApproverItems"
-            :label="text.whoApproves"
-            density="compact"
-            hide-details
-            class="field"
-          />
-        </div>
-        <v-text-field v-model="taskText" :label="text.taskText" density="compact" hide-details class="mt-2" />
-        <DateField
-          v-model="taskDue"
-          :label="text.taskDueLabel"
-          clearable
-          density="compact"
-          hide-details
-          class="mt-2 due-field"
-        />
-        <!-- a form of several fields: one clear button sends it -->
-        <div class="d-flex flex-wrap align-center ga-2 mt-2">
+        <div class="d-flex align-center ga-2 mt-4 mb-2">
+          <h3 class="label flex-grow-1">{{ text.givenTasks }}</h3>
           <v-btn
             variant="flat"
             color="primary"
-            class="text-none px-6"
-            prepend-icon="mdi-send"
-            :disabled="!assigneeUid || !(taskText ?? '').trim() || busy"
-            :loading="busy"
-            @click="giveTask"
+            class="text-none"
+            prepend-icon="mdi-plus-thick"
+            @click="newTask"
           >
-            {{ text.giveTaskButton }}
+            {{ text.newTask }}
           </v-btn>
         </div>
-        <article v-for="task of posts.givenTasks" :key="task.id" class="task mt-2">
+        <p v-if="!posts.givenTasks.length" class="muted">{{ text.noneGiven }}</p>
+        <article v-for="task of posts.givenTasks" :key="task.id" class="task">
           <div class="d-flex align-center ga-2">
             <span class="flex-grow-1">
               {{ task.text }} — {{ task.assigneeName }}
@@ -153,6 +123,38 @@
         </article>
       </template>
     </template>
+
+    <!-- a new task: to whom, what, who approves, until when; sent by its button -->
+    <AppDialog v-model="taskDialog" :title="text.newTask" icon="mdi-clipboard-text-outline" max-width="560">
+      <div class="form">
+        <v-autocomplete
+          v-model="assigneeUid"
+          :items="posts.people"
+          item-title="name"
+          item-value="uid"
+          :label="text.assignee"
+          density="compact"
+          hide-details
+        />
+        <v-text-field v-model="taskText" :label="text.taskText" density="compact" hide-details />
+        <v-select
+          v-model="taskApprover"
+          :items="taskApproverItems"
+          :label="text.whoApproves"
+          density="compact"
+          hide-details
+        />
+        <DateField v-model="taskDue" :label="text.taskDueLabel" clearable density="compact" hide-details />
+      </div>
+      <template #actions>
+        <DialogButtons
+          :confirm-text="text.send"
+          :disabled="!assigneeUid || !(taskText ?? '').trim() || busy"
+          @cancel="taskDialog = false"
+          @confirm="giveTask"
+        />
+      </template>
+    </AppDialog>
 
     <!-- a task sent: what, to whom, approved by whom, until when -->
     <AppDialog
@@ -292,10 +294,21 @@ const taskDue = ref<string | null>(null)
 /** sent: a window says what went to whom */
 const taskSentDialog = ref(false)
 const sentTask = shallowRef<PostTask | null>(null)
+/** the window of a new task, empty */
+const taskDialog = ref(false)
+function newTask() {
+  assigneeUid.value = null
+  taskText.value = ''
+  taskApprover.value = ''
+  taskDue.value = null
+  taskDialog.value = true
+}
+
 const giveTask = () =>
   assigneeUid.value &&
   (taskText.value ?? '').trim() &&
   run(async () => {
+    taskDialog.value = false
     sentTask.value = await posts.createTask(
       assigneeUid.value!,
       taskText.value.trim(),
@@ -345,8 +358,10 @@ const giveTask = () =>
   color: rgb(var(--v-theme-delete));
 }
 
-.due-field {
-  max-width: 360px;
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .task {

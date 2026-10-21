@@ -1,4 +1,24 @@
 export const posts = {
+  tasksForMe: {
+    ua: 'Доручено мені',
+    ru: 'Поручено мне',
+    en: 'Asked of me'
+  },
+  newTask: {
+    ua: 'Нове доручення',
+    ru: 'Новое поручение',
+    en: 'A new task'
+  },
+  givenTasks: {
+    ua: 'Мої доручення іншим',
+    ru: 'Мои поручения другим',
+    en: 'The tasks I gave'
+  },
+  noneGiven: {
+    ua: 'Ви ще нікому нічого не доручали',
+    ru: 'Вы ещё никому ничего не поручали',
+    en: 'You gave no tasks yet'
+  },
   taskDueLabel: {
     ua: 'Термін виконання (необов’язково)',
     ru: 'Срок выполнения (необязательно)',
@@ -28,16 +48,6 @@ export const posts = {
     ua: 'Добре',
     ru: 'Хорошо',
     en: 'OK'
-  },
-  giveTaskButton: {
-    ua: 'Доручити',
-    ru: 'Поручить',
-    en: 'Ask'
-  },
-  taskSent: {
-    ua: 'Доручення надіслано: виконавець отримав повідомлення.',
-    ru: 'Поручение отправлено: исполнитель получил сообщение.',
-    en: 'Sent: the servant got a message.'
   },
   submit: {
     ua: 'Надіслати на публікацію в канал',
@@ -218,11 +228,6 @@ export const posts = {
     ua: 'Підготуйте нотатку або тему, натисніть «Надіслати на публікацію» і виберіть це доручення.',
     ru: 'Подготовьте заметку или тему, нажмите «Отправить на публикацию» и выберите это поручение.',
     en: 'Prepare a note or a topic, choose “Send for publication” and this task.'
-  },
-  giveTask: {
-    ua: 'Доручити підготовку',
-    ru: 'Поручить подготовку',
-    en: 'Ask someone to prepare a post'
   },
   assignee: {
     ua: 'Кому',

@@ -152,10 +152,13 @@ test('a pastor approves or returns with a word, and asks a servant to prepare a 
     .toMatchObject({ body: { comment: 'Додайте вірш' } })
 
   await page.getByRole('tab', { name: /Доручення/ }).click()
-  await page.locator('.v-autocomplete', { hasText: 'Кому' }).click()
+  // a new task: in its own window, sent by its button
+  await page.getByRole('button', { name: 'Нове доручення' }).click()
+  const form = dialog(page)
+  await form.locator('.v-autocomplete', { hasText: 'Кому' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Музикант' }).click()
-  await page.getByRole('textbox', { name: 'Що підготувати' }).fill('Анонс молодіжної зустрічі')
-  await page.getByRole('button', { name: 'Доручити', exact: true }).click()
+  await form.getByRole('textbox', { name: 'Що підготувати' }).fill('Анонс молодіжної зустрічі')
+  await form.getByRole('button', { name: 'Надіслати', exact: true }).click()
   // a window says what went to whom
   const sentDialog = dialog(page)
   await expect(sentDialog).toContainText('Доручення надіслано: Музикант')
