@@ -105,16 +105,22 @@
             class="field"
           />
         </div>
-        <v-text-field
-          v-model="taskText"
-          :label="text.taskText"
-          density="compact"
-          hide-details
-          class="mt-2"
-          append-inner-icon="mdi-plus-thick"
-          @click:append-inner="giveTask"
-          @keydown.enter="giveTask"
-        />
+        <v-text-field v-model="taskText" :label="text.taskText" density="compact" hide-details class="mt-2" />
+        <!-- a form of three fields: one clear button sends it -->
+        <div class="d-flex flex-wrap align-center ga-2 mt-2">
+          <v-btn
+            variant="flat"
+            color="primary"
+            class="text-none px-6"
+            prepend-icon="mdi-send"
+            :disabled="!assigneeUid || !(taskText ?? '').trim() || busy"
+            :loading="busy"
+            @click="giveTask"
+          >
+            {{ text.giveTaskButton }}
+          </v-btn>
+          <span v-if="taskSent" class="sent">{{ text.taskSent }}</span>
+        </div>
         <article v-for="task of posts.givenTasks" :key="task.id" class="task mt-2">
           <div class="d-flex align-center ga-2">
             <span class="flex-grow-1">
@@ -235,13 +241,17 @@ const taskApproverItems = computed(() => [
   { value: '', title: text.value.noApproval },
   ...posts.approvers.map((person) => ({ value: person.uid, title: person.name }))
 ])
+/** sent: a word that it is, under the button */
+const taskSent = ref(false)
 const giveTask = () =>
   assigneeUid.value &&
   (taskText.value ?? '').trim() &&
   run(async () => {
+    taskSent.value = false
     await posts.createTask(assigneeUid.value!, taskText.value.trim(), taskApprover.value || null)
     taskText.value = ''
     assigneeUid.value = null
+    taskSent.value = true
   })
 </script>
 
@@ -263,6 +273,11 @@ const giveTask = () =>
 
 .field {
   flex: 1 1 220px;
+}
+
+.sent {
+  color: rgb(var(--v-theme-primary));
+  font-size: 14px;
 }
 
 .task {

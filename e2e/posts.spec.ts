@@ -154,7 +154,8 @@ test('a pastor approves or returns with a word, and asks a servant to prepare a 
   await page.locator('.v-autocomplete', { hasText: 'Кому' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Музикант' }).click()
   await page.getByRole('textbox', { name: 'Що підготувати' }).fill('Анонс молодіжної зустрічі')
-  await page.locator('.mdi-plus-thick').click()
+  await page.getByRole('button', { name: 'Доручити', exact: true }).click()
+  await expect(page.getByText('Доручення надіслано')).toBeVisible()
   await expect
     .poll(() => requests.find((request) => request.path === '/post-tasks'))
     .toMatchObject({
