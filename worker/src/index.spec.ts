@@ -648,11 +648,12 @@ describe('the posts of the channel', () => {
 
     // the queue of the channel shows it, waiting; it is not published before the approval
     const queue = (await call('GET', '/posts', 'leader')).body
-    expect(queue).toMatchObject({
-      canPublish: true,
-      canApprove: false,
-      approvers: [{ uid: 'owner-uid' }, { uid: 'pastor-uid' }]
-    })
+    expect(queue).toMatchObject({ canPublish: true, canApprove: false })
+    // the people come by their last visit: the same moment here, in any order
+    expect((queue.approvers as { uid: string }[]).map((person) => person.uid).sort()).toEqual([
+      'owner-uid',
+      'pastor-uid'
+    ])
     expect(queue.submissions).toMatchObject([{ id, status: 'pending' }])
     expect((await call('POST', `/posts/${id}/publish`, 'leader', {})).body).toEqual({ error: 'not-approved' })
 
