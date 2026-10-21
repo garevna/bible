@@ -21,6 +21,12 @@ export interface UserRecord {
   telegramChatId?: number
   /** the home group the user belongs to (see groups.ts), chosen by the user */
   homeGroupId?: string
+  /** a reader asks for the status of a servant: when, and a word about where they serve */
+  statusRequest?: { at: number; note: string }
+  /** a status was given to a reader: its name, until the user is greeted with it in the app */
+  statusGranted?: string
+  /** a new user: the app offers once to ask for the status of a servant (gone once it is offered) */
+  offerStatus?: boolean
   /** ms */
   lastSeen: number
   /** who gave the role and when */
@@ -52,6 +58,8 @@ export async function touchUser(store: UsersStore, user: AuthUser, now = Date.no
   const old = await getUser(store, user.uid)
   const record: UserRecord = {
     role: 'reader',
+    // the very first sign in: the app offers once to ask for the status of a servant
+    ...(old ? {} : { offerStatus: true }),
     ...old,
     uid: user.uid,
     email: short(user.email),
@@ -135,8 +143,10 @@ export async function updateUser(
 ): Promise<UserView> {
   const record =
     uid === admin.uid && change.role === undefined ? admin : await changeable(store, owners, admin, uid)
+  // a status given (or the reader kept): the request is answered
+  const { statusRequest: _answered, ...rest } = record
   const updated: UserRecord = {
-    ...record,
+    ...(change.role ? rest : record),
     ...(change.role ? { role: change.role } : {}),
     ...(change.ministries ? { ministries: change.ministries } : {}),
     ...(change.phone !== undefined ? { phone: change.phone ?? undefined } : {}),
@@ -164,6 +174,27 @@ export async function renameUsersMinistry(store: UsersStore, owners: string, fro
 /** '+380501234567' (E.164); the app checks the number with libphonenumber-js, the worker its form */
 export const isPhone = (value: unknown): value is string =>
   typeof value === 'string' && /^\+[1-9]\d{7,14}$/.test(value)
+
+/** The offer to ask for the status of a servant was shown: it is not shown again */
+export async function statusOffered(store: UsersStore, me: UserRecord) {
+  const { offerStatus: _shown, ...rest } = me
+  await save(store, rest)
+}
+
+/** A reader was given a status: the app greets them with it once (null: greeted) */
+export async function setStatusGranted(store: UsersStore, uid: string, name: string | null) {
+  const record = await getUser(store, uid)
+  if (!record) return
+  const { statusGranted: _greeted, ...rest } = record
+  await save(store, name ? { ...rest, statusGranted: name } : rest)
+}
+
+/** A reader asks for the status of a servant */
+export async function askForStatus(store: UsersStore, me: UserRecord, note: string, now: number) {
+  const updated: UserRecord = { ...me, statusRequest: { at: now, note } }
+  await save(store, updated)
+  return updated
+}
 
 /** The user chooses their own home group (or none with null) */
 export async function setOwnHomeGroup(

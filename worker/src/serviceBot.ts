@@ -42,6 +42,32 @@ export const NO_BOT: ServiceBot = {
   channelTitle: async () => ''
 }
 
+/**
+ * The link that invites to the service channel: the bot is its administrator, so Telegram gives it
+ * (the link of the channel, or a new one); kept a week. Null without a bot or a channel.
+ */
+export async function channelInvite(
+  token: string | undefined,
+  chatId: string | undefined,
+  store: UsersStore,
+  fetcher: typeof fetch
+): Promise<string | null> {
+  if (!token || !chatId) return null
+  const key = `settings:chatInvite:${chatId}`
+  const kept = await store.get(key)
+  if (kept) return kept
+  const chat = await call(fetcher, token, 'getChat', { chat_id: chatId }).catch(() => ({ result: undefined }))
+  let link = typeof chat.result?.invite_link === 'string' ? chat.result.invite_link : null
+  if (!link) {
+    const made = await call(fetcher, token, 'exportChatInviteLink', { chat_id: chatId }).catch(() => ({
+      result: undefined
+    }))
+    link = typeof made.result === 'string' ? made.result : null
+  }
+  if (link) await store.put(key, link, { expirationTtl: 7 * 24 * 60 * 60 })
+  return link
+}
+
 /** The title of a channel, asked of Telegram once and kept: "Назва", or its @name, or its id */
 export async function chatTitle(
   token: string,
@@ -82,7 +108,10 @@ async function call(fetcher: typeof fetch, token: string, method: string, body: 
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body)
   })
-  return (await response.json().catch(() => ({}))) as { ok?: boolean; result?: Record<string, unknown> }
+  return (await response.json().catch(() => ({}))) as {
+    ok?: boolean
+    result?: Record<string, unknown> & string
+  }
 }
 
 /** the secret Telegram puts into the header of every update: derived from the token, no setting of its own */

@@ -84,6 +84,15 @@
               }}</v-chip>
             </div>
             <div v-if="item.email && item.name" class="user-email">{{ item.email }}</div>
+            <v-chip
+              v-if="item.statusRequest"
+              size="x-small"
+              color="calendar-orange"
+              variant="tonal"
+              class="mt-1"
+            >
+              <v-icon icon="mdi-account-arrow-up-outline" size="x-small" start />{{ text.asksStatus }}
+            </v-chip>
           </div>
         </div>
       </template>
@@ -133,6 +142,34 @@
                   <v-icon icon="mdi-send-outline" size="x-small" />
                   {{ item.telegramChatId ? text.telegramLinked : text.telegramNotLinked }}
                 </span>
+              </div>
+
+              <!-- a reader asks for the status of a servant: given or declined in one click -->
+              <div v-if="item.statusRequest" class="d-flex flex-wrap ga-2 align-center request">
+                <span class="flex-grow-1">
+                  {{ text.asksStatus
+                  }}<template v-if="item.statusRequest.note">: «{{ item.statusRequest.note }}»</template>
+                </span>
+                <v-btn
+                  variant="flat"
+                  color="primary"
+                  size="small"
+                  class="text-none"
+                  :loading="saving === item.uid"
+                  @click="change(item, { role: 'servant' })"
+                >
+                  {{ text.grantServant }}
+                </v-btn>
+                <v-btn
+                  variant="tonal"
+                  color="delete"
+                  size="small"
+                  class="text-none"
+                  :disabled="saving === item.uid"
+                  @click="change(item, { role: READER })"
+                >
+                  {{ text.declineRequest }}
+                </v-btn>
               </div>
 
               <div class="d-flex flex-wrap ga-2 align-center">
@@ -300,14 +337,17 @@ const isReader = (item: UserView) =>
 
 const shown = computed(() => {
   const words = (query.value ?? '').trim().toLowerCase()
-  return users.value
-    .filter((item) => readers.value || roleFilter.value === READER || !isReader(item))
-    .filter((item) => !roleFilter.value || item.role === roleFilter.value)
-    .filter((item) => !ministryFilter.value || ministriesOf(item).includes(ministryFilter.value))
-    .filter(
-      (item) =>
-        !words || `${item.name ?? ''} ${item.email ?? ''} ${item.phone ?? ''}`.toLowerCase().includes(words)
-    )
+  return (
+    users.value
+      // the readers who ask for a status are always shown
+      .filter((item) => readers.value || roleFilter.value === READER || !isReader(item) || item.statusRequest)
+      .filter((item) => !roleFilter.value || item.role === roleFilter.value)
+      .filter((item) => !ministryFilter.value || ministriesOf(item).includes(ministryFilter.value))
+      .filter(
+        (item) =>
+          !words || `${item.name ?? ''} ${item.email ?? ''} ${item.phone ?? ''}`.toLowerCase().includes(words)
+      )
+  )
 })
 
 const day = (ms: number) => formatDate(new Date(ms), localeOf(user.lang)).short
@@ -381,6 +421,12 @@ defineExpose({ load })
 
 .user-name {
   font-weight: 600;
+}
+
+.request {
+  padding: 8px 12px;
+  border-radius: var(--app-radius);
+  background: rgb(var(--v-theme-calendar-orange) / 10%);
 }
 
 .readiness {

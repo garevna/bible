@@ -6,6 +6,86 @@ const [ohienko, asv] = [
 ]
 
 export const header = {
+  requestTitle: {
+    ua: 'Стати служителем',
+    ru: 'Стать служителем',
+    en: 'Become a servant'
+  },
+  requestLead: {
+    ua: 'Зараз ви читач: вам доступні Біблія, нотатки і теми. Якщо ви служите в церкві, надішліть запит — адміністратор надасть вам статус служителя.',
+    ru: 'Сейчас вы читатель: вам доступны Библия, заметки и темы. Если вы служите в церкви, отправьте запрос — администратор даст вам статус служителя.',
+    en: 'You are a reader now: the Bible, notes and topics. If you serve in the church, send a request: an administrator will give you the status of a servant.'
+  },
+  requestNote: {
+    ua: 'Де ви служите (необов’язково)',
+    ru: 'Где вы служите (необязательно)',
+    en: 'Where you serve (optional)'
+  },
+  requestNoteExample: {
+    ua: 'Наприклад: музичне служіння',
+    ru: 'Например: музыкальное служение',
+    en: 'For example: the music ministry'
+  },
+  requestSend: {
+    ua: 'Надіслати запит',
+    ru: 'Отправить запрос',
+    en: 'Send the request'
+  },
+  requestLater: {
+    ua: 'Пізніше',
+    ru: 'Позже',
+    en: 'Later'
+  },
+  requestSent: {
+    ua: 'Запит надіслано. Коли адміністратор змінить ваш статус, застосунок вам про це скаже.',
+    ru: 'Запрос отправлен. Когда администратор изменит ваш статус, приложение вам об этом скажет.',
+    en: 'The request is sent. When an administrator changes your status, the app will tell you.'
+  },
+  requestFailed: {
+    ua: 'Не вдалося надіслати запит. Спробуйте ще раз.',
+    ru: 'Не удалось отправить запрос. Попробуйте ещё раз.',
+    en: 'The request was not sent. Please try again.'
+  },
+  requestWaiting: {
+    ua: 'Запит надіслано',
+    ru: 'Запрос отправлен',
+    en: 'Request sent'
+  },
+  grantedTitle: {
+    ua: 'Вітаємо!',
+    ru: 'Поздравляем!',
+    en: 'Congratulations!'
+  },
+  grantedStatus: {
+    ua: 'Ваш статус у застосунку змінено. Тепер ви — {name}.',
+    ru: 'Ваш статус в приложении изменён. Теперь вы — {name}.',
+    en: 'Your status in the app has changed. You are now: {name}.'
+  },
+  grantedNext: {
+    ua: 'Щоб отримувати запрошення на служіння:',
+    ru: 'Чтобы получать приглашения на служение:',
+    en: 'To get the invitations to serve:'
+  },
+  grantedChannel: {
+    ua: 'Приєднайтеся до каналу служителів у Telegram.',
+    ru: 'Присоединитесь к каналу служителей в Telegram.',
+    en: 'Join the channel of the servants in Telegram.'
+  },
+  grantedJoin: {
+    ua: 'Приєднатися до каналу',
+    ru: 'Присоединиться к каналу',
+    en: 'Join the channel'
+  },
+  grantedBot: {
+    ua: 'Підключіть Telegram: бот надсилатиме вам запрошення особисто.',
+    ru: 'Подключите Telegram: бот будет присылать вам приглашения лично.',
+    en: 'Link Telegram: the bot will send you the invitations in private.'
+  },
+  grantedOk: {
+    ua: 'Зрозуміло',
+    ru: 'Понятно',
+    en: 'Got it'
+  },
   ohienko,
   asv,
 

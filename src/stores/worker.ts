@@ -111,6 +111,8 @@ export interface UserView {
   emailVerified: boolean
   name: string | null
   role: Role
+  /** a reader asks for the status of a servant */
+  statusRequest?: { at: number; note: string }
   /** the ministries the user serves in, e.g. 'Музичне служіння' */
   ministries?: string[]
   /** the mobile number, '+380501234567' */
@@ -209,6 +211,16 @@ export const useWorkerStore = defineStore('worker', () => {
   const groups = ref(false)
   /** the home group the user belongs to */
   const homeGroupId = ref<string | null>(null)
+  /** a reader asked for the status of a servant (when) */
+  const statusRequestAt = ref<number | null>(null)
+  /** a new reader: the app offers once to ask for it */
+  const offerStatus = ref(false)
+  /** the window that asks for it: opened once after signing in, or from the menu of the avatar */
+  const statusRequestOpen = ref(false)
+  /** a status given to the user (its name): the app greets them once */
+  const statusGranted = ref<string | null>(null)
+  /** the link that invites to the service channel of the ministers */
+  const serviceChannel = ref<string | null>(null)
   /** the duties of leaders asked of the user, taken over by the user, or handed over by the user */
   const handovers = ref<(Handover & { ministry: string })[]>([])
   /** the calendar: everyone who signed in (a reader sees the open events for everyone) */
@@ -266,6 +278,10 @@ export const useWorkerStore = defineStore('worker', () => {
     ministryRoles.value = {}
     groups.value = false
     homeGroupId.value = null
+    statusRequestAt.value = null
+    offerStatus.value = false
+    statusGranted.value = null
+    serviceChannel.value = null
     handovers.value = []
     calendar.value = false
     allTranslations.value = false
@@ -287,6 +303,10 @@ export const useWorkerStore = defineStore('worker', () => {
         ministryRoles?: Record<string, string[]>
         groups?: boolean
         homeGroupId?: string | null
+        statusRequestAt?: number | null
+        offerStatus?: boolean
+        statusGranted?: string | null
+        serviceChannel?: string | null
         handovers?: (Handover & { ministry: string })[]
         allTranslations?: boolean
         telegramLinked?: boolean
@@ -305,6 +325,10 @@ export const useWorkerStore = defineStore('worker', () => {
       ministryRoles.value = me.ministryRoles ?? {}
       groups.value = Boolean(me.groups)
       homeGroupId.value = me.homeGroupId ?? null
+      statusRequestAt.value = me.statusRequestAt ?? null
+      offerStatus.value = Boolean(me.offerStatus)
+      statusGranted.value = me.statusGranted ?? null
+      serviceChannel.value = me.serviceChannel ?? null
       handovers.value = me.handovers ?? []
       calendar.value = true
       allTranslations.value = Boolean(me.allTranslations)
@@ -428,6 +452,25 @@ export const useWorkerStore = defineStore('worker', () => {
     await loadRole()
   }
 
+  /** a reader asks for the status of a servant: the administrators of the users are told */
+  async function requestStatus(note: string) {
+    statusRequestAt.value = (
+      await call<{ statusRequestAt: number }>('POST', '/status-request', { note })
+    ).statusRequestAt
+  }
+
+  /** the offer to ask for the status was shown: not again */
+  async function statusOffered() {
+    offerStatus.value = false
+    await call('PUT', '/me', { offered: true }).catch(() => undefined)
+  }
+
+  /** the user was greeted with the status given */
+  async function greeted() {
+    statusGranted.value = null
+    await call('PUT', '/me', { greeted: true }).catch(() => undefined)
+  }
+
   /** the user chooses their home group (or none) */
   async function setHomeGroup(id: string | null) {
     homeGroupId.value = (
@@ -536,6 +579,14 @@ export const useWorkerStore = defineStore('worker', () => {
     needsPhone,
     serviceBot,
     groups,
+    statusRequestAt,
+    offerStatus,
+    statusOffered,
+    statusRequestOpen,
+    statusGranted,
+    serviceChannel,
+    requestStatus,
+    greeted,
     homeGroupId,
     setHomeGroup,
     handovers,

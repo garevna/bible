@@ -520,6 +520,66 @@ describe('roles kept by the administrators', () => {
   })
 })
 
+describe('a reader asks for the status of a servant', () => {
+  it('a new user is offered once to ask for it, not again', async () => {
+    const { call } = setup()
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({ offerStatus: true })
+    expect((await call('PUT', '/me', 'reader', { offered: true })).body).toEqual({ offerStatus: false })
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({ offerStatus: false })
+  })
+
+  it('the people who give the statuses are told; the status given answers the request', async () => {
+    const { call, messages, clock } = setup()
+    for (const user of ['owner', 'pastor', 'musician', 'reader']) await call('GET', '/me', user)
+    // the pastor gives the statuses, the musician does not
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'admin' })
+    await call('PUT', '/admin/users/musician-uid', 'owner', { role: 'servant' })
+
+    const asked = await call('POST', '/status-request', 'reader', { note: 'Музичне служіння' })
+    expect(asked.body.statusRequestAt).toEqual(expect.any(Number))
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({
+      statusRequestAt: asked.body.statusRequestAt
+    })
+    const told = async (uid: string) =>
+      (await messages.forUser(uid, clock.now)).filter((message) =>
+        message.text.includes('просить статус служителя')
+      )
+    expect(await told('owner-uid')).toHaveLength(1)
+    expect((await told('pastor-uid'))[0]!.text).toContain('Музичне служіння')
+    expect(await told('musician-uid')).toHaveLength(0)
+    // asked again: nobody is told twice
+    await call('POST', '/status-request', 'reader', {})
+    expect(await told('pastor-uid')).toHaveLength(1)
+    // a servant does not ask
+    expect((await call('POST', '/status-request', 'musician', {})).status).toBe(409)
+
+    // the administrators see the request; the status given answers it, and the reader is told
+    const users = (await call('GET', '/admin/users', 'pastor')).body.users as {
+      uid: string
+      statusRequest?: unknown
+    }[]
+    expect(users.find((user) => user.uid === 'reader-uid')!.statusRequest).toMatchObject({
+      note: 'Музичне служіння'
+    })
+    await call('PUT', '/admin/users/reader-uid', 'pastor', { role: 'servant' })
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({
+      role: 'servant',
+      statusRequestAt: null
+    })
+    const toReader = (await messages.forUser('reader-uid', clock.now)).filter(
+      (message) => message.toUid === 'reader-uid'
+    )
+    expect(toReader[0]!.text).toContain('Вам надано статус «Служитель»')
+    // the app greets them with the status once
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({
+      statusGranted: 'Служитель',
+      serviceChannel: null
+    })
+    expect((await call('PUT', '/me', 'reader', { greeted: true })).body).toEqual({ statusGranted: null })
+    expect((await call('GET', '/me', 'reader')).body).toMatchObject({ statusGranted: null })
+  })
+})
+
 describe('the resources of the ministries', () => {
   it('the kinds of materials: kept by the planners of the schedule', async () => {
     const { call } = setup()

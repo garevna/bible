@@ -134,6 +134,21 @@ export const admin = {
     ru: 'Удалить вид',
     en: 'Remove the kind'
   },
+  asksStatus: {
+    ua: 'Просить статус служителя',
+    ru: 'Просит статус служителя',
+    en: 'Asks for the status of a servant'
+  },
+  grantServant: {
+    ua: 'Надати статус служителя',
+    ru: 'Дать статус служителя',
+    en: 'Give the status of a servant'
+  },
+  declineRequest: {
+    ua: 'Відхилити запит',
+    ru: 'Отклонить запрос',
+    en: 'Decline the request'
+  },
   sectionLocations: {
     ua: 'Локації',
     ru: 'Локации',

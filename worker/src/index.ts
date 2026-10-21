@@ -28,6 +28,7 @@ import { handleSchedule, type ScheduleContext } from './scheduleRoutes'
 import {
   type Ask,
   answered,
+  channelInvite,
   chatTitle,
   askOf,
   forgetChat,
@@ -88,6 +89,9 @@ import {
   setAddresses,
   setDirectory,
   setTranslationMinistries,
+  askForStatus,
+  setStatusGranted,
+  statusOffered,
   setOwnHomeGroup,
   setOwnPhone,
   setTelegramChat,
@@ -120,6 +124,7 @@ import {
  *   PUT    /groups/:id              its leader: the day, the place, the members…; directories: the name, the leader
  *   DELETE /groups/:id              removes it                                       directories
  *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
+ *   POST   /status-request          { note? }: a reader asks for the status of a servant (the administrators of users are told)
  *   GET    /youtube?url             the title and the channel of a video of YouTube (a material)
  *   POST   /handover                { ministry, toUid, until? }: the leader (or an administrator) asks a deputy
  *   POST   /handover/answer         { ministry, answer: 'accept' | 'decline' }: the deputy answers
@@ -198,6 +203,7 @@ const ROUTES = [
   /^(PUT|DELETE) \/groups\/[^/]+$/,
   /^PUT \/groups-visibility$/,
   /^GET \/youtube$/,
+  /^POST \/status-request$/,
   /^(POST|DELETE) \/handover$/,
   /^POST \/handover\/answer$/,
   /^GET \/ministry-roles$/,
@@ -758,13 +764,37 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         (await getGroups(env.USERS)).some((group) => group.leaderUid === me.uid),
       telegramLinked: Boolean(me.telegramChatId),
       homeGroupId: me.homeGroupId ?? null,
+      // a reader who asked for the status of a servant
+      statusRequestAt: me.statusRequest?.at ?? null,
+      // a new reader: the app offers once to ask for it
+      offerStatus: Boolean(me.offerStatus) && !serves(roles, roleId),
+      // a status given to a reader: the app greets them, and invites to the service channel
+      statusGranted: me.statusGranted ?? null,
+      serviceChannel: me.statusGranted
+        ? await channelInvite(env.SERVICE_BOT_TOKEN, env.SERVICE_CHAT_ID, env.USERS, deps.fetcher)
+        : null,
       // ministers are asked for their mobile number until they give it
       needsPhone: serves(roles, roleId) && !me.phone
     })
   }
 
   if (route === 'PUT /me') {
-    const { phone, homeGroupId } = ((await body()) ?? {}) as { phone?: unknown; homeGroupId?: unknown }
+    const { phone, homeGroupId, greeted, offered } = ((await body()) ?? {}) as {
+      phone?: unknown
+      homeGroupId?: unknown
+      greeted?: unknown
+      offered?: unknown
+    }
+    // the offer to ask for the status of a servant was shown, once
+    if (offered === true) {
+      await statusOffered(env.USERS, me)
+      return json({ offerStatus: false })
+    }
+    // the user was greeted with the status given
+    if (greeted === true) {
+      await setStatusGranted(env.USERS, me.uid, null)
+      return json({ statusGranted: null })
+    }
     // the home group of the user: one of the groups, or none
     if (homeGroupId !== undefined) {
       const known = (await getGroups(env.USERS)).some((group) => group.id === homeGroupId)
@@ -898,6 +928,35 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       groups.map((item) => (item.id === id ? updated : item))
     )
     return json({ group: show(updated) })
+  }
+
+  // a reader asks for the status of a servant: the people who give the statuses are told
+  if (route === 'POST /status-request') {
+    if (serves(roles, roleId)) return json({ error: 'serves' }, 409)
+    const note = ((await body()) as { note?: unknown } | null)?.note
+    const words = typeof note === 'string' ? note.trim().slice(0, 300) : ''
+    const now = deps.now?.() ?? Date.now()
+    if (!me.statusRequest) {
+      const everyone = await listUsers(env.USERS, env.OWNERS, true)
+      const givers = everyone
+        .filter((user) => user.owner || rightsOf(roles, user.role).manage.includes('users'))
+        .map((user) => user.uid)
+      await tell(
+        env,
+        deps,
+        me,
+        givers,
+        `🙋 ${nameOf(me)}${me.email && me.name ? ` (${me.email})` : ''} просить статус служителя.${words ? ` ${words}` : ''} Змініть статус у розділі «Служителі».`
+      )
+    }
+    // asked again: the first words stay unless new ones are given
+    const updated = await askForStatus(
+      env.USERS,
+      me,
+      words || (me.statusRequest?.note ?? ''),
+      me.statusRequest?.at ?? now
+    )
+    return json({ statusRequestAt: updated.statusRequest!.at })
   }
 
   // a video of YouTube given as a material: its title comes by itself
@@ -1213,12 +1272,26 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     ) {
       return json({ error: 'bad-request' }, 400)
     }
+    const asked = Boolean(target?.statusRequest)
+    const wasReader = target ? !serves(roles, roleOf(target, env.OWNERS)) : false
     const user = await updateUser(env.USERS, env.OWNERS, me, uid, {
       ...(role ? { role } : {}),
       ...(ministries ? { ministries } : {}),
       ...(change.phone !== undefined ? { phone: change.phone as string | null } : {}),
       ...(name !== undefined ? { name } : {})
     })
+    // the one who asked for the status of a servant is told it is given
+    if (asked && role && serves(roles, user.role))
+      await tell(
+        env,
+        deps,
+        me,
+        [uid],
+        `✅ Вам надано статус «${rightsOf(roles, user.role).name}». Оновіть сторінку застосунку.`
+      )
+    // a reader who now serves is greeted with the status in the app, once
+    if (wasReader && role && serves(roles, user.role))
+      await setStatusGranted(env.USERS, uid, rightsOf(roles, user.role).name)
     return json({ user })
   } catch (error) {
     if (!(error instanceof RoleChangeError)) throw error

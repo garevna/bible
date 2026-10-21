@@ -64,6 +64,14 @@
           </v-list-item>
         </template>
         <v-divider v-if="compact && worker.calendar" />
+        <!-- a reader asks for the status of a servant -->
+        <v-list-item
+          v-if="worker.calendar && worker.role === READER"
+          prepend-icon="mdi-account-arrow-up-outline"
+          :title="header.requestTitle"
+          :subtitle="worker.statusRequestAt ? header.requestWaiting : ''"
+          @click="worker.statusRequestOpen = true"
+        />
         <!-- the home group of the user: an administrator or a servant -->
         <v-list-item
           v-if="worker.canReceive"
@@ -168,7 +176,7 @@ import HomeGroupDialog from '@/components/groups/HomeGroupDialog.vue'
 import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
-import { useWorkerStore } from '@/stores/worker'
+import { READER, useWorkerStore } from '@/stores/worker'
 import type { Page } from '@/types'
 import { pickImage, resizeImage } from '@/utils/image'
 
