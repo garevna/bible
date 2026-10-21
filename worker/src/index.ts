@@ -56,6 +56,7 @@ import {
   setGroupsVisibility,
   type HomeGroup
 } from './groups'
+import { d1Posts, type PostsStore, type PostTask, type Submission } from './posts'
 import { getMaterialKinds, isYouTube, parseMaterialKinds, setMaterialKinds, videoOf } from './materialKinds'
 import { getHandovers, parseUntil, renameHandover, setHandovers, type Handovers } from './handovers'
 import {
@@ -126,6 +127,14 @@ import {
  *   DELETE /groups/:id              removes it                                       directories
  *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
  *   POST   /status-request          { note? }: a reader asks for the status of a servant (the administrators of users are told)
+ *   GET    /posts                   the posts for the channel the user sees: their own, to approve, the queue (publish)
+ *   POST   /posts                   { kind, post, approverUid?, taskId? }: sent for publication
+ *   POST   /posts/:id/approve       its approver
+ *   POST   /posts/:id/return        { comment }: its approver, or the ones who publish
+ *   POST   /posts/:id/publish       { image? }: an approved post goes to the channel             publish
+ *   DELETE /posts/:id               its author (not published yet), or the ones who publish
+ *   POST   /post-tasks              { assigneeUid, text, approverUid? }: a post asked of a servant  approvePosts
+ *   DELETE /post-tasks/:id          the one who asked
  *   GET    /youtube?url             the title and the channel of a video of YouTube (a material)
  *   POST   /handover                { ministry, toUid, until? }: the leader (or an administrator) asks a deputy
  *   POST   /handover/answer         { ministry, answer: 'accept' | 'decline' }: the deputy answers
@@ -171,6 +180,8 @@ export interface Deps {
   messages?: MessagesStore
   /** the schedule of ministries; D1 when not given */
   schedule?: ScheduleStore
+  /** the posts sent for publication in the channel; D1 when not given */
+  posts?: PostsStore
   now?: () => number
 }
 
@@ -204,6 +215,11 @@ const ROUTES = [
   /^(PUT|DELETE) \/groups\/[^/]+$/,
   /^PUT \/groups-visibility$/,
   /^GET \/youtube$/,
+  /^(GET|POST) \/posts$/,
+  /^POST \/posts\/[^/]+\/(approve|return|publish)$/,
+  /^DELETE \/posts\/[^/]+$/,
+  /^POST \/post-tasks$/,
+  /^DELETE \/post-tasks\/[^/]+$/,
   /^POST \/status-request$/,
   /^(POST|DELETE) \/handover$/,
   /^POST \/handover\/answer$/,
@@ -824,7 +840,9 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
   }
 
   if (pathname.startsWith('/telegram/')) {
-    if (!rights.publish) return json({ error: 'forbidden' }, 403)
+    // the preview: for everyone who sends a post for publication; sending: the right to publish
+    if (route === 'POST /telegram/preview' ? !serves(roles, roleId) : !rights.publish)
+      return json({ error: 'forbidden' }, 403)
     const post = parsePost(await body())
     if (!post) return json({ error: 'bad-request' }, 400)
     const messages = formatTopic(post)
@@ -838,6 +856,230 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       // the app says where the post went
       const channel = await chatTitle(token, chatId, env.USERS, deps.fetcher)
       return json({ sent: sent + (post.image ? 1 : 0), channel })
+    } catch (error) {
+      const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
+      return json({ error: 'telegram', message }, 502)
+    }
+  }
+
+  // the posts of the channel: sent, approved, published; the posts asked of the servants
+  if (pathname.startsWith('/posts') || pathname.startsWith('/post-tasks')) {
+    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    const store = deps.posts ?? d1Posts(env.DB)
+    const now = deps.now?.() ?? Date.now()
+    const everyone = await listUsers(env.USERS, env.OWNERS, true)
+    const rightsOfUser = (user: (typeof everyone)[number]) =>
+      rightsFor(roles, ministryRoles, roleOf(user, env.OWNERS), user.uid, handovers)
+    const servingUsers = everyone.filter((user) => serves(roles, roleOf(user, env.OWNERS)))
+    /** the pastors who decide: they approve the posts */
+    const approvers = servingUsers.filter((user) => rightsOfUser(user).approvePosts)
+    /** the administrators of the channel: they publish */
+    const publishers = servingUsers.filter((user) => rightsOfUser(user).publish).map((user) => user.uid)
+    const person = (uid: unknown) =>
+      typeof uid === 'string' ? servingUsers.find((user) => user.uid === uid) : undefined
+    const titleOf = (item: Submission) => item.title || '…'
+
+    if (route === 'GET /posts') {
+      const submissions = (await store.submissions()).filter(
+        (item) =>
+          item.authorUid === me.uid ||
+          item.approverUid === me.uid ||
+          (rights.publish && item.status !== 'returned')
+      )
+      const tasks = (await store.tasks()).filter(
+        (task) => task.assigneeUid === me.uid || task.byUid === me.uid
+      )
+      return json({
+        submissions,
+        tasks,
+        approvers: approvers.map((user) => ({ uid: user.uid, name: nameOf(user) })),
+        people: servingUsers.map((user) => ({ uid: user.uid, name: nameOf(user) })),
+        canApprove: Boolean(rights.approvePosts),
+        canPublish: rights.publish
+      })
+    }
+
+    if (route === 'POST /posts') {
+      const payload = ((await body()) ?? {}) as {
+        kind?: unknown
+        post?: unknown
+        approverUid?: unknown
+        taskId?: unknown
+      }
+      const kind = payload.kind === 'topic' ? 'topic' : payload.kind === 'note' ? 'note' : null
+      const post = parsePost(payload.post)
+      if (!kind || !post) return json({ error: 'bad-request' }, 400)
+      // a task says who approves; the ones who decide or publish need nobody to approve their own
+      const task = typeof payload.taskId === 'string' ? await store.task(payload.taskId) : null
+      if (
+        payload.taskId !== undefined &&
+        payload.taskId !== null &&
+        (!task || task.assigneeUid !== me.uid || task.status !== 'open')
+      )
+        return json({ error: 'bad-request' }, 400)
+      const approverUid = task
+        ? task.approverUid
+        : typeof payload.approverUid === 'string'
+          ? payload.approverUid
+          : null
+      const approver = approverUid ? approvers.find((user) => user.uid === approverUid) : undefined
+      if (approverUid && !approver) return json({ error: 'bad-request' }, 400)
+      if (!approverUid && !task && !rights.approvePosts && !rights.publish)
+        return json({ error: 'approval-needed' }, 400)
+      const item: Submission = {
+        id: crypto.randomUUID(),
+        kind,
+        title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : ''),
+        post,
+        authorUid: me.uid,
+        authorName: nameOf(me),
+        approverUid: approver?.uid ?? null,
+        approverName: approver ? nameOf(approver) : null,
+        status: approver ? 'pending' : 'approved',
+        comment: '',
+        taskId: task?.id ?? null,
+        createdAt: now,
+        decidedAt: null,
+        publishedAt: null,
+        publishedBy: null
+      }
+      await store.putSubmission(item)
+      if (task) await store.putTask({ ...task, status: 'done' })
+      if (approver)
+        await tell(
+          env,
+          deps,
+          me,
+          [approver.uid],
+          `📝 ${nameOf(me)} просить затвердити публікацію «${titleOf(item)}». Розділ «Публікації».`
+        )
+      else
+        await tell(
+          env,
+          deps,
+          me,
+          publishers,
+          `📝 Нова публікація для каналу: «${titleOf(item)}» (${nameOf(me)}). Розділ «Публікації».`
+        )
+      return json({ submission: item })
+    }
+
+    if (route === 'POST /post-tasks') {
+      if (!rights.approvePosts) return json({ error: 'forbidden' }, 403)
+      const payload = ((await body()) ?? {}) as {
+        assigneeUid?: unknown
+        text?: unknown
+        approverUid?: unknown
+      }
+      const assignee = person(payload.assigneeUid)
+      const text = typeof payload.text === 'string' ? payload.text.trim().slice(0, 500) : ''
+      const approver = payload.approverUid ? approvers.find((user) => user.uid === payload.approverUid) : null
+      if (!assignee || !text || approver === undefined) return json({ error: 'bad-request' }, 400)
+      const task: PostTask = {
+        id: crypto.randomUUID(),
+        byUid: me.uid,
+        byName: nameOf(me),
+        assigneeUid: assignee.uid,
+        assigneeName: nameOf(assignee),
+        text,
+        approverUid: approver?.uid ?? null,
+        approverName: approver ? nameOf(approver) : null,
+        status: 'open',
+        createdAt: now
+      }
+      await store.putTask(task)
+      await tell(
+        env,
+        deps,
+        me,
+        [assignee.uid],
+        `📝 Доручення від ${nameOf(me)}: підготувати публікацію для каналу — ${text}.${approver ? ` Затверджує: ${nameOf(approver)}.` : ''} Розділ «Публікації».`
+      )
+      return json({ task })
+    }
+
+    const taskId = pathname.match(/^\/post-tasks\/([^/]+)$/)?.[1]
+    if (taskId) {
+      const task = await store.task(decodeURIComponent(taskId))
+      if (!task) return json({ error: 'not-found' }, 404)
+      if (task.byUid !== me.uid) return json({ error: 'forbidden' }, 403)
+      await store.deleteTask(task.id)
+      return json({ removed: task.id })
+    }
+
+    const [, id = '', action] = pathname.match(/^\/posts\/([^/]+)(?:\/(\w+))?$/) ?? []
+    const item = await store.submission(decodeURIComponent(id))
+    if (!item) return json({ error: 'not-found' }, 404)
+
+    if (request.method === 'DELETE') {
+      if (!(item.authorUid === me.uid && item.status !== 'published') && !rights.publish)
+        return json({ error: 'forbidden' }, 403)
+      await store.deleteSubmission(item.id)
+      return json({ removed: item.id })
+    }
+
+    if (action === 'approve') {
+      if (item.approverUid !== me.uid || item.status !== 'pending') return json({ error: 'forbidden' }, 403)
+      const approved: Submission = { ...item, status: 'approved', decidedAt: now }
+      await store.putSubmission(approved)
+      await tell(env, deps, me, [item.authorUid], `✅ Публікацію «${titleOf(item)}» затверджено.`)
+      await tell(
+        env,
+        deps,
+        me,
+        publishers,
+        `📝 Затверджено для каналу: «${titleOf(item)}» (${item.authorName}). Розділ «Публікації».`
+      )
+      return json({ submission: approved })
+    }
+
+    if (action === 'return') {
+      const mayReturn =
+        (item.approverUid === me.uid && item.status === 'pending') ||
+        (rights.publish && item.status !== 'published')
+      if (!mayReturn) return json({ error: 'forbidden' }, 403)
+      const comment = (((await body()) as { comment?: unknown } | null)?.comment ?? '') as string
+      const word = typeof comment === 'string' ? comment.trim().slice(0, 1000) : ''
+      const returned: Submission = { ...item, status: 'returned', comment: word, decidedAt: now }
+      await store.putSubmission(returned)
+      await tell(
+        env,
+        deps,
+        me,
+        [item.authorUid],
+        `↩️ Публікацію «${titleOf(item)}» повернуто.${word ? ` ${word}` : ''}`
+      )
+      return json({ submission: returned })
+    }
+
+    // publish: approved (or needing no approval), with the picture the administrator of the channel adds
+    if (!rights.publish) return json({ error: 'forbidden' }, 403)
+    if (item.status !== 'approved')
+      return json({ error: item.status === 'pending' ? 'not-approved' : 'not-found' }, 409)
+    const image = (((await body()) as { image?: unknown } | null)?.image ?? undefined) as string | undefined
+    const post = parsePost({ ...item.post, ...(image ? { image } : {}) })
+    if (!post) return json({ error: 'bad-request' }, 400)
+    try {
+      const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId } = env
+      const caption = post.image ? titleBlock(post) : null
+      if (post.image && caption !== null) await sendPhoto(token, chatId, post.image, caption, deps.fetcher)
+      await sendMessages(token, chatId, formatTopic(post), deps.fetcher)
+      const published: Submission = {
+        ...item,
+        post,
+        status: 'published',
+        publishedAt: now,
+        publishedBy: nameOf(me)
+      }
+      await store.putSubmission(published)
+      await tell(
+        env,
+        deps,
+        me,
+        [item.authorUid, ...(item.approverUid ? [item.approverUid] : [])],
+        `📢 Публікацію «${titleOf(item)}» опубліковано в каналі.`
+      )
+      return json({ submission: published, channel: await chatTitle(token, chatId, env.USERS, deps.fetcher) })
     } catch (error) {
       const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
       return json({ error: 'telegram', message }, 502)
@@ -1444,6 +1686,8 @@ export default {
   // once a day: the expired messages and the past events go
   scheduled: async (_event: ScheduledController, env: Env) => {
     await d1Store(env.DB).deleteExpired(Date.now())
+    // the published and returned posts and the done tasks: kept two months
+    await d1Posts(env.DB).deleteOld(Date.now() - 60 * DAY)
     await d1Schedule(env.DB).deletePast(localDay(Date.now()))
   }
 } satisfies ExportedHandler<Env>

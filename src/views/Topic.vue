@@ -5,6 +5,11 @@
       <span class="topic-title text-primary ml-2 flex-grow-1">{{ topics.currentTopic?.title }}</span>
       <!-- editing mode, publishers only: the topic as a post of the Telegram channel -->
       <PublishPost v-if="showControls && topics.currentTopic && worker.canPublish" :build="topicAsPost" />
+      <SubmitPost
+        v-else-if="showControls && topics.currentTopic && worker.canReceive"
+        :build="topicAsPost"
+        kind="topic"
+      />
       <SendMessage v-if="showControls && topics.currentTopic && worker.canSend" :attach="topicAsAttachment" />
       <ControlsView v-model="showControls" storage-key="topicMode" />
 
@@ -118,6 +123,7 @@ import { useDisplay } from 'vuetify'
 
 import ControlsView from '@/components/ControlsView.vue'
 import PublishPost from '@/components/PublishPost.vue'
+import SubmitPost from '@/components/posts/SubmitPost.vue'
 import SendMessage from '@/components/messages/SendMessage.vue'
 import CreateNote from '@/components/notes/CreateNote.vue'
 import AddVerses from '@/components/selectors/AddVerses.vue'

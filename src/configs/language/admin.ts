@@ -164,6 +164,16 @@ export const admin = {
     ru: 'Удалить статус (его люди станут служителями)',
     en: 'Remove the status (its people become servants)'
   },
+  rightApprovePosts: {
+    ua: 'Затверджує публікації для каналу',
+    ru: 'Утверждает публикации для канала',
+    en: 'Approves the posts of the channel'
+  },
+  ministryRightApprovePosts: {
+    ua: 'Затверджує публікації',
+    ru: 'Утверждает публикации',
+    en: 'Approves the posts'
+  },
   sectionLocations: {
     ua: 'Локації',
     ru: 'Локации',

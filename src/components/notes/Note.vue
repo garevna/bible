@@ -6,6 +6,7 @@
       <v-spacer />
       <template v-if="showControls">
         <PublishPost v-if="worker.canPublish" :build="noteAsPost" small />
+        <SubmitPost v-else-if="worker.canReceive" :build="noteAsPost" kind="note" small />
         <SendMessage v-if="worker.canSend" :attach="noteAsAttachment" small />
         <DialogToUpdateNote :note="note" small @saved="emit('changed')" />
         <ConfirmButton icon="$deleteNote" :text="notes.deleteNote" @confirm="remove" />
@@ -45,6 +46,7 @@ import { storeToRefs } from 'pinia'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import PublishPost from '@/components/PublishPost.vue'
+import SubmitPost from '@/components/posts/SubmitPost.vue'
 import SendMessage from '@/components/messages/SendMessage.vue'
 import DialogToUpdateNote from '@/components/notes/DialogToUpdateNote.vue'
 import { getVersesByRefs, noteDate } from '@/db'

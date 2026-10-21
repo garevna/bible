@@ -25,6 +25,8 @@ export interface MinistryRole {
   approve: boolean
   /** posts notes and topics to the Telegram channel */
   publish: boolean
+  /** decides whether a post may go to the channel (approves the posts sent for publication) */
+  approvePosts?: boolean
   /** writes messages to the people of the ministry */
   send: boolean
   /** its people */
@@ -42,6 +44,7 @@ export interface MinistryRights {
   /** the ministries whose applications the user takes */
   approve: string[]
   publish: boolean
+  approvePosts: boolean
   /** the ministries whose people the user writes to */
   send: string[]
 }
@@ -107,17 +110,26 @@ export function ministryRightsOf(
   uid: string,
   handovers: Handovers = {}
 ): MinistryRights {
-  const rights: MinistryRights = { leads: [], invite: [], approve: [], publish: false, send: [] }
+  const rights: MinistryRights = {
+    leads: [],
+    invite: [],
+    approve: [],
+    publish: false,
+    approvePosts: false,
+    send: []
+  }
   for (const [ministry, list] of Object.entries(roles)) {
-    const mine = list.filter((role) => role.uids.includes(uid))
-    // the deputy who took the duties over leads as the leader does
-    const leads = mine.some((role) => role.lead) || actingOf(handovers, ministry) === uid
+    const acting = actingOf(handovers, ministry) === uid
+    // the deputy who took the duties over has the roles of the leaders too (e.g. the channel: publishing)
+    const mine = list.filter((role) => role.uids.includes(uid) || (acting && role.lead))
+    const leads = mine.some((role) => role.lead)
     if (leads) rights.leads.push(ministry)
     // a leader invites, approves and writes to the people of the ministry
     if (leads || mine.some((role) => role.invite)) rights.invite.push(ministry)
     if (leads || mine.some((role) => role.approve)) rights.approve.push(ministry)
     if (leads || mine.some((role) => role.send)) rights.send.push(ministry)
     if (mine.some((role) => role.publish)) rights.publish = true
+    if (mine.some((role) => role.approvePosts)) rights.approvePosts = true
   }
   return rights
 }
@@ -156,6 +168,7 @@ const isRole = (value: unknown): value is MinistryRole => {
     ) &&
     // the roles saved before the deputies have none
     (role.deputy === undefined || typeof role.deputy === 'boolean') &&
+    (role.approvePosts === undefined || typeof role.approvePosts === 'boolean') &&
     Array.isArray(role.uids) &&
     role.uids.length <= 100 &&
     role.uids.every((uid) => typeof uid === 'string' && uid.length <= 200)
@@ -179,6 +192,7 @@ export function parseMinistryRoles(value: unknown, ministries: string[]): Minist
       invite: role.invite,
       approve: role.approve,
       publish: role.publish,
+      approvePosts: role.approvePosts ?? false,
       send: role.send,
       uids: [...new Set(role.uids)]
     }))

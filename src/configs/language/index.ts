@@ -8,6 +8,7 @@ import { messages } from './messages'
 import { nestedDraggable } from './nestedDraggable'
 import { notes } from './notes'
 import { pages } from './pages'
+import { posts } from './posts'
 import { publish } from './publish'
 import { search } from './search'
 import { selector } from './selector'
@@ -27,6 +28,7 @@ export const languages = {
   nestedDraggable,
   notes,
   pages,
+  posts,
   publish,
   search,
   selector,

@@ -192,7 +192,8 @@ const PAGE_ICONS: Partial<Record<Page, string>> = {
   topic: '$topics',
   admin: 'mdi-shield-account-outline',
   messages: 'mdi-message-arrow-right',
-  calendar: 'mdi-calendar-month-outline'
+  calendar: 'mdi-calendar-month-outline',
+  posts: 'mdi-bullhorn-outline'
 }
 const icon = computed(() => {
   const page = (app.page ?? 'bible') as Page

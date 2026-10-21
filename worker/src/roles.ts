@@ -17,6 +17,8 @@ export interface RoleDef {
   name: string
   /** posts notes and topics to the Telegram channel */
   publish: boolean
+  /** decides whether a post may go to the channel (approves the posts sent for publication) */
+  approvePosts?: boolean
   /** writes messages to colleagues */
   send: boolean
   /** the roles whose people it may write to */
@@ -81,6 +83,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     id: 'admin',
     name: 'Адміністратор',
     publish: true,
+    approvePosts: true,
     send: true,
     sendToRoles: ['servant', 'admin', SUPERVISOR],
     sendToPeople: true,
@@ -93,6 +96,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     id: SUPERVISOR,
     name: 'Супервайзер',
     publish: true,
+    approvePosts: true,
     send: true,
     sendToRoles: ['servant', 'admin', SUPERVISOR],
     sendToPeople: true,
@@ -120,6 +124,7 @@ export function effectiveRights(status: RoleDef, ministry: MinistryRights): Righ
   return {
     ...status,
     publish: status.publish || ministry.publish,
+    approvePosts: Boolean(status.approvePosts) || ministry.approvePosts,
     send: status.send || ministry.send.length > 0,
     invite: status.invite.includes(ANY_MINISTRY)
       ? [ANY_MINISTRY]
@@ -190,6 +195,7 @@ const isRoleDef = (value: unknown): value is RoleDef => {
     role.messageDays >= 1 &&
     role.messageDays <= 30 &&
     (role.approve === undefined || typeof role.approve === 'boolean') &&
+    (role.approvePosts === undefined || typeof role.approvePosts === 'boolean') &&
     (role.invite === undefined ||
       (Array.isArray(role.invite) &&
         role.invite.length <= 100 &&
@@ -217,6 +223,7 @@ export function parseRoles(value: unknown): RoleDef[] | null {
     sendToPeople: role.sendToPeople,
     messageDays: role.messageDays,
     approve: role.approve ?? false,
+    approvePosts: role.approvePosts ?? false,
     // every ministry, or the chosen ones
     invite: role.invite?.includes(ANY_MINISTRY) ? [ANY_MINISTRY] : [...new Set(role.invite ?? [])],
     manage: [...new Set(role.manage)]

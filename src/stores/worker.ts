@@ -23,6 +23,8 @@ export interface RoleDef {
   id: string
   name: string
   publish: boolean
+  /** decides whether a post may go to the channel */
+  approvePosts?: boolean
   send: boolean
   sendToRoles: string[]
   sendToPeople: boolean
@@ -57,6 +59,8 @@ export interface MinistryRole {
   approve: boolean
   /** posts notes and topics to the Telegram channel */
   publish: boolean
+  /** decides whether a post may go to the channel */
+  approvePosts?: boolean
   /** writes messages to the people of the ministry */
   send: boolean
   uids: string[]

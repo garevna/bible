@@ -64,6 +64,18 @@
           </v-list-item>
         </template>
         <v-divider v-if="compact && worker.calendar" />
+        <!-- the posts of the channel: the servants; the number of what waits for the user -->
+        <v-list-item
+          v-if="worker.canReceive"
+          prepend-icon="mdi-bullhorn-outline"
+          :title="pages.posts"
+          v-bind="here('posts')"
+          @click="app.setPage('posts')"
+        >
+          <template v-if="posts.waiting" #append>
+            <v-badge :content="posts.waiting" color="warning" inline />
+          </template>
+        </v-list-item>
         <!-- the app on the home screen of the phone, until it is there -->
         <v-list-item
           v-if="!installed"
@@ -182,6 +194,7 @@ import { storeToRefs } from 'pinia'
 import PhoneDialog from '@/components/PhoneDialog.vue'
 import HomeGroupDialog from '@/components/groups/HomeGroupDialog.vue'
 import InstallDialog from '@/components/user/InstallDialog.vue'
+import { usePostsStore } from '@/stores/posts'
 import { installed } from '@/utils/install'
 import { useAppStore } from '@/stores/app'
 import { useLanguageStore } from '@/stores/language'
@@ -201,7 +214,8 @@ const {
   calendar: calendarText,
   groups: groupsText,
   header,
-  messages: messagesText
+  messages: messagesText,
+  pages
 } = storeToRefs(useLanguageStore())
 
 /** the number of unread messages on the avatar: a phone, where the messages are in its menu */
@@ -223,6 +237,14 @@ const failed = ref(false)
 const phoneDialog = ref(false)
 const homeGroupDialog = ref(false)
 const installDialog = ref(false)
+
+/** the posts of the channel: what waits for the user (to approve, to publish, to prepare) */
+const posts = usePostsStore()
+watch(
+  () => worker.canReceive,
+  (serves) => serves && posts.load().catch(() => undefined),
+  { immediate: true }
+)
 let asked = false
 watch(
   () => worker.needsPhone,

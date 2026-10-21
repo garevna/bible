@@ -1,4 +1,9 @@
 export const pages = {
+  posts: {
+    ua: 'Публікації',
+    ru: 'Публикации',
+    en: 'Posts'
+  },
   calendar: {
     ua: 'Календар служінь',
     ru: 'Календарь служений',

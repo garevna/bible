@@ -57,6 +57,8 @@ async function fakeWorker(
       read.push(readMatch[1]!)
       return route.fulfill({ json: { read: true } })
     }
+    // the posts of the channel: none here
+    if (path === '/posts') return route.fulfill({ json: { submissions: [], tasks: [] } })
     sent.push(request.postDataJSON())
     return route.fulfill({ json: { sent: 1 } })
   })

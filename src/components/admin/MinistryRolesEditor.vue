@@ -103,7 +103,7 @@ const emit = defineEmits<{ save: [roles: MinistryRole[]] }>()
 
 const { admin: text } = storeToRefs(useLanguageStore())
 
-const RIGHTS = ['lead', 'deputy', 'invite', 'approve', 'publish', 'send'] as const
+const RIGHTS = ['lead', 'deputy', 'invite', 'approve', 'publish', 'approvePosts', 'send'] as const
 type Right = (typeof RIGHTS)[number]
 
 const rightNames = computed<Record<Right, string>>(() => ({
@@ -112,6 +112,7 @@ const rightNames = computed<Record<Right, string>>(() => ({
   invite: text.value.ministryRightInvite,
   approve: text.value.ministryRightApprove,
   publish: text.value.ministryRightPublish,
+  approvePosts: text.value.ministryRightApprovePosts,
   send: text.value.ministryRightSend
 }))
 
@@ -153,6 +154,7 @@ function add() {
       invite: false,
       approve: false,
       publish: false,
+      approvePosts: false,
       send: false,
       uids: []
     }

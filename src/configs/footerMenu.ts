@@ -20,5 +20,7 @@ export const footerMenu: FooterMenuItem[] = [
   // opened from the header, ministers only
   { icon: '', value: 'messages', component: 'Messages', menu: 'messages' },
   // ministers: the first page they see
-  { icon: '', value: 'calendar', component: 'Calendar', menu: 'calendar' }
+  { icon: '', value: 'calendar', component: 'Calendar', menu: 'calendar' },
+  // the posts of the channel: from the menu of the avatar
+  { icon: '', value: 'posts', component: 'Posts', menu: 'posts' }
 ]

@@ -1,3 +1,4 @@
+import { memoryPosts } from './posts'
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -56,6 +57,7 @@ const users: Record<string, AuthUser> = {
 function setup() {
   const messages = memoryMessages()
   const schedule = memorySchedule()
+  const posts = memoryPosts()
   const clock = { now: Date.now() }
   const env: Env = {
     TELEGRAM_BOT_TOKEN: 'TOKEN',
@@ -84,12 +86,12 @@ function setup() {
         body: body ? JSON.stringify(body) : undefined
       }),
       env,
-      { verify, fetcher: fetcher as unknown as typeof fetch, messages, schedule, now: () => clock.now }
+      { verify, fetcher: fetcher as unknown as typeof fetch, messages, schedule, posts, now: () => clock.now }
     )
     const answer = (await response.json().catch(() => null)) as Answer
     return { status: response.status, body: answer, headers: response.headers }
   }
-  return { call, fetcher, env, clock, messages, schedule }
+  return { call, fetcher, env, clock, messages, schedule, posts }
 }
 
 const topic = { title: 'Тема', items: [{ kind: 'verse', text: 'Вірш', ref: 'Від Матвія 1:1' }] }
@@ -115,6 +117,7 @@ const ministryRole = (id: string, rights: Record<string, boolean> = {}, uids: st
   invite: false,
   approve: false,
   publish: false,
+  approvePosts: false,
   send: false,
   ...rights,
   uids
@@ -576,6 +579,137 @@ describe('roles kept by the administrators', () => {
       'Молитовне служіння': [{ name: 'Лідер служіння', lead: true, uids: ['pastor-uid'] }]
     })
     expect(settings.leaders).toEqual({ 'Молитовне служіння': ['pastor-uid'] })
+  })
+})
+
+describe('the posts of the channel', () => {
+  const note = { title: 'Слово на тиждень', items: [{ kind: 'note', text: 'Бог є любов', verses: [] }] }
+
+  /** the pastor approves (a status of their own), the leader publishes (a role of the channel), the musician writes */
+  async function church() {
+    const context = setup()
+    const { call } = context
+    for (const user of ['owner', 'pastor', 'musician', 'leader', 'reader']) await call('GET', '/me', user)
+    const roles = (await call('GET', '/admin/settings', 'owner')).body.roles as { id: string }[]
+    await call('PUT', '/admin/roles', 'owner', {
+      roles: [
+        ...roles,
+        {
+          id: 'status-pastor',
+          name: 'Пастор',
+          publish: false,
+          approvePosts: true,
+          send: false,
+          sendToRoles: [],
+          sendToPeople: false,
+          messageDays: 1,
+          manage: []
+        }
+      ]
+    })
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'status-pastor' })
+    for (const uid of ['musician-uid', 'leader-uid'])
+      await call('PUT', `/admin/users/${uid}`, 'owner', { role: 'servant' })
+    await call('PUT', '/admin/directories/ministries', 'owner', { items: ['Канал ХХЦ'] })
+    await call('PUT', '/admin/ministry-roles', 'owner', {
+      ministryRoles: { 'Канал ХХЦ': [ministryRole('r-lead', { lead: true, publish: true }, ['leader-uid'])] }
+    })
+    return context
+  }
+
+  it('sent, approved by the pastor, published by the administrator of the channel', async () => {
+    const { call, fetcher, messages, clock } = await church()
+    const told = async (uid: string, words: string) =>
+      (await messages.forUser(uid, clock.now)).some(
+        (message) => message.toUid === uid && message.text.includes(words)
+      )
+
+    // a servant who does not decide asks a pastor; a reader sends nothing
+    expect((await call('POST', '/posts', 'reader', { kind: 'note', post: note })).status).toBe(403)
+    expect((await call('POST', '/posts', 'musician', { kind: 'note', post: note })).body).toEqual({
+      error: 'approval-needed'
+    })
+    expect(
+      (await call('POST', '/posts', 'musician', { kind: 'note', post: note, approverUid: 'leader-uid' }))
+        .status
+    ).toBe(400)
+    const sent = await call('POST', '/posts', 'musician', {
+      kind: 'note',
+      post: note,
+      approverUid: 'pastor-uid'
+    })
+    const id = (sent.body.submission as { id: string }).id
+    expect(sent.body.submission).toMatchObject({
+      status: 'pending',
+      approverName: 'pastor@example.com',
+      title: 'Слово на тиждень'
+    })
+    expect(await told('pastor-uid', 'просить затвердити публікацію «Слово на тиждень»')).toBe(true)
+
+    // the queue of the channel shows it, waiting; it is not published before the approval
+    const queue = (await call('GET', '/posts', 'leader')).body
+    expect(queue).toMatchObject({
+      canPublish: true,
+      canApprove: false,
+      approvers: [{ uid: 'owner-uid' }, { uid: 'pastor-uid' }]
+    })
+    expect(queue.submissions).toMatchObject([{ id, status: 'pending' }])
+    expect((await call('POST', `/posts/${id}/publish`, 'leader', {})).body).toEqual({ error: 'not-approved' })
+
+    // only its approver approves
+    expect((await call('POST', `/posts/${id}/approve`, 'leader', {})).status).toBe(403)
+    expect((await call('POST', `/posts/${id}/approve`, 'pastor', {})).body.submission).toMatchObject({
+      status: 'approved'
+    })
+    expect(await told('musician-uid', 'затверджено')).toBe(true)
+    expect(await told('leader-uid', 'Затверджено для каналу')).toBe(true)
+
+    // the administrator of the channel adds a picture and publishes it
+    expect((await call('POST', `/posts/${id}/publish`, 'musician', {})).status).toBe(403)
+    fetcher.mockClear()
+    const published = await call('POST', `/posts/${id}/publish`, 'leader', {
+      image: 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='
+    })
+    expect(published.body.submission).toMatchObject({ status: 'published', publishedBy: 'Лідер' })
+    const methods = fetcher.mock.calls.map(([url]) => String(url).split('/').at(-1))
+    expect(methods).toEqual(expect.arrayContaining(['sendPhoto', 'sendMessage']))
+    expect(await told('musician-uid', 'опубліковано в каналі')).toBe(true)
+  })
+
+  it('a pastor needs no approval of their own; returned with a word; a task says who approves', async () => {
+    const { call, messages, clock } = await church()
+    const own = await call('POST', '/posts', 'pastor', { kind: 'note', post: note })
+    expect(own.body.submission).toMatchObject({ status: 'approved', approverUid: null })
+
+    // the administrator of the channel returns it with a word to its author
+    const id = (own.body.submission as { id: string }).id
+    expect(
+      (await call('POST', `/posts/${id}/return`, 'leader', { comment: 'Додайте вірш' })).body.submission
+    ).toMatchObject({ status: 'returned', comment: 'Додайте вірш' })
+    expect(
+      (await messages.forUser('pastor-uid', clock.now)).some((message) =>
+        message.text.includes('Додайте вірш')
+      )
+    ).toBe(true)
+
+    // the pastor asks the musician to prepare one, approved by the pastor
+    expect(
+      (await call('POST', '/post-tasks', 'musician', { assigneeUid: 'leader-uid', text: 'x' })).status
+    ).toBe(403)
+    const task = await call('POST', '/post-tasks', 'pastor', {
+      assigneeUid: 'musician-uid',
+      text: 'Анонс молодіжної зустрічі',
+      approverUid: 'pastor-uid'
+    })
+    const taskId = (task.body.task as { id: string }).id
+    expect((await call('GET', '/posts', 'musician')).body.tasks).toMatchObject([
+      { id: taskId, status: 'open' }
+    ])
+    const answer = await call('POST', '/posts', 'musician', { kind: 'note', post: note, taskId })
+    expect(answer.body.submission).toMatchObject({ status: 'pending', approverUid: 'pastor-uid', taskId })
+    expect((await call('GET', '/posts', 'musician')).body.tasks).toMatchObject([
+      { id: taskId, status: 'done' }
+    ])
   })
 })
 

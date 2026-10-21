@@ -30,6 +30,14 @@
           <p v-else-if="role.id === SUPERVISOR" class="hint">{{ text.supervisorFixed }}</p>
           <template v-else>
             <v-switch
+              v-model="role.approvePosts"
+              inset
+              :label="text.rightApprovePosts"
+              color="secondary"
+              density="compact"
+              hide-details
+            />
+            <v-switch
               v-model="role.publish"
               inset
               :label="text.rightPublish"
