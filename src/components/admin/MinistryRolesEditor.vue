@@ -35,9 +35,7 @@
         @update:model-value="(chosen: unknown) => setRights(role, chosen as Right[])"
       >
         <v-chip
-          v-for="right of RIGHTS.filter(
-            (item) => !leader || !['lead', 'deputy'].includes(item) || role[item]
-          )"
+          v-for="right of RIGHTS.filter((item) => !['lead', 'deputy'].includes(item) || role[item])"
           :key="right"
           :value="right"
           size="small"
@@ -98,6 +96,8 @@ const props = defineProps<{
   disabled?: boolean
   /** a leader of the ministry: the roles that lead are given by the administrators */
   leader?: boolean
+  /** the roles not shown here (the leaders and the deputies, chosen apart): kept as they are */
+  others?: MinistryRole[]
 }>()
 const emit = defineEmits<{ save: [roles: MinistryRole[]] }>()
 
@@ -116,7 +116,7 @@ const rightNames = computed<Record<Right, string>>(() => ({
   send: text.value.ministryRightSend
 }))
 
-const save = (roles: MinistryRole[]) => emit('save', roles)
+const save = (roles: MinistryRole[]) => emit('save', [...(props.others ?? []), ...roles])
 /** a leader sees the roles of the leaders and of their deputies as the administrators gave them */
 const fixed = (role: MinistryRole) => Boolean(props.leader && (role.lead || role.deputy))
 

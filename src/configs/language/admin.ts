@@ -174,6 +174,21 @@ export const admin = {
     ru: 'Утверждает публикации',
     en: 'Approves the posts'
   },
+  deputies: {
+    ua: 'Заступники лідера',
+    ru: 'Заместители лидера',
+    en: 'Deputies of the leader'
+  },
+  leaderRole: {
+    ua: 'Лідер служіння',
+    ru: 'Лидер служения',
+    en: 'Leader of the ministry'
+  },
+  deputyRole: {
+    ua: 'Заступник лідера',
+    ru: 'Заместитель лидера',
+    en: 'Deputy of the leader'
+  },
   sectionLocations: {
     ua: 'Локації',
     ru: 'Локации',
@@ -345,7 +360,7 @@ export const admin = {
     en: 'Roles in the ministry'
   },
   ministryRolesHint: {
-    ua: 'Роль дає своїм людям права в цьому служінні. Лідерів служіння призначає адміністратор; вони ведуть служіння (події, запрошення, заявки) і дають інші ролі.',
+    ua: 'Інші ролі служіння (наприклад, «Музикант», «Публікатор»): роль дає своїм людям права в цьому служінні. Лідери ведуть служіння (події, запрошення, заявки) і дають ці ролі.',
     ru: 'Роль даёт своим людям права в этом служении. Лидеров служения назначает администратор; они ведут служение (события, приглашения, заявки) и дают другие роли.',
     en: 'A role gives its people rights in this ministry. The leaders of the ministry are given by the administrators; they lead it (the events, the invitations, the applications) and give the other roles.'
   },

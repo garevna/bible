@@ -487,18 +487,40 @@ test('the lists of ministries and locations', async ({ page }) => {
   await expect(details.locator('.event')).toContainText('Ранкова молитва')
   await expect(details.locator('.event')).toContainText('Онлайн')
   await expect(details.locator('.day')).toContainText('1 / 2')
-  // a role of the ministry: added by the icon of its field, its rights by the chips, its people chosen
-  await details.getByRole('textbox', { name: 'Нова роль' }).fill('Лідер служіння')
-  await details.locator('.new-role .mdi-plus-thick').click()
-  await expect(details.locator('.role')).toHaveCount(1)
-  await details.locator('.role .v-chip', { hasText: 'Лідер служіння' }).click()
-  await details.locator('.role .v-autocomplete', { hasText: 'Хто має цю роль' }).click()
+  // the leader and the deputy: two fields of people
+  await details.locator('.people-field', { hasText: 'Лідери служіння' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
   await expect
     .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
     .toMatchObject({
       ministryRoles: {
-        'Молитовне служіння': [{ name: 'Лідер служіння', lead: true, invite: false, uids: ['leader-uid'] }]
+        'Молитовне служіння': [
+          { id: 'r-lead', name: 'Лідер служіння', lead: true, invite: true, uids: ['leader-uid'] }
+        ]
+      }
+    })
+  await page.keyboard.press('Escape')
+  await details.locator('.people-field', { hasText: 'Заступники лідера' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'pastor@example.com' }).click()
+  await expect
+    .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
+    .toMatchObject({
+      ministryRoles: {
+        'Молитовне служіння': [
+          { id: 'r-deputy', deputy: true, uids: ['pastor-uid'] },
+          { id: 'r-lead', uids: ['leader-uid'] }
+        ]
+      }
+    })
+  await page.keyboard.press('Escape')
+  // another role: added by the icon of its field; the leader and the deputy stay as they are
+  await details.getByRole('textbox', { name: 'Нова роль' }).fill('Музикант')
+  await details.locator('.new-role .mdi-plus-thick').click()
+  await expect
+    .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
+    .toMatchObject({
+      ministryRoles: {
+        'Молитовне служіння': [{ id: 'r-deputy' }, { id: 'r-lead' }, { name: 'Музикант', lead: false }]
       }
     })
   await page.keyboard.press('Escape')

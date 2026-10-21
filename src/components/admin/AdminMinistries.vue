@@ -54,9 +54,43 @@
                 @click:append-inner="rename(item.name)"
                 @keydown.enter="rename(item.name)"
               />
-              <!-- the roles inside the ministry: the leaders are the people of the roles that lead -->
+              <!-- the leaders and their deputies: chosen here, in two fields -->
+              <div class="d-flex flex-wrap ga-2">
+                <v-autocomplete
+                  :model-value="peopleOf(item.name, 'lead')"
+                  :items="schedule.people"
+                  item-title="name"
+                  item-value="uid"
+                  :label="text.leaders"
+                  :disabled="saving"
+                  multiple
+                  chips
+                  closable-chips
+                  density="compact"
+                  hide-details
+                  class="people-field"
+                  @update:model-value="(uids: string[]) => setPeople(item.name, 'lead', uids)"
+                />
+                <v-autocomplete
+                  :model-value="peopleOf(item.name, 'deputy')"
+                  :items="schedule.people"
+                  item-title="name"
+                  item-value="uid"
+                  :label="text.deputies"
+                  :disabled="saving"
+                  multiple
+                  chips
+                  closable-chips
+                  density="compact"
+                  hide-details
+                  class="people-field"
+                  @update:model-value="(uids: string[]) => setPeople(item.name, 'deputy', uids)"
+                />
+              </div>
+              <!-- the other roles inside the ministry -->
               <MinistryRolesEditor
-                :roles="roles?.[item.name] ?? []"
+                :roles="(roles?.[item.name] ?? []).filter((role) => !role.lead && !role.deputy)"
+                :others="(roles?.[item.name] ?? []).filter((role) => role.lead || role.deputy)"
                 :people="schedule.people"
                 :disabled="saving"
                 @save="(list: MinistryRole[]) => saveRoles(item.name, list)"
@@ -310,6 +344,39 @@ const saveRoles = (ministry: string, list: MinistryRole[]) =>
     roles.value = (await worker.setMinistryRoles({ ...roles.value, [ministry]: list })).ministryRoles
   })
 
+/** the leaders and the deputies: the people of the roles that lead, and of the roles of the deputies */
+const peopleOf = (ministry: string, kind: 'lead' | 'deputy') => [
+  ...new Set((roles.value?.[ministry] ?? []).filter((role) => role[kind]).flatMap((role) => role.uids))
+]
+
+/** the leaders or the deputies chosen: kept in their role (made the first time) */
+function setPeople(ministry: string, kind: 'lead' | 'deputy', uids: string[]) {
+  const list = roles.value?.[ministry] ?? []
+  const own = list.find((role) => role[kind])
+  const made: MinistryRole = own ?? {
+    id: kind === 'lead' ? 'r-lead' : 'r-deputy',
+    name: kind === 'lead' ? text.value.leaderRole : text.value.deputyRole,
+    lead: kind === 'lead',
+    deputy: kind === 'deputy',
+    // the leaders lead the events, invite, approve and write to the people; the deputies do it when asked
+    invite: kind === 'lead',
+    approve: kind === 'lead',
+    publish: false,
+    approvePosts: false,
+    send: kind === 'lead',
+    uids: []
+  }
+  // the people of the other roles of the same kind are the ones chosen now
+  const next = list
+    .map((role) =>
+      role[kind] && role.id !== made.id
+        ? { ...role, uids: role.uids.filter((uid) => uids.includes(uid)) }
+        : role
+    )
+    .filter((role) => role.id !== made.id)
+  saveRoles(ministry, [{ ...made, uids }, ...next])
+}
+
 const askHandover = (ministry: string, toUid: string, until: string | null) =>
   run(async () => {
     const { ministry: _name, ...handover } = await worker.askHandover(ministry, toUid, until)
@@ -391,6 +458,10 @@ function openInvitations(event: ScheduleEvent) {
   flex-direction: column;
   gap: 12px;
   padding: 12px 4px;
+}
+
+.people-field {
+  flex: 1 1 280px;
 }
 
 .leaders {
