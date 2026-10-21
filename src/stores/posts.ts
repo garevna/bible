@@ -8,7 +8,8 @@ import type { TopicPost } from '@/utils/topicPost'
 /** A post sent for the channel (see worker/src/posts.ts) */
 export interface Submission {
   id: string
-  kind: 'note' | 'topic'
+  /** a note, a topic, or a picture (kept in Telegram: 'tg:…' in post.image) */
+  kind: 'note' | 'topic' | 'image'
   title: string
   post: TopicPost
   authorUid: string
@@ -32,6 +33,8 @@ export interface PostTask {
   byName: string
   assigneeUid: string
   assigneeName: string
+  /** what it asks for: a post (a note or a topic) or a picture */
+  kind: 'post' | 'image'
   text: string
   approverUid: string | null
   approverName: string | null
@@ -58,6 +61,11 @@ export const usePostsStore = defineStore('posts', () => {
   const people = ref<PersonItem[]>([])
   const canApprove = ref(false)
   const canPublish = ref(false)
+  /** the private channel of Telegram the pictures are kept in, when it is connected */
+  const storage = ref<{ title: string } | null>(null)
+  /** the bot of the public channel and the channel: the steps to connect the private channel say them */
+  const channelBot = ref('')
+  const channel = ref('')
   const loaded = ref(false)
 
   async function load() {
@@ -68,6 +76,9 @@ export const usePostsStore = defineStore('posts', () => {
       people: PersonItem[]
       canApprove: boolean
       canPublish: boolean
+      storage?: { title: string } | null
+      channelBot?: string
+      channel?: string
     }>('GET', '/posts')
     submissions.value = answer.submissions ?? []
     tasks.value = answer.tasks ?? []
@@ -75,6 +86,9 @@ export const usePostsStore = defineStore('posts', () => {
     people.value = answer.people ?? []
     canApprove.value = Boolean(answer.canApprove)
     canPublish.value = Boolean(answer.canPublish)
+    storage.value = answer.storage ?? null
+    channelBot.value = answer.channelBot ?? ''
+    channel.value = answer.channel ?? ''
     loaded.value = true
   }
 
@@ -84,7 +98,7 @@ export const usePostsStore = defineStore('posts', () => {
   }
 
   const submit = async (
-    kind: 'note' | 'topic',
+    kind: 'note' | 'topic' | 'image',
     post: TopicPost,
     approverUid: string | null,
     taskId: string | null
@@ -113,13 +127,17 @@ export const usePostsStore = defineStore('posts', () => {
         .submission
     )
 
-  /** to the channel, with its picture; the window of the app says where it went */
-  async function publish(id: string, image: string | null, messages: string[]) {
+  /** to the channel, with a picture of the device or an approved one; the window of the app says where it went */
+  async function publish(id: string, image: string | null, imageFrom: string | null, messages: string[]) {
     const answer = await worker.request<{ submission: Submission; channel: string }>(
       'POST',
       `/posts/${id}/publish`,
-      image ? { image } : {}
+      imageFrom ? { imageFrom } : image ? { image } : {}
     )
+    if (imageFrom) {
+      const used = submissions.value.find((item) => item.id === imageFrom)
+      if (used) put({ ...used, status: 'published' })
+    }
     put(answer.submission)
     worker.channelPost = { channel: answer.channel, texts: messages }
   }
@@ -133,16 +151,31 @@ export const usePostsStore = defineStore('posts', () => {
     assigneeUid: string,
     text: string,
     approverUid: string | null,
-    due: string | null
+    due: string | null,
+    kind: 'post' | 'image' = 'post'
   ) {
     const { task } = await worker.request<{ task: PostTask }>('POST', '/post-tasks', {
       assigneeUid,
       text,
       approverUid,
-      due
+      due,
+      kind
     })
     tasks.value = [task, ...tasks.value]
     return task
+  }
+
+  /** the private channel of the pictures: found by the worker among the updates of the bot */
+  async function connectStorage() {
+    storage.value = (
+      await worker.request<{ storage: { title: string } }>('POST', '/posts/storage', {})
+    ).storage
+  }
+
+  /** a picture asked by a task: kept in Telegram, then sent for the approval */
+  async function sendPicture(task: PostTask, image: string) {
+    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image })).image
+    return submit('image', { title: task.text, items: [], image: kept }, null, task.id)
   }
 
   async function removeTask(id: string) {
@@ -169,6 +202,10 @@ export const usePostsStore = defineStore('posts', () => {
           )
       : []
   )
+  /** the approved pictures, waiting for a post of the channel */
+  const pictures = computed(() =>
+    submissions.value.filter((item) => item.kind === 'image' && item.status === 'approved')
+  )
   const myTasks = computed(() =>
     tasks.value.filter((task) => task.assigneeUid === user.uid && task.status === 'open')
   )
@@ -188,6 +225,9 @@ export const usePostsStore = defineStore('posts', () => {
     people,
     canApprove,
     canPublish,
+    storage,
+    channelBot,
+    channel,
     loaded,
     load,
     submit,
@@ -197,6 +237,9 @@ export const usePostsStore = defineStore('posts', () => {
     remove,
     createTask,
     removeTask,
+    connectStorage,
+    sendPicture,
+    pictures,
     mine,
     toApprove,
     queue,

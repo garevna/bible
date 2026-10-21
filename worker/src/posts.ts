@@ -8,7 +8,8 @@ import type { TopicPost } from './post'
  */
 export interface Submission {
   id: string
-  kind: 'note' | 'topic'
+  /** a note, a topic, or a picture (asked by a task; kept in Telegram, see telegram.ts) */
+  kind: 'note' | 'topic' | 'image'
   title: string
   post: TopicPost
   authorUid: string
@@ -35,7 +36,8 @@ export interface PostTask {
   byName: string
   assigneeUid: string
   assigneeName: string
-  /** what to prepare */
+  /** what to prepare: a post (a note or a topic) or a picture */
+  kind: 'post' | 'image'
   text: string
   approverUid: string | null
   approverName: string | null
@@ -82,6 +84,7 @@ interface TaskRow {
   by_name: string
   assignee_uid: string
   assignee_name: string
+  kind?: string
   text: string
   approver_uid: string | null
   approver_name: string | null
@@ -92,7 +95,7 @@ interface TaskRow {
 
 const submissionOf = (row: SubmissionRow): Submission => ({
   id: row.id,
-  kind: row.kind === 'topic' ? 'topic' : 'note',
+  kind: row.kind === 'topic' ? 'topic' : row.kind === 'image' ? 'image' : 'note',
   title: row.title,
   post: JSON.parse(row.post) as TopicPost,
   authorUid: row.author_uid,
@@ -116,6 +119,7 @@ const taskOf = (row: TaskRow): PostTask => ({
   byName: row.by_name,
   assigneeUid: row.assignee_uid,
   assigneeName: row.assignee_name,
+  kind: row.kind === 'image' ? 'image' : 'post',
   text: row.text,
   approverUid: row.approver_uid,
   approverName: row.approver_name,
@@ -174,7 +178,7 @@ export function d1Posts(db: D1Database): PostsStore {
     async putTask(t) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO post_tasks (id, by_uid, by_name, assignee_uid, assignee_name, text, approver_uid, approver_name, due, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO post_tasks (id, by_uid, by_name, assignee_uid, assignee_name, kind, text, approver_uid, approver_name, due, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .bind(
           t.id,
@@ -182,6 +186,7 @@ export function d1Posts(db: D1Database): PostsStore {
           t.byName,
           t.assigneeUid,
           t.assigneeName,
+          t.kind,
           t.text,
           t.approverUid,
           t.approverName,

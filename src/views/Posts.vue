@@ -56,6 +56,28 @@
     </template>
 
     <template v-else-if="tab === 'queue'">
+      <!-- the private channel of the pictures: connected once, by its button -->
+      <p v-if="posts.storage" class="muted mb-3">
+        <v-icon icon="mdi-image-multiple-outline" size="small" />
+        {{ format(text.storageOn, { name: posts.storage.title }) }}
+      </p>
+      <v-alert v-else type="info" variant="tonal" class="mb-3">
+        <p>{{ text.storageOff }}</p>
+        <ol class="storage-steps">
+          <li>{{ text.storageStep1 }}</li>
+          <li>
+            {{
+              posts.channelBot
+                ? format(text.storageStep2Named, { bot: posts.channelBot, channel: posts.channel })
+                : text.storageStep2
+            }}
+          </li>
+          <li>{{ text.storageStep3 }}</li>
+        </ol>
+        <v-btn variant="flat" color="primary" class="text-none mt-2" :loading="busy" @click="connectStorage">
+          {{ text.storageConnect }}
+        </v-btn>
+      </v-alert>
       <p v-if="!posts.queue.length" class="muted">{{ text.noneInQueue }}</p>
       <PostCard
         v-for="item of posts.queue"
@@ -83,7 +105,17 @@
             · {{ format(text.approver, { name: task.approverName }) }}</template
           >
         </p>
-        <p class="hint mb-0">{{ text.taskHow }}</p>
+        <v-btn
+          v-if="task.kind === 'image'"
+          variant="flat"
+          color="primary"
+          class="text-none mt-1"
+          prepend-icon="mdi-image-plus"
+          @click="pickPicture(task)"
+        >
+          {{ text.uploadPicture }}
+        </v-btn>
+        <p v-else class="hint mb-0">{{ text.taskHow }}</p>
       </article>
 
       <!-- a pastor: the tasks given, and a new one by its own button -->
@@ -136,6 +168,17 @@
           density="compact"
           hide-details
         />
+        <v-btn-toggle
+          v-model="taskKind"
+          mandatory
+          divided
+          density="comfortable"
+          color="secondary"
+          variant="outlined"
+        >
+          <v-btn value="post" class="text-none" prepend-icon="$note">{{ text.kindPost }}</v-btn>
+          <v-btn value="image" class="text-none" prepend-icon="mdi-image-outline">{{ text.kindImage }}</v-btn>
+        </v-btn-toggle>
         <v-text-field v-model="taskText" :label="text.taskText" density="compact" hide-details />
         <v-select
           v-model="taskApprover"
@@ -153,6 +196,62 @@
           @cancel="taskDialog = false"
           @confirm="giveTask"
         />
+      </template>
+    </AppDialog>
+
+    <!-- a picture for a task: seen before it is sent -->
+    <AppDialog v-model="pictureDialog" :title="text.uploadPicture" icon="mdi-image-plus" max-width="560">
+      <template v-if="picturing">
+        <p class="mb-2">«{{ picturing.text }}»</p>
+        <img v-if="picture" :src="picture" alt="" class="preview" />
+        <v-btn
+          variant="text"
+          class="text-none mt-2"
+          prepend-icon="mdi-image-edit-outline"
+          @click="choosePicture"
+        >
+          {{ text.otherPicture }}
+        </v-btn>
+      </template>
+      <template #actions>
+        <DialogButtons
+          :confirm-text="text.send"
+          :disabled="!picture || busy"
+          @cancel="pictureDialog = false"
+          @confirm="sendPicture"
+        />
+      </template>
+    </AppDialog>
+
+    <!-- a picture sent: to whom it goes now -->
+    <AppDialog
+      v-model="pictureSentDialog"
+      :title="text.pictureSentTitle"
+      icon="mdi-check-circle-outline"
+      max-width="480"
+    >
+      <p class="lead">{{ pictureSentText }}</p>
+      <template #actions>
+        <v-spacer />
+        <v-btn variant="flat" color="primary" class="text-none px-6" @click="pictureSentDialog = false">{{
+          text.taskOk
+        }}</v-btn>
+      </template>
+    </AppDialog>
+
+    <!-- the private channel connected -->
+    <AppDialog
+      v-model="storageDialog"
+      :title="text.storageConnected"
+      icon="mdi-check-circle-outline"
+      max-width="480"
+    >
+      <p class="lead">{{ format(text.storageOn, { name: posts.storage?.title ?? '' }) }}</p>
+      <template #actions>
+        <v-spacer />
+        <v-btn variant="flat" color="primary" class="text-none px-6" @click="storageDialog = false">{{
+          text.taskOk
+        }}</v-btn>
       </template>
     </AppDialog>
 
@@ -214,6 +313,7 @@ import { useUserStore } from '@/stores/user'
 import { useWorkerStore, WorkerError } from '@/stores/worker'
 import { fullDateFormat, localeOf, toISODateString } from '@/utils/dates'
 import { format } from '@/utils/format'
+import { pickImage, resizeImage } from '@/utils/image'
 
 /**
  * The posts of the public channel: the user's own and their states, the ones a pastor approves,
@@ -270,15 +370,65 @@ function sendReturn() {
 }
 
 /** the messages the post becomes, shown with the channel once it is published */
-const publish = (item: Submission, image: string | null) =>
+const publish = (item: Submission, image: string | null, imageFrom: string | null) =>
   run(async () => {
-    const { messages, caption } = await worker.preview({ ...item.post, ...(image ? { image } : {}) })
-    await posts.publish(item.id, image, [...(caption ? [caption] : []), ...messages])
+    // the window that says where it went shows the texts (the picture is in the channel)
+    const { messages, caption } = await worker.preview({ ...item.post, image: undefined })
+    await posts.publish(item.id, image, imageFrom, [...(caption ? [caption] : []), ...messages])
+  })
+
+/** the private channel of the pictures: the worker finds it among the updates of the bot */
+const storageDialog = ref(false)
+const connectStorage = () =>
+  run(async () => {
+    try {
+      await posts.connectStorage()
+      storageDialog.value = true
+    } catch (cause) {
+      throw cause instanceof WorkerError && cause.message === 'no-storage'
+        ? new WorkerError(text.value.storageNotFound)
+        : cause
+    }
+  })
+
+/** a picture asked by a task: chosen on the device, seen, sent */
+const pictureDialog = ref(false)
+const picturing = shallowRef<PostTask | null>(null)
+const picture = ref<string | null>(null)
+async function choosePicture() {
+  const file = await pickImage()
+  if (!file) return
+  try {
+    picture.value = await resizeImage(file, { size: 1600 })
+  } catch {
+    // not a picture the browser reads: said plainly
+    error.value = text.value.badPicture
+  }
+}
+async function pickPicture(task: PostTask) {
+  picturing.value = task
+  picture.value = null
+  await choosePicture()
+  if (picture.value) pictureDialog.value = true
+}
+const pictureSentDialog = ref(false)
+const pictureSentText = ref('')
+const sendPicture = () =>
+  run(async () => {
+    const task = picturing.value!
+    pictureDialog.value = false
+    await posts.sendPicture(task, picture.value!)
+    pictureSentText.value = task.approverName
+      ? format(text.value.pictureSentApprover, { name: task.approverName })
+      : text.value.pictureSentQueue
+    pictureSentDialog.value = true
   })
 
 const assigneeUid = ref<string | null>(null)
 const taskText = ref('')
 const taskApprover = ref<string>('')
+/** a post (a note or a topic) or a picture */
+const taskKind = ref<'post' | 'image'>('post')
 const taskApproverItems = computed(() => [
   { value: '', title: text.value.noApproval },
   ...posts.approvers.map((person) => ({ value: person.uid, title: person.name }))
@@ -301,6 +451,7 @@ function newTask() {
   taskText.value = ''
   taskApprover.value = ''
   taskDue.value = null
+  taskKind.value = 'post'
   taskDialog.value = true
 }
 
@@ -313,7 +464,8 @@ const giveTask = () =>
       assigneeUid.value!,
       taskText.value.trim(),
       taskApprover.value || null,
-      taskDue.value
+      taskDue.value,
+      taskKind.value
     )
     taskText.value = ''
     assigneeUid.value = null
@@ -356,6 +508,18 @@ const giveTask = () =>
 
 .due--late {
   color: rgb(var(--v-theme-delete));
+}
+
+.storage-steps {
+  padding-left: 20px;
+  margin: 6px 0;
+}
+
+.preview {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: var(--app-radius);
 }
 
 .form {

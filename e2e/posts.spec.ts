@@ -22,10 +22,13 @@ const submission = (change: Record<string, unknown>) => ({
   ...change
 })
 
+/** a picture of one white pixel */
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
 /** The worker (see playwright.config.ts): the posts of the channel the user sees, and what the app sends */
 async function fakeWorker(
   page: Page,
-  who: { approve?: boolean; publish?: boolean; submissions?: unknown[] }
+  who: { approve?: boolean; publish?: boolean; submissions?: unknown[]; tasks?: unknown[]; storage?: boolean }
 ) {
   const requests: { method: string; path: string; body: unknown }[] = []
   await page.route('**/worker-test/**', async (route: Route) => {
@@ -50,7 +53,8 @@ async function fakeWorker(
       return route.fulfill({
         json: {
           submissions: who.submissions ?? [],
-          tasks: [],
+          tasks: who.tasks ?? [],
+          storage: who.storage ? { title: 'ХХЦ — файли' } : null,
           approvers: [{ uid: 'pastor-uid', name: 'Пастор Іван' }],
           people: [{ uid: 'musician-uid', name: 'Музикант' }],
           canApprove: Boolean(who.approve),
@@ -63,6 +67,10 @@ async function fakeWorker(
       return route.fulfill({
         json: { submission: submission({ ...body, id: 'new', approverUid: body.approverUid }) }
       })
+    if (path === '/posts/storage') return route.fulfill({ json: { storage: { title: 'ХХЦ — файли' } } })
+    if (path === '/posts/upload') return route.fulfill({ json: { image: 'tg:file-id-00001' } })
+    if (path.startsWith('/files/'))
+      return route.fulfill({ body: Buffer.from(PNG, 'base64'), contentType: 'image/png' })
     if (path.endsWith('/approve'))
       return route.fulfill({ json: { submission: submission({ status: 'approved' }) } })
     if (path.endsWith('/return'))
@@ -192,4 +200,78 @@ test('the administrator of the channel publishes the approved, not the waiting',
     .toMatchObject({ method: 'POST' })
   // a window says where it went
   await expect(dialog(page)).toContainText('Повідомлення надіслано в канал «Канал ХХЦ»')
+})
+
+test('the pictures: the private channel connected, a picture asked, uploaded, chosen for a post', async ({
+  page
+}) => {
+  const requests = await fakeWorker(page, {
+    approve: true,
+    publish: true,
+    tasks: [
+      {
+        id: 't-picture',
+        byUid: 'pastor-uid',
+        byName: 'Пастор Іван',
+        assigneeUid: 'e2e-uid',
+        assigneeName: 'E2E',
+        kind: 'image',
+        text: 'Картинка до анонсу',
+        approverUid: 'pastor-uid',
+        approverName: 'Пастор Іван',
+        due: null,
+        status: 'open',
+        createdAt: Date.now()
+      }
+    ],
+    submissions: [
+      submission({ status: 'approved' }),
+      submission({
+        id: 'pic',
+        kind: 'image',
+        title: 'Обкладинка',
+        status: 'approved',
+        post: { title: 'Обкладинка', items: [], image: 'tg:file-id-00002' }
+      })
+    ]
+  })
+  await signIn(page)
+  await openPosts(page)
+
+  // the private channel: connected by its button
+  await page.getByRole('tab', { name: /Черга каналу/ }).click()
+  await expect(page.getByText('Сховище картинок ще не підключено')).toBeVisible()
+  await page.getByRole('button', { name: 'Підключити' }).click()
+  await expect(dialog(page)).toContainText('Сховище картинок: ХХЦ — файли')
+  await dialog(page).getByRole('button', { name: 'Добре' }).click()
+
+  // an approved picture goes with a post
+  const post = page.locator('.post-card', { hasText: 'Бог є любов' })
+  await post.getByRole('button', { name: 'Вибрати готову картинку' }).click()
+  await dialog(page).locator('.gallery__item', { hasText: 'Обкладинка' }).click()
+  await post.getByRole('button', { name: 'Опублікувати' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.path === '/posts/s1/publish'))
+    .toMatchObject({ body: { imageFrom: 'pic' } })
+  await page.keyboard.press('Escape')
+
+  // a picture asked of the user: uploaded from the device, seen, sent
+  await page.getByRole('tab', { name: /Доручення/ }).click()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Завантажити картинку' }).click()
+  await (
+    await chooser
+  ).setFiles({ name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') })
+  const send = dialog(page)
+  await expect(send).toContainText('«Картинка до анонсу»')
+  await send.getByRole('button', { name: 'Надіслати', exact: true }).click()
+  await expect(dialog(page)).toContainText('Картинку надіслано на затвердження: Пастор Іван')
+  expect(requests.find((request) => request.path === '/posts/upload')).toBeTruthy()
+  expect(requests.find((request) => request.path === '/posts' && request.method === 'POST')).toMatchObject({
+    body: {
+      kind: 'image',
+      taskId: 't-picture',
+      post: { title: 'Картинка до анонсу', image: 'tg:file-id-00001' }
+    }
+  })
 })

@@ -71,7 +71,18 @@ import {
   setMinistryRoles,
   type MinistryRoles
 } from './ministryRoles'
-import { escape, formatTopic, sendMessages, sendPhoto, TelegramError, titleBlock } from './telegram'
+import {
+  botName,
+  escape,
+  findStorageChat,
+  formatTopic,
+  sendMessages,
+  sendPhoto,
+  storedPhoto,
+  storePhoto,
+  TelegramError,
+  titleBlock
+} from './telegram'
 import { getTypes, parseTypes, setTypes } from './types'
 import {
   DIRECTORIES,
@@ -129,6 +140,9 @@ import {
  *   POST   /status-request          { note? }: a reader asks for the status of a servant (the administrators of users are told)
  *   GET    /posts                   the posts for the channel the user sees: their own, to approve, the queue (publish)
  *   POST   /posts                   { kind, post, approverUid?, taskId? }: sent for publication
+ *   POST   /posts/upload            { image }: a picture kept in the private channel of the pictures (Telegram)
+ *   POST   /posts/storage           the private channel of the pictures, found among the updates of the bot     publish
+ *   GET    /files/:id               the bytes of a picture kept in Telegram
  *   POST   /posts/:id/approve       its approver
  *   POST   /posts/:id/return        { comment }: its approver, or the ones who publish
  *   POST   /posts/:id/publish       { image? }: an approved post goes to the channel             publish
@@ -216,6 +230,8 @@ const ROUTES = [
   /^PUT \/groups-visibility$/,
   /^GET \/youtube$/,
   /^(GET|POST) \/posts$/,
+  /^POST \/posts\/(upload|storage)$/,
+  /^GET \/files\/[^/]+$/,
   /^POST \/posts\/[^/]+\/(approve|return|publish)$/,
   /^DELETE \/posts\/[^/]+$/,
   /^POST \/post-tasks$/,
@@ -862,9 +878,34 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     }
   }
 
+  // a picture kept in Telegram: its bytes, for the servants who see the posts
+  if (route.startsWith('GET /files/')) {
+    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    const response = await storedPhoto(
+      env.TELEGRAM_BOT_TOKEN,
+      decodeURIComponent(pathname.slice('/files/'.length)),
+      deps.fetcher
+    ).catch(() => null)
+    if (!response?.ok) return json({ error: 'not-found' }, 404)
+    return new Response(response.body, {
+      headers: {
+        'content-type': response.headers.get('content-type') ?? 'image/jpeg',
+        'cache-control': 'private, max-age=86400',
+        ...cors
+      }
+    })
+  }
+
   // the posts of the channel: sent, approved, published; the posts asked of the servants
   if (pathname.startsWith('/posts') || pathname.startsWith('/post-tasks')) {
     if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    /** the private channel of the pictures (the bot of the public channel is its administrator) */
+    const storage = await env.USERS.get<{ id: string; title: string }>('settings:storageChat', 'json')
+    /** a picture of the device goes to the private channel: only its id is kept here */
+    const keep = async (image: string) =>
+      image.startsWith('data:') && storage
+        ? storePhoto(env.TELEGRAM_BOT_TOKEN, storage.id, image, deps.fetcher)
+        : image
     const store = deps.posts ?? d1Posts(env.DB)
     const now = deps.now?.() ?? Date.now()
     const everyone = await listUsers(env.USERS, env.OWNERS, true)
@@ -895,10 +936,47 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         approvers: approvers.map((user) => ({ uid: user.uid, name: nameOf(user) })),
         people: servingUsers.map((user) => ({ uid: user.uid, name: nameOf(user) })),
         canApprove: Boolean(rights.approvePosts),
-        canPublish: rights.publish
+        canPublish: rights.publish,
+        storage: storage ? { title: storage.title } : null,
+        // the ones who connect the private channel of the pictures: which bot, publishing where
+        ...(rights.publish && !storage
+          ? {
+              channelBot: await botName(env.TELEGRAM_BOT_TOKEN, env.USERS, deps.fetcher).catch(() => ''),
+              channel: await chatTitle(
+                env.TELEGRAM_BOT_TOKEN,
+                env.TELEGRAM_CHAT_ID,
+                env.USERS,
+                deps.fetcher
+              ).catch(() => '')
+            }
+          : {})
       })
     }
 
+    // the private channel of the pictures: found among the updates of the bot of the public channel
+    if (route === 'POST /posts/storage') {
+      if (!rights.publish) return json({ error: 'forbidden' }, 403)
+      const found = await findStorageChat(env.TELEGRAM_BOT_TOKEN, env.TELEGRAM_CHAT_ID, deps.fetcher).catch(
+        () => null
+      )
+      if (!found) return json({ error: 'no-storage' }, 404)
+      await env.USERS.put('settings:storageChat', JSON.stringify(found))
+      return json({ storage: { title: found.title } })
+    }
+
+    // a picture: kept in the private channel, its id comes back
+    if (route === 'POST /posts/upload') {
+      if (!storage) return json({ error: 'no-storage' }, 409)
+      const image = ((await body()) as { image?: unknown } | null)?.image
+      const post = parsePost({ title: 'x', items: [], image })
+      if (!post?.image?.startsWith('data:')) return json({ error: 'bad-request' }, 400)
+      try {
+        return json({ image: await keep(post.image) })
+      } catch (error) {
+        const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
+        return json({ error: 'telegram', message }, 502)
+      }
+    }
     if (route === 'POST /posts') {
       const payload = ((await body()) ?? {}) as {
         kind?: unknown
@@ -906,11 +984,22 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         approverUid?: unknown
         taskId?: unknown
       }
-      const kind = payload.kind === 'topic' ? 'topic' : payload.kind === 'note' ? 'note' : null
+      const kind =
+        payload.kind === 'topic'
+          ? 'topic'
+          : payload.kind === 'note'
+            ? 'note'
+            : payload.kind === 'image'
+              ? 'image'
+              : null
       const post = parsePost(payload.post)
-      if (!kind || !post) return json({ error: 'bad-request' }, 400)
+      // a picture: kept in Telegram already (sent by POST /posts/upload)
+      if (!kind || !post || (kind === 'image' && !post.image?.startsWith('tg:')))
+        return json({ error: 'bad-request' }, 400)
       // a task says who approves; the ones who decide or publish need nobody to approve their own
       const task = typeof payload.taskId === 'string' ? await store.task(payload.taskId) : null
+      // a task of a picture is answered by a picture, a task of a post by a post
+      if (task && (task.kind === 'image') !== (kind === 'image')) return json({ error: 'bad-request' }, 400)
       if (
         payload.taskId !== undefined &&
         payload.taskId !== null &&
@@ -971,6 +1060,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         text?: unknown
         approverUid?: unknown
         due?: unknown
+        kind?: unknown
       }
       const assignee = person(payload.assigneeUid)
       // the last day: not in the past
@@ -985,6 +1075,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         byName: nameOf(me),
         assigneeUid: assignee.uid,
         assigneeName: nameOf(assignee),
+        kind: payload.kind === 'image' ? 'image' : 'post',
         text,
         approverUid: approver?.uid ?? null,
         approverName: approver ? nameOf(approver) : null,
@@ -1061,14 +1152,25 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     if (!rights.publish) return json({ error: 'forbidden' }, 403)
     if (item.status !== 'approved')
       return json({ error: item.status === 'pending' ? 'not-approved' : 'not-found' }, 409)
-    const image = (((await body()) as { image?: unknown } | null)?.image ?? undefined) as string | undefined
-    const post = parsePost({ ...item.post, ...(image ? { image } : {}) })
-    if (!post) return json({ error: 'bad-request' }, 400)
+    const choice = ((await body()) ?? {}) as { image?: unknown; imageFrom?: unknown }
+    // a picture of the device, or an approved picture asked by a task
+    const picture = typeof choice.imageFrom === 'string' ? await store.submission(choice.imageFrom) : null
+    if (
+      choice.imageFrom !== undefined &&
+      (!picture || picture.kind !== 'image' || picture.status !== 'approved')
+    )
+      return json({ error: 'bad-request' }, 400)
+    const image = picture?.post.image ?? (typeof choice.image === 'string' ? choice.image : undefined)
+    if (!parsePost({ ...item.post, ...(image ? { image } : {}) })) return json({ error: 'bad-request' }, 400)
     try {
       const { TELEGRAM_BOT_TOKEN: token, TELEGRAM_CHAT_ID: chatId } = env
+      // kept in the private channel, not in our database
+      const kept = image ? await keep(image) : item.post.image
+      const post = { ...item.post, ...(kept ? { image: kept } : {}) }
       const caption = post.image ? titleBlock(post) : null
       if (post.image && caption !== null) await sendPhoto(token, chatId, post.image, caption, deps.fetcher)
-      await sendMessages(token, chatId, formatTopic(post), deps.fetcher)
+      const messages = formatTopic(post)
+      if (messages.length) await sendMessages(token, chatId, messages, deps.fetcher)
       const published: Submission = {
         ...item,
         post,
@@ -1077,6 +1179,14 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         publishedBy: nameOf(me)
       }
       await store.putSubmission(published)
+      // the picture chosen is used: published with the post
+      if (picture)
+        await store.putSubmission({
+          ...picture,
+          status: 'published',
+          publishedAt: now,
+          publishedBy: nameOf(me)
+        })
       await tell(
         env,
         deps,

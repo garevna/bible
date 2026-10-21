@@ -100,25 +100,124 @@ function imageFile(dataUrl: string): Blob {
   return new Blob([bytes], { type })
 }
 
-/** Sends the picture with its caption (up to 1024 characters) */
+/**
+ * Sends the picture with its caption (up to 1024 characters): a data URL, or a picture kept in
+ * Telegram already ('tg:' and the id of its file: not sent again). The id of the file sent comes back.
+ */
 export async function sendPhoto(
   token: string,
   chatId: string,
   image: string,
   caption: string,
   fetcher: typeof fetch = fetch
-): Promise<void> {
-  const form = new FormData()
-  form.append('chat_id', chatId)
-  form.append('caption', caption.slice(0, 1024))
-  form.append('parse_mode', 'HTML')
-  form.append('photo', imageFile(image), 'topic.jpg')
+): Promise<string | null> {
+  const kept = image.startsWith('tg:') ? image.slice(3) : null
+  let body: FormData | string
+  if (kept)
+    body = JSON.stringify({
+      chat_id: chatId,
+      caption: caption.slice(0, 1024),
+      parse_mode: 'HTML',
+      photo: kept
+    })
+  else {
+    const form = new FormData()
+    form.append('chat_id', chatId)
+    form.append('caption', caption.slice(0, 1024))
+    form.append('parse_mode', 'HTML')
+    form.append('photo', imageFile(image), 'topic.jpg')
+    body = form
+  }
   const response = await fetcher(`https://api.telegram.org/bot${token}/sendPhoto`, {
     method: 'POST',
-    body: form
+    ...(kept ? { headers: { 'content-type': 'application/json' } } : {}),
+    body
   })
-  if (!response.ok) {
-    const { description } = (await response.json().catch(() => ({}))) as { description?: string }
-    throw new TelegramError(description || `Telegram: ${response.status}`)
+  const answer = (await response.json().catch(() => ({}))) as {
+    description?: string
+    result?: { photo?: { file_id: string }[] }
   }
+  if (!response.ok) throw new TelegramError(answer.description || `Telegram: ${response.status}`)
+  // the largest size of the picture
+  return answer.result?.photo?.at(-1)?.file_id ?? null
+}
+
+/**
+ * The pictures of the posts are kept in a private channel of the bot of the public channel, not in our
+ * databases: a picture sent there leaves the id of its file, and the channel gets it by the same id.
+ */
+export async function storePhoto(
+  token: string,
+  chatId: string,
+  image: string,
+  fetcher: typeof fetch = fetch
+) {
+  const id = await sendPhoto(token, chatId, image, '', fetcher)
+  if (!id) throw new TelegramError('Telegram: no file')
+  return `tg:${id}`
+}
+
+/** The bytes of a picture kept in Telegram (up to 20 MB, as Telegram gives the files to the bots) */
+export async function storedPhoto(token: string, image: string, fetcher: typeof fetch = fetch) {
+  const file = (await (
+    await fetcher(`https://api.telegram.org/bot${token}/getFile`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ file_id: image.replace(/^tg:/, '') })
+    })
+  ).json()) as { result?: { file_path?: string } }
+  if (!file.result?.file_path) return null
+  return fetcher(`https://api.telegram.org/file/bot${token}/${file.result.file_path}`)
+}
+
+/**
+ * The private channel the bot of the public channel was added to: found among its updates (a message
+ * posted there), not the public channel itself
+ */
+export async function findStorageChat(token: string, publicChat: string, fetcher: typeof fetch = fetch) {
+  const answer = (await (
+    await fetcher(`https://api.telegram.org/bot${token}/getUpdates`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ allowed_updates: ['channel_post', 'my_chat_member'] })
+    })
+  ).json()) as {
+    result?: { channel_post?: { chat: ChatOf }; my_chat_member?: { chat: ChatOf } }[]
+  }
+  const chats = (answer.result ?? [])
+    .map((update) => update.channel_post?.chat ?? update.my_chat_member?.chat)
+    .filter((chat): chat is ChatOf => Boolean(chat) && chat!.type === 'channel')
+    .filter((chat) => String(chat.id) !== publicChat && `@${chat.username ?? ''}` !== publicChat)
+  const chat = chats.at(-1)
+  return chat ? { id: String(chat.id), title: chat.title ?? String(chat.id) } : null
+}
+
+/** "@kcc_bot": the username of a bot, asked of Telegram once and kept a week */
+export async function botName(
+  token: string,
+  store: {
+    get(key: string): Promise<string | null>
+    put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>
+  },
+  fetcher: typeof fetch = fetch
+) {
+  const kept = await store.get('settings:channelBotName')
+  if (kept) return kept
+  const answer = (await (
+    await fetcher(`https://api.telegram.org/bot${token}/getMe`)
+  )
+    .json()
+    .catch(() => ({}))) as {
+    result?: { username?: string }
+  }
+  const name = answer.result?.username ? `@${answer.result.username}` : ''
+  if (name) await store.put('settings:channelBotName', name, { expirationTtl: 7 * 24 * 60 * 60 })
+  return name
+}
+
+interface ChatOf {
+  id: number
+  type: string
+  title?: string
+  username?: string
 }

@@ -1,4 +1,94 @@
 export const posts = {
+  badPicture: {
+    ua: 'Не вдалося відкрити картинку. Виберіть інший файл (JPG або PNG).',
+    ru: 'Не удалось открыть картинку. Выберите другой файл (JPG или PNG).',
+    en: 'The picture could not be opened. Choose another file (JPG or PNG).'
+  },
+  storageStep2Named: {
+    ua: 'Додайте туди адміністратором бота {bot} — це він публікує в канал «{channel}».',
+    ru: 'Добавьте туда администратором бота {bot} — это он публикует в канал «{channel}».',
+    en: 'Add the bot {bot} there as an administrator: it publishes in “{channel}”.'
+  },
+  kindPost: {
+    ua: 'Нотатка або тема',
+    ru: 'Заметка или тема',
+    en: 'A note or a topic'
+  },
+  kindImage: {
+    ua: 'Картинка',
+    ru: 'Картинка',
+    en: 'A picture'
+  },
+  uploadPicture: {
+    ua: 'Завантажити картинку',
+    ru: 'Загрузить картинку',
+    en: 'Upload a picture'
+  },
+  otherPicture: {
+    ua: 'Вибрати іншу',
+    ru: 'Выбрать другую',
+    en: 'Choose another'
+  },
+  pictureSentTitle: {
+    ua: 'Картинку надіслано',
+    ru: 'Картинка отправлена',
+    en: 'The picture is sent'
+  },
+  pictureSentApprover: {
+    ua: 'Картинку надіслано на затвердження: {name}. Ви отримаєте повідомлення, коли її затвердять.',
+    ru: 'Картинка отправлена на утверждение: {name}. Вы получите сообщение, когда её утвердят.',
+    en: 'Sent for approval to {name}. You will get a message when it is approved.'
+  },
+  pictureSentQueue: {
+    ua: 'Картинку надіслано адміністратору каналу.',
+    ru: 'Картинка отправлена администратору канала.',
+    en: 'Sent to the administrator of the channel.'
+  },
+  choosePicture: {
+    ua: 'Вибрати готову картинку',
+    ru: 'Выбрать готовую картинку',
+    en: 'Choose a ready picture'
+  },
+  storageOn: {
+    ua: 'Сховище картинок: {name}',
+    ru: 'Хранилище картинок: {name}',
+    en: 'Pictures are kept in: {name}'
+  },
+  storageOff: {
+    ua: 'Сховище картинок ще не підключено. Картинки зберігаються в закритому Telegram-каналі:',
+    ru: 'Хранилище картинок ещё не подключено. Картинки хранятся в закрытом Telegram-канале:',
+    en: 'The pictures are not connected yet. They are kept in a private Telegram channel:'
+  },
+  storageStep1: {
+    ua: 'Створіть у Telegram частний канал, наприклад «ХХЦ — файли».',
+    ru: 'Создайте в Telegram частный канал, например «ХХЦ — файлы».',
+    en: 'Create a private Telegram channel, e.g. “ХХЦ — files”.'
+  },
+  storageStep2: {
+    ua: 'Додайте туди адміністратором бота, який публікує в публічний канал.',
+    ru: 'Добавьте туда администратором бота, который публикует в публичный канал.',
+    en: 'Add the bot of the public channel there as an administrator.'
+  },
+  storageStep3: {
+    ua: 'Опублікуйте в цьому каналі будь-яке повідомлення й натисніть «Підключити».',
+    ru: 'Опубликуйте в этом канале любое сообщение и нажмите «Подключить».',
+    en: 'Post any message there and choose “Connect”.'
+  },
+  storageConnect: {
+    ua: 'Підключити',
+    ru: 'Подключить',
+    en: 'Connect'
+  },
+  storageConnected: {
+    ua: 'Сховище підключено',
+    ru: 'Хранилище подключено',
+    en: 'Connected'
+  },
+  storageNotFound: {
+    ua: 'Канал не знайдено: перевірте, що бот — адміністратор каналу і що в каналі є нове повідомлення.',
+    ru: 'Канал не найден: проверьте, что бот — администратор канала и что в канале есть новое сообщение.',
+    en: 'Not found: check that the bot is an administrator of the channel and that a new message is there.'
+  },
   tasksForMe: {
     ua: 'Доручено мені',
     ru: 'Поручено мне',

@@ -242,6 +242,17 @@ export const useWorkerStore = defineStore('worker', () => {
   const hasDashboard = computed(() => isAdmin.value || leads.value.length > 0)
   const manages = (function_: Manage) => rights.value.manage.includes(function_)
 
+  /** a file of the worker (a picture kept in Telegram), with the token of the user */
+  async function requestBlob(path: string): Promise<Blob> {
+    const authUser = firebase.authUser ?? (await firebase.waitForAuth())
+    if (!authUser) throw new WorkerError('unauthorized')
+    const response = await fetch(`${workerUrl}${path}`, {
+      headers: { authorization: `Bearer ${await authUser.getIdToken()}` }
+    })
+    if (!response.ok) throw new WorkerError(String(response.status))
+    return response.blob()
+  }
+
   async function call<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
@@ -565,6 +576,7 @@ export const useWorkerStore = defineStore('worker', () => {
   return {
     /** a request to the worker with the token of the user (for other stores, e.g. the schedule) */
     request: call,
+    requestBlob,
     channelPost,
     role,
     roleName,

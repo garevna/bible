@@ -677,6 +677,98 @@ describe('the posts of the channel', () => {
     expect(await told('musician-uid', 'опубліковано в каналі')).toBe(true)
   })
 
+  it('a picture asked by a task: kept in the private channel of Telegram, approved, published with a post', async () => {
+    const { call, fetcher, env, messages, schedule, posts, clock } = await church()
+    // Telegram: the private channel among the updates, the file of a picture sent, the file asked for
+    fetcher.mockImplementation(async (url: unknown) => {
+      const method = String(url).split('/').at(-1)
+      if (method === 'getUpdates')
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            result: [{ channel_post: { chat: { id: -100555, type: 'channel', title: 'ХХЦ — файли' } } }]
+          })
+        )
+      if (method === 'sendPhoto')
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            result: { photo: [{ file_id: 'small-id-0001' }, { file_id: 'large-id-0001' }] }
+          })
+        )
+      if (method === 'getFile')
+        return new Response(JSON.stringify({ ok: true, result: { file_path: 'photos/1.jpg' } }))
+      if (String(url).includes('/file/bot'))
+        return new Response('JPEG', { headers: { 'content-type': 'image/jpeg' } })
+      return new Response('{"ok":true}')
+    })
+    const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='
+    // no private channel yet: no picture is kept
+    expect((await call('POST', '/posts/upload', 'musician', { image: jpeg })).body).toEqual({
+      error: 'no-storage'
+    })
+    expect((await call('POST', '/posts/storage', 'musician', {})).status).toBe(403)
+    expect((await call('POST', '/posts/storage', 'leader', {})).body).toEqual({
+      storage: { title: 'ХХЦ — файли' }
+    })
+    expect((await call('GET', '/posts', 'musician')).body.storage).toEqual({ title: 'ХХЦ — файли' })
+
+    // the pastor asks the musician for a picture; the musician uploads it and sends it for the task
+    const task = await call('POST', '/post-tasks', 'pastor', {
+      assigneeUid: 'musician-uid',
+      text: 'Картинка до анонсу',
+      approverUid: 'pastor-uid',
+      kind: 'image'
+    })
+    const taskId = (task.body.task as { id: string; kind: string }).id
+    expect(task.body.task).toMatchObject({ kind: 'image' })
+    const uploaded = await call('POST', '/posts/upload', 'musician', { image: jpeg })
+    expect(uploaded.body).toEqual({ image: 'tg:large-id-0001' })
+    // a task of a picture is answered by a picture
+    expect((await call('POST', '/posts', 'musician', { kind: 'note', post: note, taskId })).status).toBe(400)
+    const picture = await call('POST', '/posts', 'musician', {
+      kind: 'image',
+      post: { title: 'Картинка до анонсу', items: [], image: 'tg:large-id-0001' },
+      taskId
+    })
+    const pictureId = (picture.body.submission as { id: string }).id
+    expect(picture.body.submission).toMatchObject({ kind: 'image', status: 'pending' })
+    await call('POST', `/posts/${pictureId}/approve`, 'pastor', {})
+
+    // the servants see it through the worker
+    const file = await handle(
+      new Request('https://worker.test/files/tg%3Alarge-id-0001', {
+        headers: { origin: 'https://garevna.github.io', authorization: 'Bearer musician' }
+      }),
+      env,
+      {
+        verify: async (token: string) => users[token]!,
+        fetcher: fetcher as unknown as typeof fetch,
+        messages,
+        schedule,
+        posts,
+        now: () => clock.now
+      }
+    )
+    expect(file.headers.get('content-type')).toBe('image/jpeg')
+    expect(await file.text()).toBe('JPEG')
+
+    // the pastor's post is published with the approved picture: sent by its id, not again
+    const own = await call('POST', '/posts', 'pastor', { kind: 'note', post: note })
+    const ownId = (own.body.submission as { id: string }).id
+    fetcher.mockClear()
+    const published = await call('POST', `/posts/${ownId}/publish`, 'leader', { imageFrom: pictureId })
+    expect(published.body.submission).toMatchObject({
+      status: 'published',
+      post: { image: 'tg:large-id-0001' }
+    })
+    const photo = fetcher.mock.calls.find(([url]) => String(url).endsWith('/sendPhoto'))!
+    expect(JSON.parse(String(photo[1]!.body))).toMatchObject({ photo: 'large-id-0001' })
+    expect((await call('GET', '/posts', 'leader')).body.submissions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: pictureId, status: 'published' })])
+    )
+  })
+
   it('a pastor needs no approval of their own; returned with a word; a task says who approves', async () => {
     const { call, messages, clock } = await church()
     const own = await call('POST', '/posts', 'pastor', { kind: 'note', post: note })

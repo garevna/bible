@@ -24,9 +24,11 @@ const MAX_TEXT = 20_000
 /** Telegram takes photos up to 10 MB; the app sends pictures of 1280 px, far smaller */
 const MAX_IMAGE = 4_000_000
 const IMAGE = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/
+/** a picture kept in Telegram (see telegram.ts, storePhoto): 'tg:' and the id of its file */
+export const STORED = /^tg:[\w-]{10,300}$/
 
 const isImage = (value: unknown): value is string =>
-  typeof value === 'string' && value.length <= MAX_IMAGE && IMAGE.test(value)
+  typeof value === 'string' && value.length <= MAX_IMAGE && (IMAGE.test(value) || STORED.test(value))
 
 const isText = (value: unknown, max = MAX_TEXT): value is string =>
   typeof value === 'string' && value.length <= max
