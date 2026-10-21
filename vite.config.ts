@@ -28,8 +28,9 @@ export default defineConfig(({ command }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'safari-pinned-tab.svg'],
       manifest: {
-        name: 'Bible-ukr',
-        short_name: 'Bible-ukr',
+        name: 'ХХЦ',
+        // the name under the icon on the phone
+        short_name: 'ХХЦ',
         theme_color: '#4caf50',
         background_color: '#4caf50',
         display: 'standalone',
