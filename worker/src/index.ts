@@ -133,7 +133,7 @@ import {
  *   POST   /posts/:id/return        { comment }: its approver, or the ones who publish
  *   POST   /posts/:id/publish       { image? }: an approved post goes to the channel             publish
  *   DELETE /posts/:id               its author (not published yet), or the ones who publish
- *   POST   /post-tasks              { assigneeUid, text, approverUid? }: a post asked of a servant  approvePosts
+ *   POST   /post-tasks              { assigneeUid, text, approverUid?, due? }: a post asked of a servant  approvePosts
  *   DELETE /post-tasks/:id          the one who asked
  *   GET    /youtube?url             the title and the channel of a video of YouTube (a material)
  *   POST   /handover                { ministry, toUid, until? }: the leader (or an administrator) asks a deputy
@@ -970,11 +970,15 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         assigneeUid?: unknown
         text?: unknown
         approverUid?: unknown
+        due?: unknown
       }
       const assignee = person(payload.assigneeUid)
+      // the last day: not in the past
+      const due = parseUntil(payload.due, localDay(now))
       const text = typeof payload.text === 'string' ? payload.text.trim().slice(0, 500) : ''
       const approver = payload.approverUid ? approvers.find((user) => user.uid === payload.approverUid) : null
-      if (!assignee || !text || approver === undefined) return json({ error: 'bad-request' }, 400)
+      if (!assignee || !text || approver === undefined || due === false)
+        return json({ error: 'bad-request' }, 400)
       const task: PostTask = {
         id: crypto.randomUUID(),
         byUid: me.uid,
@@ -984,6 +988,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         text,
         approverUid: approver?.uid ?? null,
         approverName: approver ? nameOf(approver) : null,
+        due,
         status: 'open',
         createdAt: now
       }
@@ -993,7 +998,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         deps,
         me,
         [assignee.uid],
-        `📝 Доручення від ${nameOf(me)}: підготувати публікацію для каналу — ${text}.${approver ? ` Затверджує: ${nameOf(approver)}.` : ''} Розділ «Публікації».`
+        `📝 Доручення від ${nameOf(me)}: підготувати публікацію для каналу — ${text}.${due ? ` Термін:${untilText(due)}.` : ''}${approver ? ` Затверджує: ${nameOf(approver)}.` : ''} Розділ «Публікації».`
       )
       return json({ task })
     }

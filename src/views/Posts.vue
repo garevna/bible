@@ -73,6 +73,9 @@
       <p v-if="!posts.myTasks.length" class="muted">{{ text.noneTasks }}</p>
       <article v-for="task of posts.myTasks" :key="task.id" class="task">
         <p class="task__text">{{ task.text }}</p>
+        <p v-if="task.due" class="due" :class="{ 'due--late': task.due <= today }">
+          {{ format(text.taskDue, { day: dayText(task.due) }) }}
+        </p>
         <p class="muted">
           {{ format(text.taskFrom, { name: task.byName }) }}
           <template v-if="task.approverName">
@@ -106,7 +109,15 @@
           />
         </div>
         <v-text-field v-model="taskText" :label="text.taskText" density="compact" hide-details class="mt-2" />
-        <!-- a form of three fields: one clear button sends it -->
+        <DateField
+          v-model="taskDue"
+          :label="text.taskDueLabel"
+          clearable
+          density="compact"
+          hide-details
+          class="mt-2 due-field"
+        />
+        <!-- a form of several fields: one clear button sends it -->
         <div class="d-flex flex-wrap align-center ga-2 mt-2">
           <v-btn
             variant="flat"
@@ -119,12 +130,12 @@
           >
             {{ text.giveTaskButton }}
           </v-btn>
-          <span v-if="taskSent" class="sent">{{ text.taskSent }}</span>
         </div>
         <article v-for="task of posts.givenTasks" :key="task.id" class="task mt-2">
           <div class="d-flex align-center ga-2">
             <span class="flex-grow-1">
               {{ task.text }} — {{ task.assigneeName }}
+              <template v-if="task.due"> · {{ format(text.taskDue, { day: dayText(task.due) }) }}</template>
               <v-chip
                 size="x-small"
                 variant="tonal"
@@ -142,6 +153,32 @@
         </article>
       </template>
     </template>
+
+    <!-- a task sent: what, to whom, approved by whom, until when -->
+    <AppDialog
+      v-model="taskSentDialog"
+      :title="text.taskSentTitle"
+      icon="mdi-check-circle-outline"
+      max-width="480"
+    >
+      <template v-if="sentTask">
+        <p class="lead">{{ format(text.taskSentLead, { name: sentTask.assigneeName }) }}</p>
+        <p class="mt-2">«{{ sentTask.text }}»</p>
+        <p v-if="sentTask.due" class="mt-2">{{ format(text.taskDue, { day: dayText(sentTask.due) }) }}</p>
+        <p class="mt-2">
+          {{
+            sentTask.approverName ? format(text.approver, { name: sentTask.approverName }) : text.noApproval
+          }}
+        </p>
+        <p class="muted mt-2">{{ text.taskSentNext }}</p>
+      </template>
+      <template #actions>
+        <v-spacer />
+        <v-btn variant="flat" color="primary" class="text-none px-6" @click="taskSentDialog = false">
+          {{ text.taskOk }}
+        </v-btn>
+      </template>
+    </AppDialog>
 
     <!-- the word that returns a post to its author -->
     <AppDialog v-model="returnDialog" :title="text.return" icon="mdi-undo" max-width="480">
@@ -167,10 +204,13 @@ import { storeToRefs } from 'pinia'
 import AppDialog from '@/components/AppDialog.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
+import DateField from '@/components/DateField.vue'
 import PostCard from '@/components/posts/PostCard.vue'
 import { useLanguageStore } from '@/stores/language'
-import { usePostsStore, type Submission } from '@/stores/posts'
+import { usePostsStore, type PostTask, type Submission } from '@/stores/posts'
+import { useUserStore } from '@/stores/user'
 import { useWorkerStore, WorkerError } from '@/stores/worker'
+import { fullDateFormat, localeOf, toISODateString } from '@/utils/dates'
 import { format } from '@/utils/format'
 
 /**
@@ -242,16 +282,30 @@ const taskApproverItems = computed(() => [
   ...posts.approvers.map((person) => ({ value: person.uid, title: person.name }))
 ])
 /** sent: a word that it is, under the button */
-const taskSent = ref(false)
+const user = useUserStore()
+const today = toISODateString(new Date())
+/** "31 грудня 2026 р." */
+const dayText = (day: string) => fullDateFormat(new Date(`${day}T12:00:00`), localeOf(user.lang))
+
+/** the last day of the task, if any */
+const taskDue = ref<string | null>(null)
+/** sent: a window says what went to whom */
+const taskSentDialog = ref(false)
+const sentTask = shallowRef<PostTask | null>(null)
 const giveTask = () =>
   assigneeUid.value &&
   (taskText.value ?? '').trim() &&
   run(async () => {
-    taskSent.value = false
-    await posts.createTask(assigneeUid.value!, taskText.value.trim(), taskApprover.value || null)
+    sentTask.value = await posts.createTask(
+      assigneeUid.value!,
+      taskText.value.trim(),
+      taskApprover.value || null,
+      taskDue.value
+    )
     taskText.value = ''
     assigneeUid.value = null
-    taskSent.value = true
+    taskDue.value = null
+    taskSentDialog.value = true
   })
 </script>
 
@@ -275,9 +329,24 @@ const giveTask = () =>
   flex: 1 1 220px;
 }
 
-.sent {
-  color: rgb(var(--v-theme-primary));
+.lead {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.due {
   font-size: 14px;
+  font-weight: 600;
+  color: rgb(var(--v-theme-secondary));
+  margin-bottom: 2px;
+}
+
+.due--late {
+  color: rgb(var(--v-theme-delete));
+}
+
+.due-field {
+  max-width: 360px;
 }
 
 .task {

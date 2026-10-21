@@ -39,6 +39,8 @@ export interface PostTask {
   text: string
   approverUid: string | null
   approverName: string | null
+  /** the last day ('YYYY-MM-DD'), or null without one */
+  due: string | null
   status: 'open' | 'done'
   createdAt: number
 }
@@ -83,6 +85,7 @@ interface TaskRow {
   text: string
   approver_uid: string | null
   approver_name: string | null
+  due?: string | null
   status: string
   created_at: number
 }
@@ -116,6 +119,7 @@ const taskOf = (row: TaskRow): PostTask => ({
   text: row.text,
   approverUid: row.approver_uid,
   approverName: row.approver_name,
+  due: row.due ?? null,
   status: row.status === 'done' ? 'done' : 'open',
   createdAt: row.created_at
 })
@@ -170,7 +174,7 @@ export function d1Posts(db: D1Database): PostsStore {
     async putTask(t) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO post_tasks (id, by_uid, by_name, assignee_uid, assignee_name, text, approver_uid, approver_name, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO post_tasks (id, by_uid, by_name, assignee_uid, assignee_name, text, approver_uid, approver_name, due, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .bind(
           t.id,
@@ -181,6 +185,7 @@ export function d1Posts(db: D1Database): PostsStore {
           t.text,
           t.approverUid,
           t.approverName,
+          t.due,
           t.status,
           t.createdAt
         )

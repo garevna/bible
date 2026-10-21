@@ -1,4 +1,34 @@
 export const posts = {
+  taskDueLabel: {
+    ua: 'Термін виконання (необов’язково)',
+    ru: 'Срок выполнения (необязательно)',
+    en: 'The last day (optional)'
+  },
+  taskDue: {
+    ua: 'Термін: до {day}',
+    ru: 'Срок: до {day}',
+    en: 'Until {day}'
+  },
+  taskSentTitle: {
+    ua: 'Доручення надіслано',
+    ru: 'Поручение отправлено',
+    en: 'The task is sent'
+  },
+  taskSentLead: {
+    ua: 'Доручення надіслано: {name}',
+    ru: 'Поручение отправлено: {name}',
+    en: 'Sent to {name}'
+  },
+  taskSentNext: {
+    ua: 'Виконавець отримав повідомлення в застосунку і в Telegram. Коли матеріал буде готовий, ви побачите це тут.',
+    ru: 'Исполнитель получил сообщение в приложении и в Telegram. Когда материал будет готов, вы увидите это здесь.',
+    en: 'The servant got a message in the app and in Telegram. You will see here when the material is ready.'
+  },
+  taskOk: {
+    ua: 'Добре',
+    ru: 'Хорошо',
+    en: 'OK'
+  },
   giveTaskButton: {
     ua: 'Доручити',
     ru: 'Поручить',

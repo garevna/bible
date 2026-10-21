@@ -85,6 +85,7 @@ async function fakeWorker(
             text: body.text,
             approverUid: body.approverUid,
             approverName: null,
+            due: body.due,
             status: 'open',
             createdAt: Date.now()
           }
@@ -155,7 +156,11 @@ test('a pastor approves or returns with a word, and asks a servant to prepare a 
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'Музикант' }).click()
   await page.getByRole('textbox', { name: 'Що підготувати' }).fill('Анонс молодіжної зустрічі')
   await page.getByRole('button', { name: 'Доручити', exact: true }).click()
-  await expect(page.getByText('Доручення надіслано')).toBeVisible()
+  // a window says what went to whom
+  const sentDialog = dialog(page)
+  await expect(sentDialog).toContainText('Доручення надіслано: Музикант')
+  await expect(sentDialog).toContainText('«Анонс молодіжної зустрічі»')
+  await sentDialog.getByRole('button', { name: 'Добре' }).click()
   await expect
     .poll(() => requests.find((request) => request.path === '/post-tasks'))
     .toMatchObject({

@@ -700,8 +700,25 @@ describe('the posts of the channel', () => {
     const task = await call('POST', '/post-tasks', 'pastor', {
       assigneeUid: 'musician-uid',
       text: 'Анонс молодіжної зустрічі',
-      approverUid: 'pastor-uid'
+      approverUid: 'pastor-uid',
+      due: '2099-12-31'
     })
+    expect(task.body.task).toMatchObject({ due: '2099-12-31' })
+    expect(
+      (await messages.forUser('musician-uid', clock.now)).some((message) =>
+        message.text.includes('Термін: до 31 грудня 2099 р.')
+      )
+    ).toBe(true)
+    // the last day is not in the past
+    expect(
+      (
+        await call('POST', '/post-tasks', 'pastor', {
+          assigneeUid: 'musician-uid',
+          text: 'x',
+          due: '2000-01-01'
+        })
+      ).status
+    ).toBe(400)
     const taskId = (task.body.task as { id: string }).id
     expect((await call('GET', '/posts', 'musician')).body.tasks).toMatchObject([
       { id: taskId, status: 'open' }

@@ -35,6 +35,8 @@ export interface PostTask {
   text: string
   approverUid: string | null
   approverName: string | null
+  /** the last day ('YYYY-MM-DD'), or null */
+  due: string | null
   status: 'open' | 'done'
   createdAt: number
 }
@@ -127,13 +129,20 @@ export const usePostsStore = defineStore('posts', () => {
     submissions.value = submissions.value.filter((item) => item.id !== id)
   }
 
-  async function createTask(assigneeUid: string, text: string, approverUid: string | null) {
+  async function createTask(
+    assigneeUid: string,
+    text: string,
+    approverUid: string | null,
+    due: string | null
+  ) {
     const { task } = await worker.request<{ task: PostTask }>('POST', '/post-tasks', {
       assigneeUid,
       text,
-      approverUid
+      approverUid,
+      due
     })
     tasks.value = [task, ...tasks.value]
+    return task
   }
 
   async function removeTask(id: string) {
