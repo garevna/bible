@@ -18,6 +18,7 @@ import {
   setRoles,
   type Manage,
   effectiveRights,
+  isCustom,
   SUPERVISOR,
   type RoleDef,
   type Rights
@@ -319,7 +320,7 @@ async function answerHandover(
 
 /** everyone but the readers serves: they get messages and see the ministries (a removed role is a reader) */
 const serves = (roles: RoleDef[], roleId: string) =>
-  roleId === 'owner' || (roleId !== READER && roles.some((role) => role.id === roleId))
+  roleId === 'owner' || (roleId !== READER && (roles.some((role) => role.id === roleId) || isCustom(roleId)))
 
 /** the service bot, writing to the linked users of the list */
 const botFor = (env: Env, deps: Deps, users: UserView[]): ServiceBot =>
@@ -1185,6 +1186,15 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     if (!can('roles')) return json({ error: 'forbidden' }, 403)
     const parsed = parseRoles(((await body()) as { roles?: unknown } | null)?.roles)
     if (!parsed) return json({ error: 'bad-request' }, 400)
+    // only a supervisor (or an owner) adds or removes a status
+    const customOf = (list: RoleDef[]) =>
+      list
+        .filter((role) => isCustom(role.id))
+        .map((role) => role.id)
+        .sort()
+        .join()
+    if (customOf(parsed) !== customOf(roles) && roleId !== 'owner' && roleId !== SUPERVISOR)
+      return json({ error: 'forbidden' }, 403)
     await setRoles(env.USERS, parsed)
     return json({ roles: parsed })
   }

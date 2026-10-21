@@ -3,7 +3,7 @@
     <h2 class="admin-title">{{ text.sectionRoles }}</h2>
     <p class="hint">{{ text.rolesHint }}</p>
 
-    <!-- each status opens its rights; there are four of them, none is added or removed -->
+    <!-- each status opens its rights; four are built in, a supervisor adds and removes the others -->
     <v-expansion-panels v-model="opened" variant="accordion" class="mb-4">
       <v-expansion-panel
         v-for="role of draft"
@@ -14,6 +14,13 @@
       >
         <v-expansion-panel-title>
           <span class="flex-grow-1 font-weight-bold">{{ role.name }}</span>
+          <ConfirmButton
+            v-if="mighty && role.id.startsWith('status-')"
+            icon="$unlink"
+            :text="`${text.removeStatus}: ${role.name}`"
+            class="mr-2"
+            @confirm="remove(role)"
+          />
         </v-expansion-panel-title>
 
         <v-expansion-panel-text>
@@ -121,6 +128,16 @@
     </v-expansion-panels>
 
     <div class="d-flex flex-wrap align-center ga-2">
+      <v-btn
+        v-if="mighty"
+        variant="tonal"
+        color="buttons"
+        class="text-none"
+        prepend-icon="mdi-plus-thick"
+        @click="add"
+      >
+        {{ text.addStatus }}
+      </v-btn>
       <v-spacer />
       <span v-if="dirty" class="text-warning text-body-2">{{ text.unsaved }}</span>
       <v-btn
@@ -141,6 +158,7 @@
 import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
+import ConfirmButton from '@/components/ConfirmButton.vue'
 import { useLanguageStore } from '@/stores/language'
 import {
   ANY_MINISTRY,
@@ -174,6 +192,34 @@ const draft = ref<RoleDef[]>(copy(roles.value))
 watch(roles, (value) => (draft.value = copy(value)))
 
 const opened = ref<string | null>(null)
+
+/** only a supervisor (or an owner) adds or removes a status */
+const mighty = computed(() => worker.role === 'owner' || worker.role === SUPERVISOR)
+
+/** a new status: the rights of a servant to begin with; it comes before the servant */
+function add() {
+  const id = `status-${Date.now().toString(36)}`
+  const servant = draft.value.findIndex((role) => role.id === 'servant')
+  draft.value.splice(servant, 0, {
+    id,
+    name: text.value.newStatus,
+    publish: false,
+    send: false,
+    sendToRoles: [],
+    sendToPeople: false,
+    messageDays: 1,
+    approve: false,
+    invite: [],
+    manage: []
+  })
+  opened.value = id
+}
+
+function remove(role: RoleDef) {
+  draft.value = draft.value
+    .filter((item) => item.id !== role.id)
+    .map((item) => ({ ...item, sendToRoles: item.sendToRoles.filter((id) => id !== role.id) }))
+}
 const busy = ref(false)
 const dirty = computed(() => JSON.stringify(draft.value) !== JSON.stringify(roles.value))
 

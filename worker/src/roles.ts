@@ -44,7 +44,10 @@ export const STATUSES = [SUPERVISOR, 'admin', 'servant', READER] as const
  * serve; the owners keep 'owner' (the rights of the supervisor, whatever the list says)
  */
 export const statusOf = (id: string) =>
-  id === 'owner' || (STATUSES as readonly string[]).includes(id) ? id : 'servant'
+  id === 'owner' || (STATUSES as readonly string[]).includes(id) || isCustom(id) ? id : 'servant'
+
+/** a status added by a supervisor: 'status-…' */
+export const isCustom = (id: string) => id.startsWith('status-')
 
 /** in the ministries a role invites to: every ministry */
 export const ANY_MINISTRY = '*'
@@ -128,7 +131,7 @@ export function effectiveRights(status: RoleDef, ministry: MinistryRights): Righ
 
 /** The four statuses: the reader has no rights, the supervisor has all of them */
 function statusesOf(list: RoleDef[]): RoleDef[] {
-  return STATUSES.map((id) => {
+  const builtIn = STATUSES.map((id) => {
     // the supervisor of the old version was a role of its own, known by its name
     const kept =
       list.find((role) => role.id === id) ??
@@ -139,6 +142,9 @@ function statusesOf(list: RoleDef[]): RoleDef[] {
       ? { ...kept, id, sendToRoles: kept.sendToRoles.filter((item) => item !== 'publisher') }
       : defaultOf(id)
   })
+  // the statuses added by the supervisors: between the administrator and the servant
+  const custom = list.filter((role) => isCustom(role.id))
+  return [builtIn[0]!, builtIn[1]!, ...custom, builtIn[2]!, builtIn[3]!]
 }
 
 const ROLES_KEY = 'settings:roles'
@@ -160,7 +166,10 @@ export const setRoles = (store: UsersStore, roles: RoleDef[]) => store.put(ROLES
 
 /** The status of a role id (see statusOf) */
 export const roleDefOf = (roles: RoleDef[], id: string): RoleDef =>
-  roles.find((role) => role.id === statusOf(id)) ?? defaultOf(READER)
+  roles.find((role) => role.id === statusOf(id)) ??
+  // a status removed by a supervisor: its people serve
+  (isCustom(id) ? roles.find((role) => role.id === 'servant') : undefined) ??
+  defaultOf(READER)
 
 const isRoleDef = (value: unknown): value is RoleDef => {
   const role = value as RoleDef
@@ -190,7 +199,10 @@ const isRoleDef = (value: unknown): value is RoleDef => {
   )
 }
 
-/** The four statuses (others are left out); the reader stays without rights, the supervisor with all. Null when it is not a list of them */
+/**
+ * The four statuses and the ones added by the supervisors ('status-…'; others are left out); the reader
+ * stays without rights, the supervisor with all. Null when it is not a list of them
+ */
 export function parseRoles(value: unknown): RoleDef[] | null {
   if (!Array.isArray(value) || value.length > 30 || !value.every(isRoleDef)) return null
   const ids = value.map((role) => role.id)

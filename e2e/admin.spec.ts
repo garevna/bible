@@ -333,8 +333,8 @@ test('statuses: four of them, their rights changed and saved together', async ({
 
   const panels = page.locator('.role-panel')
   await expect(panels).toHaveCount(4)
-  // none is added or removed; the supervisor has every right
-  await expect(page.getByRole('button', { name: 'Додати роль' })).toHaveCount(0)
+  // an administrator adds or removes none; the supervisor has every right
+  await expect(page.getByRole('button', { name: 'Додати статус' })).toHaveCount(0)
   const supervisor = panels.filter({ hasText: 'Супервайзер' })
   await supervisor.locator('.v-expansion-panel-title').click()
   await expect(supervisor).toContainText('Супервайзер має всі права')
@@ -358,6 +358,48 @@ test('statuses: four of them, their rights changed and saved together', async ({
     publish: false,
     manage: ['schedule']
   })
+})
+
+test('a supervisor adds a status of their own with its rights; an administrator cannot', async ({ page }) => {
+  const requests = await fakeWorker(page, ['roles', 'users', 'directories'])
+  // routes added later are asked first: the user is a supervisor
+  await page.route('**/worker-test/me', (route) =>
+    route.fulfill({
+      json: {
+        role: 'supervisor',
+        telegram: true,
+        canReceive: true,
+        phone: '+380501234567',
+        rights: {
+          publish: true,
+          send: true,
+          sendToPeople: true,
+          sendToRoles: [],
+          manage: ['roles', 'users', 'directories']
+        }
+      }
+    })
+  )
+  await openDashboard(page)
+  await page.getByRole('button', { name: 'Додати статус' }).click()
+  const panels = page.locator('.role-panel')
+  await expect(panels).toHaveCount(5)
+  // the new one comes before the servant
+  const fresh = panels.nth(2)
+  await fresh.getByLabel('Назва статусу').fill('Публікатор')
+  await fresh.getByLabel('Публікує нотатки й теми в Telegram-каналі').check()
+  await page.getByRole('button', { name: 'Зберегти статуси' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.path === '/admin/roles')?.body)
+    .toMatchObject({
+      roles: [
+        { id: 'supervisor' },
+        { id: 'admin' },
+        { name: 'Публікатор', publish: true },
+        { id: 'servant' },
+        { id: 'reader' }
+      ]
+    })
 })
 
 test('events of the calendar: the colors of the days, its filters, the types with their roles', async ({

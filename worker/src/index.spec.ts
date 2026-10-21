@@ -352,6 +352,65 @@ describe('roles kept by the administrators', () => {
     expect((await call('PUT', '/admin/users/musician-uid', 'pastor', { role: 'bishop' })).status).toBe(400)
   })
 
+  it('a supervisor adds a status of their own; an administrator changes its rights, not the list', async () => {
+    const { call } = setup()
+    for (const user of ['owner', 'pastor', 'musician']) await call('GET', '/me', user)
+    const roles = (await call('GET', '/admin/settings', 'owner')).body.roles as { id: string }[]
+    const publisher = role('status-publisher', { name: 'Публікатор', publish: true })
+    const saved = (await call('PUT', '/admin/roles', 'owner', { roles: [...roles, publisher] })).body
+      .roles as {
+      id: string
+    }[]
+    // between the administrator and the servant
+    expect(saved.map((item) => item.id)).toEqual([
+      'supervisor',
+      'admin',
+      'status-publisher',
+      'servant',
+      'reader'
+    ])
+    await call('PUT', '/admin/users/musician-uid', 'owner', { role: 'status-publisher' })
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({
+      role: 'status-publisher',
+      roleName: 'Публікатор',
+      rights: { publish: true },
+      canReceive: true
+    })
+
+    // an administrator with the statuses changes its rights, but adds or removes none
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'admin' })
+    const list = (await call('GET', '/admin/settings', 'pastor')).body.roles as {
+      id: string
+      send: boolean
+    }[]
+    expect(
+      (
+        await call('PUT', '/admin/roles', 'pastor', {
+          roles: list.map((item) => (item.id === 'status-publisher' ? { ...item, send: true } : item))
+        })
+      ).status
+    ).toBe(200)
+    expect(
+      (
+        await call('PUT', '/admin/roles', 'pastor', {
+          roles: list.filter((item) => item.id !== 'status-publisher')
+        })
+      ).status
+    ).toBe(403)
+    expect(
+      (await call('PUT', '/admin/roles', 'pastor', { roles: [...list, role('status-new')] })).status
+    ).toBe(403)
+
+    // removed by the supervisor: its people serve
+    await call('PUT', '/admin/roles', 'owner', {
+      roles: list.filter((item) => item.id !== 'status-publisher')
+    })
+    expect((await call('GET', '/me', 'musician')).body).toMatchObject({
+      rights: { publish: false },
+      canReceive: true
+    })
+  })
+
   it('a role of the old version is a servant', async () => {
     const { call, env } = setup()
     await call('GET', '/me', 'pastor')
