@@ -8,7 +8,9 @@ export interface Slot {
   name: string
   count: number
   materials: boolean
-  /** what to prepare, e.g. "Перелік пісень хвали" */
+  /** the kinds of the materials it prepares (ids of the resources of a ministry, see materialKinds.ts) */
+  kinds: string[]
+  /** a word about what to prepare, e.g. "Перелік пісень хвали" */
   hint: string
 }
 
@@ -36,9 +38,21 @@ export const DEFAULT_EVENT_TYPES: EventType[] = [
     ministry: null,
     roles: 'fixed',
     slots: [
-      { name: 'Пастор', count: 1, materials: true, hint: 'Нотатки, вірші з Біблії' },
-      { name: 'Лідер прославлення', count: 1, materials: true, hint: 'Перелік пісень хвали' },
-      { name: 'Учасник', count: 4, materials: false, hint: '' }
+      {
+        name: 'Пастор',
+        count: 1,
+        materials: true,
+        kinds: ['k-sermon', 'k-word'],
+        hint: 'Нотатки, вірші з Біблії'
+      },
+      {
+        name: 'Лідер прославлення',
+        count: 1,
+        materials: true,
+        kinds: ['k-plan'],
+        hint: 'Перелік пісень хвали'
+      },
+      { name: 'Учасник', count: 4, materials: false, kinds: [], hint: '' }
     ]
   },
   {
@@ -47,9 +61,15 @@ export const DEFAULT_EVENT_TYPES: EventType[] = [
     ministry: null,
     roles: 'fixed',
     slots: [
-      { name: 'Лідер прославлення', count: 1, materials: true, hint: 'Перелік пісень хвали' },
-      { name: 'Музикант', count: 3, materials: false, hint: '' },
-      { name: 'Вокаліст', count: 2, materials: false, hint: '' }
+      {
+        name: 'Лідер прославлення',
+        count: 1,
+        materials: true,
+        kinds: ['k-plan'],
+        hint: 'Перелік пісень хвали'
+      },
+      { name: 'Музикант', count: 3, materials: false, kinds: [], hint: '' },
+      { name: 'Вокаліст', count: 2, materials: false, kinds: [], hint: '' }
     ]
   },
   { id: 'pastoral', name: 'Пасторське служіння', ministry: null, roles: 'dynamic', slots: [] }
@@ -74,8 +94,15 @@ export const DEFAULT_CALENDAR: CalendarSettings = { redDays: 2, orangeDays: 5, f
 const TYPES_KEY = 'settings:eventTypes'
 const CALENDAR_KEY = 'settings:calendar'
 
+/** the roles saved before the kinds of materials have none */
+export const withKinds = (slots: Slot[]): Slot[] =>
+  slots.map((slot) => ({ ...slot, kinds: slot.kinds ?? [] }))
+
 export const getEventTypes = async (store: UsersStore) =>
-  (await store.get<EventType[]>(TYPES_KEY, 'json')) ?? DEFAULT_EVENT_TYPES
+  ((await store.get<EventType[]>(TYPES_KEY, 'json')) ?? DEFAULT_EVENT_TYPES).map((type) => ({
+    ...type,
+    slots: withKinds(type.slots)
+  }))
 
 export const setEventTypes = (store: UsersStore, types: EventType[]) =>
   store.put(TYPES_KEY, JSON.stringify(types))
@@ -99,9 +126,23 @@ export function parseSlots(value: unknown): Slot[] | null {
     const slotName = name(item?.name, 60)
     const count = Number(item?.count)
     const hint = typeof item?.hint === 'string' && item.hint.length <= 200 ? item.hint.trim() : ''
+    // the roles saved before the kinds have none
+    const kinds = item?.kinds === undefined ? [] : item.kinds
+    if (
+      !Array.isArray(kinds) ||
+      kinds.length > 20 ||
+      !kinds.every((kind) => typeof kind === 'string' && /^k-[a-z0-9-]{1,40}$/.test(kind))
+    )
+      return null
     if (!slotName || !Number.isInteger(count) || count < 1 || count > 50) return null
     if (typeof item.materials !== 'boolean') return null
-    slots.push({ name: slotName, count, materials: item.materials, hint: item.materials ? hint : '' })
+    slots.push({
+      name: slotName,
+      count,
+      materials: item.materials,
+      kinds: item.materials ? [...new Set(kinds as string[])] : [],
+      hint: item.materials ? hint : ''
+    })
   }
   return new Set(slots.map((slot) => slot.name)).size === slots.length ? slots : null
 }

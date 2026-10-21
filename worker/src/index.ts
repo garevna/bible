@@ -54,6 +54,7 @@ import {
   setGroupsVisibility,
   type HomeGroup
 } from './groups'
+import { getMaterialKinds, isYouTube, parseMaterialKinds, setMaterialKinds, videoOf } from './materialKinds'
 import { getHandovers, parseUntil, renameHandover, setHandovers, type Handovers } from './handovers'
 import {
   byLeader,
@@ -119,6 +120,7 @@ import {
  *   PUT    /groups/:id              its leader: the day, the place, the members…; directories: the name, the leader
  *   DELETE /groups/:id              removes it                                       directories
  *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
+ *   GET    /youtube?url             the title and the channel of a video of YouTube (a material)
  *   POST   /handover                { ministry, toUid, until? }: the leader (or an administrator) asks a deputy
  *   POST   /handover/answer         { ministry, answer: 'accept' | 'decline' }: the deputy answers
  *   DELETE /handover                { ministry }: the duties go back (the leader, the deputy, an administrator)
@@ -132,6 +134,7 @@ import {
  *   DELETE /admin/users/:uid        takes a user off the list                        users
  *   PUT    /admin/directories/:name { items }: 'ministries' or 'locations'           directories
  *   PUT    /admin/ministry-roles    { ministryRoles }: the roles in the ministries    directories
+ *   PUT    /admin/material-kinds    { kinds }: the resources of the ministries        schedule
  *   PUT    /admin/types             { types }                                        types
  * Every request carries the Firebase ID token: Authorization: Bearer <token>.
  */
@@ -194,13 +197,14 @@ const ROUTES = [
   /^(GET|POST) \/groups$/,
   /^(PUT|DELETE) \/groups\/[^/]+$/,
   /^PUT \/groups-visibility$/,
+  /^GET \/youtube$/,
   /^(POST|DELETE) \/handover$/,
   /^POST \/handover\/answer$/,
   /^GET \/ministry-roles$/,
   /^PUT \/ministry-roles\/[^/]+$/,
   /^PUT \/admin\/directories\/(ministries|locations)\/rename$/,
   /^GET \/admin\/(settings|users)$/,
-  /^PUT \/admin\/(roles|types|event-types|calendar|ministry-roles|addresses|translation-ministries)$/,
+  /^PUT \/admin\/(roles|types|event-types|calendar|ministry-roles|material-kinds|addresses|translation-ministries)$/,
   /^PUT \/admin\/directories\/(ministries|locations)$/,
   /^(PUT|DELETE) \/admin\/users\/[^/]+$/,
   /^GET \/schedule(\/people|\/materials)?$/,
@@ -347,6 +351,7 @@ async function scheduleContext(
       .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
       .map((user) => user.uid),
     eventTypes: await getEventTypes(env.USERS),
+    materialKinds: await getMaterialKinds(env.USERS),
     calendar: await getCalendar(env.USERS),
     schedule: deps.schedule ?? d1Schedule(env.DB),
     messages: deps.messages ?? d1Store(env.DB),
@@ -895,6 +900,15 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     return json({ group: show(updated) })
   }
 
+  // a video of YouTube given as a material: its title comes by itself
+  if (route === 'GET /youtube') {
+    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    const url = new URL(request.url).searchParams.get('url')
+    if (!isYouTube(url)) return json({ error: 'bad-request' }, 400)
+    const video = await videoOf(url, deps.fetcher).catch(() => null)
+    return video ? json(video) : json({ error: 'not-found' }, 404)
+  }
+
   // the duties of a leader handed over to a deputy, who accepts them first
   if (pathname.startsWith('/handover')) {
     const all = can('directories')
@@ -1037,6 +1051,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       ministries: await getDirectory(env.USERS, 'ministries'),
       locations: await getDirectory(env.USERS, 'locations'),
       eventTypes: await getEventTypes(env.USERS),
+      materialKinds: await getMaterialKinds(env.USERS),
       calendar: await getCalendar(env.USERS),
       leaders: leadersOf(ministryRoles, handovers),
       ministryRoles,
@@ -1067,6 +1082,15 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     if (!addresses) return json({ error: 'bad-request' }, 400)
     await setAddresses(env.USERS, addresses)
     return json({ addresses })
+  }
+
+  // the resources of the ministries: the kinds of materials
+  if (route === 'PUT /admin/material-kinds') {
+    if (!can('schedule')) return json({ error: 'forbidden' }, 403)
+    const kinds = parseMaterialKinds(((await body()) as { kinds?: unknown } | null)?.kinds)
+    if (!kinds) return json({ error: 'bad-request' }, 400)
+    await setMaterialKinds(env.USERS, kinds)
+    return json({ kinds })
   }
 
   // the roles inside the ministries, and their people (the leaders are the people of the roles that lead)

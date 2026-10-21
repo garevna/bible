@@ -27,6 +27,13 @@ const ROLES = [
   role('reader', 'Читач')
 ]
 
+/** the resources of the ministries */
+const KINDS = [
+  { id: 'k-plan', name: 'План служіння', group: 'team' },
+  { id: 'k-sermon', name: 'Конспект проповіді', group: 'team' },
+  { id: 'k-leaflet', name: 'Пам’ятка служіння', group: 'participants' }
+]
+
 /** today in the time zone of the browser: the coming days of the events */
 const today = new Date()
 const TODAY = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
@@ -135,7 +142,8 @@ async function fakeWorker(page: Page, manage: string[], leads: string[] = []) {
           eventTypes: [
             { id: 'morning-prayer', name: 'Ранкова молитва', ministry: null, roles: 'none', slots: [] }
           ],
-          calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] }
+          calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] },
+          materialKinds: KINDS
         }
       })
     }
@@ -220,6 +228,7 @@ async function fakeWorker(page: Page, manage: string[], leads: string[] = []) {
         '/admin/event-types',
         '/admin/calendar',
         '/admin/ministry-roles',
+        '/admin/material-kinds',
         '/admin/addresses'
       ].includes(path) ||
       path.startsWith('/admin/directories/')
@@ -377,6 +386,8 @@ test('events of the calendar: the colors of the days, its filters, the types wit
   await panel.getByLabel('Роль', { exact: true }).fill('Пастор')
   await panel.getByLabel('Готує матеріали').check()
   await panel.getByLabel('Що підготувати').fill('Нотатки, вірші')
+  // what it prepares: the kinds of the resources
+  await panel.locator('.slot-kinds .v-chip', { hasText: 'Конспект проповіді' }).click()
   await save.click()
   await expect
     .poll(() => requests.find((request) => request.path === '/admin/event-types')?.body)
@@ -387,8 +398,25 @@ test('events of the calendar: the colors of the days, its filters, the types wit
           name: 'Причастя',
           ministry: null,
           roles: 'fixed',
-          slots: [{ name: 'Пастор', count: 1, materials: true, hint: 'Нотатки, вірші' }]
+          slots: [{ name: 'Пастор', count: 1, materials: true, kinds: ['k-sermon'], hint: 'Нотатки, вірші' }]
         }
+      ]
+    })
+
+  // the resources of the ministries: for the team, and given to the people who come
+  await expect(page.getByRole('heading', { name: 'Ресурси служіння' })).toBeVisible()
+  await expect(page.getByText('Роздаються учасникам')).toBeVisible()
+  const fresh = page.getByRole('textbox', { name: 'Новий вид матеріалу' })
+  await fresh.last().fill('Програма зустрічі')
+  await page.locator('.new-kind .mdi-plus-thick').last().click()
+  await expect
+    .poll(() => requests.filter((request) => request.path === '/admin/material-kinds').at(-1)?.body)
+    .toMatchObject({
+      kinds: [
+        { id: 'k-plan' },
+        { id: 'k-sermon' },
+        { id: 'k-leaflet' },
+        { name: 'Програма зустрічі', group: 'participants' }
       ]
     })
 })

@@ -19,7 +19,12 @@ describe('the types of events', () => {
   it('the names of roles are distinct; a role without materials has no hint', () => {
     const pastor = { name: 'Пастор', count: 1, materials: false, hint: 'Нотатки' }
     expect(parseSlots([pastor, pastor])).toBeNull()
-    expect(parseSlots([pastor])).toEqual([{ ...pastor, hint: '' }])
+    expect(parseSlots([pastor])).toEqual([{ ...pastor, kinds: [], hint: '' }])
+    // the kinds of materials of a role that prepares them
+    expect(parseSlots([{ ...pastor, materials: true, kinds: ['k-sermon', 'k-sermon'] }])).toEqual([
+      { ...pastor, materials: true, kinds: ['k-sermon'] }
+    ])
+    expect(parseSlots([{ ...pastor, materials: true, kinds: ['проповідь'] }])).toBeNull()
     expect(parseSlots([{ ...pastor, count: 0 }])).toBeNull()
   })
 

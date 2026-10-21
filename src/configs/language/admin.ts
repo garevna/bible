@@ -104,6 +104,36 @@ export const admin = {
     ru: 'Домашние группы',
     en: 'Home groups'
   },
+  materialKinds: {
+    ua: 'Ресурси служіння',
+    ru: 'Ресурсы служения',
+    en: 'Resources of the ministries'
+  },
+  materialKindsHint: {
+    ua: 'Види матеріалів, які готують до служіння. Роль у типі події вибирає, що саме готує; матеріал (нотатка, тема або відео YouTube) позначається видом.',
+    ru: 'Виды материалов, которые готовят к служению. Роль в типе события выбирает, что именно готовит; материал (заметка, тема или видео YouTube) помечается видом.',
+    en: 'The kinds of materials prepared for a ministry. A role of a type of events chooses what it prepares; a material (a note, a topic or a YouTube video) is marked by its kind.'
+  },
+  kindsTeam: {
+    ua: 'Для команди служіння',
+    ru: 'Для команды служения',
+    en: 'For the team'
+  },
+  kindsParticipants: {
+    ua: 'Роздаються учасникам',
+    ru: 'Раздаются участникам',
+    en: 'Given to the people who come'
+  },
+  newKind: {
+    ua: 'Новий вид матеріалу',
+    ru: 'Новый вид материала',
+    en: 'A new kind of material'
+  },
+  removeKind: {
+    ua: 'Видалити вид',
+    ru: 'Удалить вид',
+    en: 'Remove the kind'
+  },
   sectionLocations: {
     ua: 'Локації',
     ru: 'Локации',

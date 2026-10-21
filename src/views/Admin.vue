@@ -96,13 +96,15 @@
               :title="text.sectionLocations"
               @error="fail"
             />
-            <AdminEvents
-              v-else-if="section === 'events'"
-              v-model:event-types="settings.eventTypes"
-              v-model:calendar="settings.calendar"
-              :ministries="settings.ministries"
-              @error="fail"
-            />
+            <template v-else-if="section === 'events'">
+              <AdminEvents
+                v-model:event-types="settings.eventTypes"
+                v-model:calendar="settings.calendar"
+                :ministries="settings.ministries"
+                @error="fail"
+              />
+              <MaterialKindsEditor v-model="settings.materialKinds" class="mt-8" @error="fail" />
+            </template>
           </template>
         </div>
       </div>
@@ -120,10 +122,17 @@ import AdminEvents from '@/components/admin/AdminEvents.vue'
 import AdminMinistries from '@/components/admin/AdminMinistries.vue'
 import AdminRoles from '@/components/admin/AdminRoles.vue'
 import AdminUsers from '@/components/admin/AdminUsers.vue'
+import MaterialKindsEditor from '@/components/admin/MaterialKindsEditor.vue'
 import MyMinistries from '@/components/admin/MyMinistries.vue'
 import GroupsBoard from '@/components/groups/GroupsBoard.vue'
 import { useLanguageStore } from '@/stores/language'
-import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
+import {
+  useScheduleStore,
+  type CalendarSettings,
+  type EventType,
+  type MaterialKind,
+  type Place
+} from '@/stores/schedule'
 import {
   useWorkerStore,
   WorkerError,
@@ -185,6 +194,7 @@ const settings = ref<{
   calendar: CalendarSettings
   ministryRoles: MinistryRoles
   handovers: Handovers
+  materialKinds: MaterialKind[]
   addresses: Record<string, Place>
   translationMinistries: string[]
 } | null>(null)
@@ -204,11 +214,13 @@ async function load() {
   busy.value = true
   try {
     const loaded = await worker.getSettings()
+    useScheduleStore().materialKinds = loaded.materialKinds ?? []
     // a worker of an older version has no roles of the ministries and no addresses yet
     settings.value = {
       ...loaded,
       ministryRoles: loaded.ministryRoles ?? {},
       handovers: loaded.handovers ?? {},
+      materialKinds: loaded.materialKinds ?? [],
       addresses: loaded.addresses ?? {},
       translationMinistries: loaded.translationMinistries ?? []
     }

@@ -1,4 +1,4 @@
-import { parseSlots, type Slot } from './eventTypes'
+import { parseSlots, type Slot, withKinds } from './eventTypes'
 import type { TopicPost } from './post'
 
 /**
@@ -80,7 +80,11 @@ export interface Material {
   role: string
   uid: string
   name: string
-  kind: 'note' | 'topic'
+  /** a note or a topic of the app (its post), or a video of YouTube (its url) */
+  kind: 'note' | 'topic' | 'video'
+  /** the kind of the material: an id of the resources of a ministry, or null */
+  resource: string | null
+  url: string | null
   title: string
   post: TopicPost
   createdAt: number
@@ -341,6 +345,8 @@ interface MaterialRow {
   uid: string
   name: string
   kind: string
+  resource?: string | null
+  url?: string | null
   title: string
   post?: string
   created_at: number
@@ -359,7 +365,7 @@ const eventOf = (row: EventRow): ScheduleEvent => ({
   until: row.until,
   needed: row.needed,
   times: row.times ? (JSON.parse(row.times) as Record<string, string>) : null,
-  slots: row.slots ? (JSON.parse(row.slots) as Slot[]) : [],
+  slots: row.slots ? withKinds(JSON.parse(row.slots) as Slot[]) : [],
   applicants: APPLICANTS.includes(row.applicants as Applicants) ? (row.applicants as Applicants) : 'ministry',
   mode: row.mode === 'open' ? 'open' : 'invite',
   responsibleUid: row.responsible_uid,
@@ -391,7 +397,9 @@ const materialItemOf = (row: MaterialRow): MaterialItem => ({
   role: row.role,
   uid: row.uid,
   name: row.name,
-  kind: row.kind === 'topic' ? 'topic' : 'note',
+  kind: row.kind === 'topic' ? 'topic' : row.kind === 'video' ? 'video' : 'note',
+  resource: row.resource ?? null,
+  url: row.url ?? null,
   title: row.title,
   createdAt: row.created_at
 })
@@ -421,7 +429,7 @@ const changeOf = (row: ChangeRow): DayChange => ({
   note: row.note
 })
 
-const MATERIAL_ITEM = 'id, event_id, day, role, uid, name, kind, title, created_at'
+const MATERIAL_ITEM = 'id, event_id, day, role, uid, name, kind, resource, url, title, created_at'
 
 export function d1Schedule(db: D1Database): ScheduleStore {
   return {
@@ -537,7 +545,7 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async putMaterial(m) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO materials (id, event_id, day, role, uid, name, kind, title, post, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO materials (id, event_id, day, role, uid, name, kind, resource, url, title, post, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .bind(
           m.id,
@@ -547,6 +555,8 @@ export function d1Schedule(db: D1Database): ScheduleStore {
           m.uid,
           m.name,
           m.kind,
+          m.resource,
+          m.url,
           m.title,
           JSON.stringify(m.post),
           m.createdAt

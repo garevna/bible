@@ -6,10 +6,24 @@
     <section v-for="slot of slots" :key="slot.name" class="role">
       <div class="d-flex flex-wrap align-center ga-2">
         <p class="role-title flex-grow-1">
-          {{ slot.hint ? format(text.materialsFor, { role: slot.name, hint: slot.hint }) : slot.name }}
+          {{
+            prepares(slot) ? format(text.materialsFor, { role: slot.name, hint: prepares(slot) }) : slot.name
+          }}
           <span class="people">{{ peopleOf(slot.name) }}</span>
         </p>
         <template v-if="mayAdd(slot.name)">
+          <!-- the kind of the material added next: one of the kinds of the role first -->
+          <v-select
+            v-if="kindItems(slot).length"
+            :model-value="chosenKind[slot.name] ?? slot.kinds[0] ?? null"
+            :items="kindItems(slot)"
+            :label="text.materialKind"
+            density="compact"
+            hide-details
+            clearable
+            class="kind-select"
+            @update:model-value="(value: string | null) => (chosenKind[slot.name] = value)"
+          />
           <v-btn
             size="small"
             variant="tonal"
@@ -30,6 +44,16 @@
           >
             {{ text.addTopic }}
           </v-btn>
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="buttons"
+            class="text-none"
+            prepend-icon="mdi-youtube"
+            @click="pickVideo(slot.name)"
+          >
+            {{ text.addVideo }}
+          </v-btn>
         </template>
       </div>
 
@@ -42,8 +66,26 @@
           class="material"
         >
           <v-expansion-panel-title>
-            <v-icon :icon="material.kind === 'topic' ? '$topic' : '$note'" size="small" class="mr-2" />
-            <span class="flex-grow-1">{{ material.title || '…' }}</span>
+            <v-icon
+              :icon="
+                material.kind === 'video' ? 'mdi-youtube' : material.kind === 'topic' ? '$topic' : '$note'
+              "
+              :color="material.kind === 'video' ? '#FF0000' : undefined"
+              size="small"
+              class="mr-2"
+            />
+            <span class="flex-grow-1">
+              {{ material.title || '…' }}
+              <v-chip
+                v-if="kindName(material.resource)"
+                size="x-small"
+                variant="tonal"
+                color="secondary"
+                class="ml-1"
+              >
+                {{ kindName(material.resource) }}
+              </v-chip>
+            </span>
             <span class="by mr-2">{{ format(text.byName, { name: material.name }) }}</span>
             <ConfirmButton
               v-if="material.uid === user.uid || schedule.approves(occurrence.event)"
@@ -54,7 +96,18 @@
             />
           </v-expansion-panel-title>
           <v-expansion-panel-text>
-            <AttachmentView v-if="full[material.id]" :attachment="full[material.id]!" />
+            <!-- a video: its picture opens it on YouTube, in a tab of its own -->
+            <a
+              v-if="material.kind === 'video' && material.url"
+              :href="material.url"
+              target="_blank"
+              rel="noopener"
+              class="video"
+            >
+              <img :src="pictureOf(material.url)" alt="" />
+              <v-icon icon="mdi-play-circle" size="56" color="white" class="play" />
+            </a>
+            <AttachmentView v-else-if="full[material.id]" :attachment="full[material.id]!" />
             <v-progress-linear v-else indeterminate color="secondary" />
           </v-expansion-panel-text>
         </v-expansion-panel>
@@ -63,6 +116,7 @@
 
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-2">{{ error }}</v-alert>
     <MaterialPicker v-model="picking" :kind="kind" @picked="add" />
+    <VideoDialog v-model="pickingVideo" @picked="addVideo" />
   </div>
 </template>
 
@@ -72,9 +126,10 @@ import { storeToRefs } from 'pinia'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import MaterialPicker from '@/components/calendar/MaterialPicker.vue'
+import VideoDialog from '@/components/calendar/VideoDialog.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
 import { useLanguageStore } from '@/stores/language'
-import { useScheduleStore, type Occurrence } from '@/stores/schedule'
+import { useScheduleStore, youTubeId, type Occurrence, type Slot } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
 import { WorkerError, type Attachment } from '@/stores/worker'
 import { format } from '@/utils/format'
@@ -98,6 +153,26 @@ const role = ref('')
 const full = ref<Record<string, Attachment>>({})
 
 const slots = computed(() => props.occurrence.event.slots.filter((slot) => slot.materials))
+
+/** the kind chosen for the next material of a role */
+const chosenKind = ref<Record<string, string | null>>({})
+const kindName = (id: string | null) => schedule.materialKinds.find((kind) => kind.id === id)?.name ?? ''
+/** the kinds of the role first, then the others */
+const kindItems = (slot: Slot) => {
+  const own = slot.kinds ?? []
+  return [
+    ...schedule.materialKinds.filter((kind) => own.includes(kind.id)),
+    ...schedule.materialKinds.filter((kind) => !own.includes(kind.id))
+  ].map((kind) => ({ value: kind.id, title: kind.name }))
+}
+const resourceOf = (name: string) => {
+  const slot = slots.value.find((item) => item.name === name)
+  return chosenKind.value[name] !== undefined ? chosenKind.value[name]! : (slot?.kinds?.[0] ?? null)
+}
+/** what the role prepares: its kinds, and a word about them */
+const prepares = (slot: Slot) =>
+  [(slot.kinds ?? []).map(kindName).filter(Boolean).join(', '), slot.hint].filter(Boolean).join('; ')
+const pictureOf = (url: string) => `https://i.ytimg.com/vi/${youTubeId(url)}/hqdefault.jpg`
 const materialsOf = (name: string) => props.occurrence.materials.filter((item) => item.role === name)
 const membersOf = (name: string) =>
   props.occurrence.team.filter(
@@ -126,10 +201,14 @@ async function run(action: () => Promise<unknown>) {
 }
 
 async function loadFull() {
-  if (!props.occurrence.materials.some((item) => !full.value[item.id])) return
+  if (!props.occurrence.materials.some((item) => item.kind !== 'video' && !full.value[item.id])) return
   await run(async () => {
     const list = await schedule.loadMaterials(props.occurrence.event.id, props.occurrence.day)
-    full.value = Object.fromEntries(list.map((item) => [item.id, { kind: item.kind, post: item.post }]))
+    full.value = Object.fromEntries(
+      list
+        .filter((item) => item.kind !== 'video')
+        .map((item) => [item.id, { kind: item.kind as 'note' | 'topic', post: item.post }])
+    )
   })
 }
 
@@ -141,7 +220,31 @@ function pick(name: string, what: 'note' | 'topic') {
 
 const add = (post: TopicPost) =>
   run(() =>
-    schedule.addMaterial(props.occurrence.event.id, props.occurrence.day, role.value, kind.value, post)
+    schedule.addMaterial(
+      props.occurrence.event.id,
+      props.occurrence.day,
+      role.value,
+      kind.value,
+      post,
+      resourceOf(role.value)
+    )
+  )
+
+const pickingVideo = ref(false)
+function pickVideo(name: string) {
+  role.value = name
+  pickingVideo.value = true
+}
+const addVideo = (url: string, title: string) =>
+  run(() =>
+    schedule.addVideo(
+      props.occurrence.event.id,
+      props.occurrence.day,
+      role.value,
+      url,
+      title,
+      resourceOf(role.value)
+    )
   )
 
 onMounted(loadFull)
@@ -171,6 +274,31 @@ watch(() => props.occurrence.materials.length, loadFull)
   border: solid 1px var(--app-border-light);
   margin-bottom: 4px;
   border-radius: var(--app-radius) !important;
+}
+
+.kind-select {
+  flex: 0 1 240px;
+}
+
+.video {
+  display: block;
+  position: relative;
+  max-width: 420px;
+  border-radius: var(--app-radius);
+  overflow: hidden;
+}
+
+.video img {
+  display: block;
+  width: 100%;
+}
+
+.play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0.9;
 }
 
 .by {

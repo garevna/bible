@@ -2,7 +2,7 @@ import { computed, ref, shallowRef, watch } from 'vue'
 import { defineStore } from 'pinia'
 
 import { DEFAULT_TYPES, type NoteType } from '@/utils/noteTypes'
-import type { CalendarSettings, EventType, Place } from '@/stores/schedule'
+import type { CalendarSettings, EventType, MaterialKind, Place } from '@/stores/schedule'
 import type { TopicPost } from '@/utils/topicPost'
 
 import { useFirebaseStore } from './firebase'
@@ -390,6 +390,7 @@ export const useWorkerStore = defineStore('worker', () => {
       leaders: Record<string, string[]>
       ministryRoles?: MinistryRoles
       handovers?: Handovers
+      materialKinds?: MaterialKind[]
       addresses: Record<string, Place>
       translationMinistries: string[]
     }>('GET', '/admin/settings')
@@ -454,6 +455,14 @@ export const useWorkerStore = defineStore('worker', () => {
         ministryRoles
       }
     )
+
+  /** the resources of the ministries: the kinds of materials */
+  const setMaterialKinds = async (kinds: MaterialKind[]) =>
+    (await call<{ kinds: MaterialKind[] }>('PUT', '/admin/material-kinds', { kinds })).kinds
+
+  /** the title and the channel of a video of YouTube */
+  const videoInfo = (url: string) =>
+    call<{ title: string; author: string }>('GET', `/youtube?url=${encodeURIComponent(url)}`)
 
   const setEventTypes = async (list: EventType[]) =>
     (await call<{ eventTypes: EventType[] }>('PUT', '/admin/event-types', { eventTypes: list })).eventTypes
@@ -553,6 +562,8 @@ export const useWorkerStore = defineStore('worker', () => {
     setUserRole,
     removeUser,
     getSettings,
+    setMaterialKinds,
+    videoInfo,
     setEventTypes,
     setCalendar,
     setMinistryRoles,

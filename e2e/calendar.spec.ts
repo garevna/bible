@@ -49,7 +49,7 @@ const communion = {
   ministry: 'Пасторське',
   roles: 'fixed',
   slots: [
-    { name: 'Пастор', count: 1, materials: true, hint: 'Нотатки, вірші' },
+    { name: 'Пастор', count: 1, materials: true, kinds: ['k-sermon'], hint: 'Нотатки, вірші' },
     { name: 'Учасник', count: 2, materials: false, hint: '' }
   ]
 }
@@ -101,6 +101,7 @@ async function fakeWorker(page: Page, planner = false) {
         }
       })
     }
+    if (path === '/youtube') return route.fulfill({ json: { title: 'Слово на неділю', author: 'ХХЦ' } })
     if (path === '/schedule/materials' && request.method() === 'GET') {
       return route.fulfill({ json: { materials: [] } })
     }
@@ -142,6 +143,10 @@ async function fakeWorker(page: Page, planner = false) {
           materials: [],
           addresses: { Церква: { address: 'Харків, вул. Сумська, 1', lat: 49.99, lng: 36.23 } },
           types: [communion],
+          materialKinds: [
+            { id: 'k-plan', name: 'План служіння', group: 'team' },
+            { id: 'k-sermon', name: 'Конспект проповіді', group: 'team' }
+          ],
           calendar: { redDays: 2, orangeDays: 5, filters: ['type', 'ministry', 'event', 'person', 'mine'] },
           today: TODAY
         }
@@ -285,7 +290,7 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
 
   // the materials of the pastor: a note of the planner
   await communionCard.getByRole('button', { name: 'Методичні матеріали' }).click()
-  await expect(communionCard).toContainText('Пастор: Нотатки, вірші')
+  await expect(communionCard).toContainText('Пастор: Конспект проповіді; Нотатки, вірші')
   await communionCard.getByRole('button', { name: 'Додати нотатку' }).click()
   await dialog(page).locator('.v-list-item', { hasText: 'Хліб і вино' }).click()
   await expect.poll(() => posted.at(-1)?.path).toBe('/schedule/materials')
@@ -294,8 +299,31 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
     day: TODAY,
     role: 'Пастор',
     kind: 'note',
+    resource: 'k-sermon',
     post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино' }] }
   })
+
+  // a video of YouTube: its title comes by itself; another kind is chosen for it
+  await communionCard.locator('.kind-select').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'План служіння' }).click()
+  await communionCard.getByRole('button', { name: 'Відео YouTube' }).click()
+  const video = dialog(page)
+  await video.getByRole('textbox', { name: 'Посилання на відео YouTube' }).fill('https://vimeo.com/1234567')
+  await expect(video).toContainText('Це не посилання на відео YouTube')
+  await video
+    .getByRole('textbox', { name: 'Посилання на відео YouTube' })
+    .fill('https://www.youtube.com/watch?v=SBwe2oTBqB4')
+  await expect(video.getByRole('textbox', { name: 'Назва' })).toHaveValue('Слово на неділю')
+  await video.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => posted.at(-1)?.body)
+    .toMatchObject({
+      role: 'Пастор',
+      kind: 'video',
+      url: 'https://www.youtube.com/watch?v=SBwe2oTBqB4',
+      title: 'Слово на неділю',
+      resource: 'k-plan'
+    })
 
   // the evening prayer is open: a call for applications in the service channel
   const evening = card(page, 'Вечірня молитва')

@@ -520,6 +520,50 @@ describe('roles kept by the administrators', () => {
   })
 })
 
+describe('the resources of the ministries', () => {
+  it('the kinds of materials: kept by the planners of the schedule', async () => {
+    const { call } = setup()
+    for (const user of ['owner', 'pastor']) await call('GET', '/me', user)
+    const defaults = (await call('GET', '/admin/settings', 'owner')).body.materialKinds as {
+      name: string
+      group: string
+    }[]
+    expect(defaults.filter((kind) => kind.group === 'participants').map((kind) => kind.name)).toEqual([
+      'Пам’ятка служіння (буклет)',
+      'Путівник по служінню (програма зустрічі)'
+    ])
+    const kinds = [{ id: 'k-plan', name: 'План служіння', group: 'team' }]
+    expect((await call('PUT', '/admin/material-kinds', 'pastor', { kinds })).status).toBe(403)
+    expect(
+      (await call('PUT', '/admin/material-kinds', 'owner', { kinds: [...kinds, ...kinds] })).status
+    ).toBe(400)
+    expect((await call('PUT', '/admin/material-kinds', 'owner', { kinds })).body).toEqual({ kinds })
+    expect((await call('GET', '/schedule', 'owner')).body.materialKinds).toEqual(kinds)
+  })
+
+  it('the title of a video of YouTube comes by itself', async () => {
+    const { call, fetcher } = setup()
+    await call('GET', '/me', 'owner')
+    fetcher.mockImplementation(async (url: unknown) =>
+      String(url).startsWith('https://www.youtube.com/oembed')
+        ? new Response(JSON.stringify({ title: 'Недільне служіння', author_name: 'ХХЦ' }))
+        : new Response('{}', { status: 404 })
+    )
+    expect(
+      (
+        await call(
+          'GET',
+          `/youtube?url=${encodeURIComponent('https://www.youtube.com/watch?v=dQw4w9WgXcQ')}`,
+          'owner'
+        )
+      ).body
+    ).toEqual({ title: 'Недільне служіння', author: 'ХХЦ' })
+    expect(
+      (await call('GET', `/youtube?url=${encodeURIComponent('https://example.com/x')}`, 'owner')).status
+    ).toBe(400)
+  })
+})
+
 describe('deputies of the leaders', () => {
   const CHANNEL = 'Канал ХХЦ'
 
@@ -1028,7 +1072,9 @@ describe('the schedule of ministries', () => {
     expect((await role('leader-uid', 'Диякон')).status).toBe(400)
     const toMusician = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
     expect(toMusician.map((message) => message.text)).toContainEqual(
-      expect.stringContaining('Підготуйте, будь ласка: Нотатки, вірші з Біблії')
+      expect.stringContaining(
+        'Підготуйте, будь ласка: Конспект проповіді (тези проповіді), Слово (конспект Слова); Нотатки, вірші з Біблії'
+      )
     )
 
     // the person of the role sends notes; another member cannot, the responsible person can
@@ -1052,6 +1098,38 @@ describe('the schedule of ministries', () => {
     const full = (await call('GET', `/schedule/materials?eventId=${eventId}&day=${day}`, 'leader')).body
       .materials as { post: unknown }[]
     expect(full[0]!.post).toEqual(post)
+
+    // a video of YouTube, of a kind of the resources; not another link, not an unknown kind
+    const video = { eventId, day, role: 'Пастор', kind: 'video', resource: 'k-word', title: 'Слово' }
+    expect(
+      (
+        await call('POST', '/schedule/materials', 'musician', {
+          ...video,
+          url: 'https://youtu.be/dQw4w9WgXcQ'
+        })
+      ).body.material
+    ).toMatchObject({
+      kind: 'video',
+      resource: 'k-word',
+      url: 'https://youtu.be/dQw4w9WgXcQ',
+      title: 'Слово'
+    })
+    expect(
+      (await call('POST', '/schedule/materials', 'musician', { ...video, url: 'https://vimeo.com/123456' }))
+        .status
+    ).toBe(400)
+    expect(
+      (
+        await call('POST', '/schedule/materials', 'musician', {
+          ...video,
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          resource: 'k-nothing'
+        })
+      ).status
+    ).toBe(400)
+    expect((await call('GET', '/messages', 'pastor')).body.messages as { text: string }[]).toContainEqual(
+      expect.objectContaining({ text: expect.stringContaining('підготував(ла) «Слово (конспект Слова)»') })
+    )
 
     // the pastor is freed and given to another
     await role('musician-uid', null)

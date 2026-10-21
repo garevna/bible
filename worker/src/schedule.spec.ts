@@ -100,6 +100,8 @@ describe('the store keeps no past', () => {
       uid: 'u',
       name: 'U',
       kind: 'note' as const,
+      resource: null,
+      url: null,
       title: '',
       post: { title: '', items: [] },
       createdAt: 0

@@ -34,6 +34,26 @@
         hide-details
         class="slot-hint"
       />
+      <!-- what it prepares: the kinds of the resources -->
+      <v-chip-group
+        v-if="slot.materials && schedule.materialKinds.length"
+        v-model="slot.kinds"
+        multiple
+        column
+        selected-class="text-secondary"
+        class="slot-kinds"
+      >
+        <v-chip
+          v-for="kind of schedule.materialKinds"
+          :key="kind.id"
+          :value="kind.id"
+          size="small"
+          variant="outlined"
+          filter
+        >
+          {{ kind.name }}
+        </v-chip>
+      </v-chip-group>
       <ButtonTooltip icon="$unlink" :text="text.removeSlot" color="delete" @click="slots.splice(index, 1)" />
     </div>
     <v-btn
@@ -42,7 +62,7 @@
       size="small"
       class="text-none"
       prepend-icon="mdi-account-plus-outline"
-      @click="slots.push({ name: '', count: 1, materials: false, hint: '' })"
+      @click="slots.push({ name: '', count: 1, materials: false, kinds: [], hint: '' })"
     >
       {{ text.addSlot }}
     </v-btn>
@@ -54,12 +74,16 @@ import { storeToRefs } from 'pinia'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import { useLanguageStore } from '@/stores/language'
-import type { Slot } from '@/stores/schedule'
+import { useScheduleStore, type Slot } from '@/stores/schedule'
 
 /** The roles of the people of an event type or of one event: a name, how many people, materials to prepare */
 const slots = defineModel<Slot[]>({ required: true })
 
 const { admin: text } = storeToRefs(useLanguageStore())
+const schedule = useScheduleStore()
+
+// the roles saved before the kinds have none
+for (const slot of slots.value) slot.kinds ??= []
 </script>
 
 <style scoped>
@@ -85,5 +109,9 @@ const { admin: text } = storeToRefs(useLanguageStore())
 
 .slot-hint {
   flex: 1 1 220px;
+}
+
+.slot-kinds {
+  flex: 1 1 100%;
 }
 </style>

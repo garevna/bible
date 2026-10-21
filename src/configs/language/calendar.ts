@@ -394,6 +394,31 @@ export const calendar = {
     ru: 'Добавить заметку',
     en: 'Add a note'
   },
+  addVideo: {
+    ua: 'Відео YouTube',
+    ru: 'Видео YouTube',
+    en: 'A YouTube video'
+  },
+  videoLink: {
+    ua: 'Посилання на відео YouTube',
+    ru: 'Ссылка на видео YouTube',
+    en: 'The link of a YouTube video'
+  },
+  videoTitle: {
+    ua: 'Назва',
+    ru: 'Название',
+    en: 'Title'
+  },
+  videoNotYouTube: {
+    ua: 'Це не посилання на відео YouTube',
+    ru: 'Это не ссылка на видео YouTube',
+    en: 'This is not a link of a YouTube video'
+  },
+  materialKind: {
+    ua: 'Вид матеріалу',
+    ru: 'Вид материала',
+    en: 'Kind of material'
+  },
   addTopic: {
     ua: 'Додати тему',
     ru: 'Добавить тему',

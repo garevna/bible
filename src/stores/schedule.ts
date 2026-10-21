@@ -11,9 +11,22 @@ export interface Slot {
   name: string
   count: number
   materials: boolean
-  /** what to prepare, e.g. "Перелік пісень хвали" */
+  /** the kinds of the materials it prepares (ids of the resources of a ministry) */
+  kinds: string[]
+  /** a word about what to prepare, e.g. "Перелік пісень хвали" */
   hint: string
 }
+
+/** A kind of materials, kept by the planners: for the team of an event, or for the people who come */
+export interface MaterialKind {
+  id: string
+  name: string
+  group: 'team' | 'participants'
+}
+
+/** "https://youtu.be/…" or "…watch?v=…": the id of the video (for its picture) */
+export const youTubeId = (url: string) =>
+  url.match(/(?:youtu\.be\/|[?&]v=|shorts\/|live\/)([\w-]{6,})/)?.[1] ?? null
 
 /** A type of events kept by the administrators: its roles are none, fixed, or given to each event */
 export interface EventType {
@@ -131,7 +144,11 @@ export interface MaterialItem {
   role: string
   uid: string
   name: string
-  kind: 'note' | 'topic'
+  /** a note or a topic of the app, or a video of YouTube */
+  kind: 'note' | 'topic' | 'video'
+  /** the kind of the material (an id of the resources), or null */
+  resource: string | null
+  url: string | null
   title: string
   createdAt: number
 }
@@ -310,6 +327,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   const materials = shallowRef<MaterialItem[]>([])
   const changes = shallowRef<DayChange[]>([])
   const types = shallowRef<EventType[]>([])
+  /** the resources of the ministries: the kinds of materials */
+  const materialKinds = shallowRef<MaterialKind[]>([])
   const settings = shallowRef<CalendarSettings>(DEFAULT_CALENDAR)
   const people = shallowRef<Person[]>([])
   const ministries = shallowRef<string[]>([])
@@ -426,6 +445,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       participants: Participant[]
       materials?: MaterialItem[]
       types?: EventType[]
+      materialKinds?: MaterialKind[]
       calendar?: CalendarSettings
       changes?: DayChange[]
       addresses?: Record<string, Place>
@@ -442,6 +462,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     participants.value = answer.participants.map((item) => ({ ...item, role: item.role ?? null }))
     materials.value = answer.materials ?? []
     types.value = answer.types ?? []
+    if (answer.materialKinds) materialKinds.value = answer.materialKinds
     changes.value = answer.changes ?? []
     addresses.value = answer.addresses ?? addresses.value
     settings.value = { ...DEFAULT_CALENDAR, ...answer.calendar }
@@ -558,12 +579,30 @@ export const useScheduleStore = defineStore('schedule', () => {
       )
     ).materials
 
-  const addMaterial = (eventId: string, day: string, role: string, kind: 'note' | 'topic', post: TopicPost) =>
-    act('POST', '/schedule/materials', { eventId, day, role, kind, post })
+  const addMaterial = (
+    eventId: string,
+    day: string,
+    role: string,
+    kind: 'note' | 'topic',
+    post: TopicPost,
+    resource: string | null
+  ) => act('POST', '/schedule/materials', { eventId, day, role, kind, post, resource })
+
+  /** a video of YouTube as a material: its link and its title */
+  const addVideo = (
+    eventId: string,
+    day: string,
+    role: string,
+    url: string,
+    title: string,
+    resource: string | null
+  ) => act('POST', '/schedule/materials', { eventId, day, role, kind: 'video', url, title, resource })
 
   const deleteMaterial = (id: string) => act('DELETE', `/schedule/materials/${encodeURIComponent(id)}`, {})
 
   return {
+    materialKinds,
+    addVideo,
     events,
     occurrences,
     shown,

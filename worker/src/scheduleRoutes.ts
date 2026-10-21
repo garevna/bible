@@ -1,4 +1,5 @@
-import type { CalendarSettings, EventType } from './eventTypes'
+import type { CalendarSettings, EventType, Slot } from './eventTypes'
+import { isYouTube, type MaterialKind } from './materialKinds'
 import { MESSAGE_LIFE, type Message, type MessagesStore } from './messages'
 import { parsePost } from './post'
 import { escape } from './telegram'
@@ -57,6 +58,8 @@ export interface ScheduleContext {
   /** the people whose role plans the schedule: they get the emergencies too */
   planners: string[]
   eventTypes: EventType[]
+  /** the resources of a ministry: the kinds of materials */
+  materialKinds: MaterialKind[]
   calendar: CalendarSettings
   schedule: ScheduleStore
   messages: MessagesStore
@@ -140,8 +143,20 @@ export async function handleSchedule(
   context: ScheduleContext,
   json: (body: unknown, status?: number) => Response
 ): Promise<Response> {
-  const { me, rights, servants, planners, eventTypes, calendar, schedule, messages, bot, leaders, now } =
-    context
+  const {
+    me,
+    rights,
+    servants,
+    planners,
+    eventTypes,
+    materialKinds,
+    calendar,
+    schedule,
+    messages,
+    bot,
+    leaders,
+    now
+  } = context
   const url = new URL(request.url)
   const route = `${request.method} ${url.pathname}`
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>
@@ -274,6 +289,7 @@ export async function handleSchedule(
       participants: (await schedule.participants(from, to)).filter((item) => ids.has(item.eventId)),
       materials: context.reader ? [] : await schedule.materials(from, to),
       types: eventTypes,
+      materialKinds,
       calendar,
       leaders,
       addresses: context.addresses ?? {},
@@ -480,6 +496,11 @@ export async function handleSchedule(
     return json({ participant })
   }
   const slotOf = (role: unknown) => event.slots.find((slot) => slot.name === role)
+  /** what a role prepares: its kinds of materials, and a word about them */
+  const toPrepare = (slot: Slot) => {
+    const kinds = slot.kinds.map((id) => materialKinds.find((item) => item.id === id)?.name).filter(Boolean)
+    return [kinds.join(', '), slot.hint].filter(Boolean).join('; ') || 'матеріали'
+  }
 
   /** a role may be given: it is a role of the event and not all its places are taken by others */
   async function roleIsFree(role: string, uid: string) {
@@ -611,16 +632,31 @@ export async function handleSchedule(
       role !== participant.role &&
       (await notify(
         [participant.uid],
-        `Ваша роль — «${role}»: ${label}.${slotOf(role)?.materials ? ` Підготуйте, будь ласка: ${slotOf(role)?.hint || 'матеріали'}.` : ''}`
+        `Ваша роль — «${role}»: ${label}.${slotOf(role)?.materials ? ` Підготуйте, будь ласка: ${toPrepare(slotOf(role)!)}.` : ''}`
       ))
     return json({ participant: { ...participant, role } })
   }
 
   if (route === 'POST /schedule/materials') {
     const slot = slotOf(body.role)
-    const kind = body.kind === 'topic' ? 'topic' : body.kind === 'note' ? 'note' : null
-    const post = parsePost(body.post)
-    if (!slot || !kind || !post) return json({ error: 'bad-request' }, 400)
+    const kind =
+      body.kind === 'topic' ? 'topic' : body.kind === 'note' ? 'note' : body.kind === 'video' ? 'video' : null
+    // the kind of the material: one of the resources, or none
+    const resource =
+      body.resource === undefined || body.resource === null
+        ? null
+        : materialKinds.some((item) => item.id === body.resource)
+          ? (body.resource as string)
+          : undefined
+    // a video: a link to YouTube with a few words; the rest: a note or a topic of the app
+    const videoTitle = typeof body.title === 'string' ? body.title.trim().slice(0, 120) : ''
+    const post =
+      kind === 'video'
+        ? isYouTube(body.url)
+          ? { title: videoTitle, items: [] }
+          : null
+        : parsePost(body.post)
+    if (!slot || !kind || !post || resource === undefined) return json({ error: 'bad-request' }, 400)
     const own = await schedule.participant(event.id, day, me.uid)
     const ofTheRole = own && own.role === slot.name && own.status !== 'declined' && own.status !== 'applied'
     if (!ofTheRole && !approves(event)) return json({ error: 'forbidden' }, 403)
@@ -634,6 +670,8 @@ export async function handleSchedule(
       uid: me.uid,
       name: nameOf(me),
       kind,
+      resource,
+      url: kind === 'video' ? (body.url as string) : null,
       title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : ''),
       post: withoutImage,
       createdAt: now
@@ -642,7 +680,7 @@ export async function handleSchedule(
     ofTheRole &&
       (await notify(
         [event.responsibleUid, event.deputyUid],
-        `${nameOf(me)} підготував(ла) матеріали («${slot.name}»): ${label}`
+        `${nameOf(me)} підготував(ла) ${resource ? `«${materialKinds.find((item) => item.id === resource)!.name}»` : 'матеріали'} («${slot.name}»): ${label}`
       ))
     return json({ material })
   }
