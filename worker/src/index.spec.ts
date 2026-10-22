@@ -724,8 +724,6 @@ describe('the posts of the channel', () => {
     expect(task.body.task).toMatchObject({ kind: 'image' })
     const uploaded = await call('POST', '/posts/upload', 'musician', { image: jpeg })
     expect(uploaded.body).toEqual({ image: 'tg:large-id-0001' })
-    // a task of a picture is answered by a picture
-    expect((await call('POST', '/posts', 'musician', { kind: 'note', post: note, taskId })).status).toBe(400)
     const picture = await call('POST', '/posts', 'musician', {
       kind: 'image',
       post: { title: 'Картинка до анонсу', items: [], image: 'tg:large-id-0001' },

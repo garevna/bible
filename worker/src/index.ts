@@ -998,8 +998,6 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         return json({ error: 'bad-request' }, 400)
       // a task says who approves; the ones who decide or publish need nobody to approve their own
       const task = typeof payload.taskId === 'string' ? await store.task(payload.taskId) : null
-      // a task of a picture is answered by a picture, a task of a post by a post
-      if (task && (task.kind === 'image') !== (kind === 'image')) return json({ error: 'bad-request' }, 400)
       if (
         payload.taskId !== undefined &&
         payload.taskId !== null &&

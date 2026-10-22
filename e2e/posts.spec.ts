@@ -215,7 +215,7 @@ test('the pictures: the private channel connected, a picture asked, uploaded, ch
         byName: 'Пастор Іван',
         assigneeUid: 'e2e-uid',
         assigneeName: 'E2E',
-        kind: 'image',
+        kind: 'post',
         text: 'Картинка до анонсу',
         approverUid: 'pastor-uid',
         approverName: 'Пастор Іван',

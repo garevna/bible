@@ -1,4 +1,29 @@
 export const posts = {
+  chooseNote: {
+    ua: 'Вибрати нотатку',
+    ru: 'Выбрать заметку',
+    en: 'Choose a note'
+  },
+  chooseTopic: {
+    ua: 'Вибрати тему',
+    ru: 'Выбрать тему',
+    en: 'Choose a topic'
+  },
+  answerSentApprover: {
+    ua: 'Надіслано на затвердження: {name}. Ви отримаєте повідомлення, коли матеріал затвердять.',
+    ru: 'Отправлено на утверждение: {name}. Вы получите сообщение, когда материал утвердят.',
+    en: 'Sent for approval to {name}. You will get a message when it is approved.'
+  },
+  answerSentQueue: {
+    ua: 'Надіслано адміністратору каналу.',
+    ru: 'Отправлено администратору канала.',
+    en: 'Sent to the administrator of the channel.'
+  },
+  noStorage: {
+    ua: 'Сховище картинок ще не підключено — попросіть адміністратора каналу підключити його.',
+    ru: 'Хранилище картинок ещё не подключено — попросите администратора канала подключить его.',
+    en: 'The pictures are not connected yet: ask the administrator of the channel.'
+  },
   badPicture: {
     ua: 'Не вдалося відкрити картинку. Виберіть інший файл (JPG або PNG).',
     ru: 'Не удалось открыть картинку. Выберите другой файл (JPG или PNG).',

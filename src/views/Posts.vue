@@ -105,17 +105,36 @@
             · {{ format(text.approver, { name: task.approverName }) }}</template
           >
         </p>
-        <v-btn
-          v-if="task.kind === 'image'"
-          variant="flat"
-          color="primary"
-          class="text-none mt-1"
-          prepend-icon="mdi-image-plus"
-          @click="pickPicture(task)"
-        >
-          {{ text.uploadPicture }}
-        </v-btn>
-        <p v-else class="hint mb-0">{{ text.taskHow }}</p>
+        <!-- the answer: a picture of the device, or a note or a topic of the user -->
+        <div class="d-flex flex-wrap ga-2 mt-1">
+          <v-btn
+            variant="flat"
+            color="primary"
+            class="text-none"
+            prepend-icon="mdi-image-plus"
+            @click="pickPicture(task)"
+          >
+            {{ text.uploadPicture }}
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            color="buttons"
+            class="text-none"
+            prepend-icon="$note"
+            @click="pickOwn(task, 'note')"
+          >
+            {{ text.chooseNote }}
+          </v-btn>
+          <v-btn
+            variant="tonal"
+            color="buttons"
+            class="text-none"
+            prepend-icon="$topic"
+            @click="pickOwn(task, 'topic')"
+          >
+            {{ text.chooseTopic }}
+          </v-btn>
+        </div>
       </article>
 
       <!-- a pastor: the tasks given, and a new one by its own button -->
@@ -168,17 +187,6 @@
           density="compact"
           hide-details
         />
-        <v-btn-toggle
-          v-model="taskKind"
-          mandatory
-          divided
-          density="comfortable"
-          color="secondary"
-          variant="outlined"
-        >
-          <v-btn value="post" class="text-none" prepend-icon="$note">{{ text.kindPost }}</v-btn>
-          <v-btn value="image" class="text-none" prepend-icon="mdi-image-outline">{{ text.kindImage }}</v-btn>
-        </v-btn-toggle>
         <v-text-field v-model="taskText" :label="text.taskText" density="compact" hide-details />
         <v-select
           v-model="taskApprover"
@@ -222,6 +230,9 @@
         />
       </template>
     </AppDialog>
+
+    <!-- a note or a topic of the user for the task -->
+    <MaterialPicker v-model="picking" :kind="pickingKind" @picked="sendOwn" />
 
     <!-- a picture sent: to whom it goes now -->
     <AppDialog
@@ -306,6 +317,7 @@ import AppDialog from '@/components/AppDialog.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import DateField from '@/components/DateField.vue'
+import MaterialPicker from '@/components/calendar/MaterialPicker.vue'
 import PostCard from '@/components/posts/PostCard.vue'
 import { useLanguageStore } from '@/stores/language'
 import { usePostsStore, type PostTask, type Submission } from '@/stores/posts'
@@ -314,6 +326,7 @@ import { useWorkerStore, WorkerError } from '@/stores/worker'
 import { fullDateFormat, localeOf, toISODateString } from '@/utils/dates'
 import { format } from '@/utils/format'
 import { pickImage, resizeImage } from '@/utils/image'
+import type { TopicPost } from '@/utils/topicPost'
 
 /**
  * The posts of the public channel: the user's own and their states, the ones a pastor approves,
@@ -413,11 +426,36 @@ async function pickPicture(task: PostTask) {
 }
 const pictureSentDialog = ref(false)
 const pictureSentText = ref('')
+/** a note or a topic of the user, sent for the task */
+const picking = ref(false)
+const pickingKind = ref<'note' | 'topic'>('note')
+function pickOwn(task: PostTask, kind: 'note' | 'topic') {
+  picturing.value = task
+  pickingKind.value = kind
+  picking.value = true
+}
+const sendOwn = (post: TopicPost) =>
+  run(async () => {
+    const task = picturing.value!
+    picking.value = false
+    await posts.submit(pickingKind.value, post, null, task.id)
+    pictureSentText.value = task.approverName
+      ? format(text.value.answerSentApprover, { name: task.approverName })
+      : text.value.answerSentQueue
+    pictureSentDialog.value = true
+  })
+
 const sendPicture = () =>
   run(async () => {
     const task = picturing.value!
     pictureDialog.value = false
-    await posts.sendPicture(task, picture.value!)
+    try {
+      await posts.sendPicture(task, picture.value!)
+    } catch (cause) {
+      throw cause instanceof WorkerError && cause.message === 'no-storage'
+        ? new WorkerError(text.value.noStorage)
+        : cause
+    }
     pictureSentText.value = task.approverName
       ? format(text.value.pictureSentApprover, { name: task.approverName })
       : text.value.pictureSentQueue
@@ -427,8 +465,6 @@ const sendPicture = () =>
 const assigneeUid = ref<string | null>(null)
 const taskText = ref('')
 const taskApprover = ref<string>('')
-/** a post (a note or a topic) or a picture */
-const taskKind = ref<'post' | 'image'>('post')
 const taskApproverItems = computed(() => [
   { value: '', title: text.value.noApproval },
   ...posts.approvers.map((person) => ({ value: person.uid, title: person.name }))
@@ -451,7 +487,6 @@ function newTask() {
   taskText.value = ''
   taskApprover.value = ''
   taskDue.value = null
-  taskKind.value = 'post'
   taskDialog.value = true
 }
 
@@ -464,8 +499,7 @@ const giveTask = () =>
       assigneeUid.value!,
       taskText.value.trim(),
       taskApprover.value || null,
-      taskDue.value,
-      taskKind.value
+      taskDue.value
     )
     taskText.value = ''
     assigneeUid.value = null
