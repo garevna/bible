@@ -133,8 +133,9 @@ export interface UserView {
 }
 
 /** A note or a topic sent in a message (its verses carry their refs, so it can be saved) */
+/** a note or a topic of the user, or a picture (kept in Telegram: 'tg:…' in post.image) */
 export interface Attachment {
-  kind: 'note' | 'topic'
+  kind: 'note' | 'topic' | 'image'
   post: TopicPost
 }
 
@@ -149,7 +150,7 @@ export interface Ask {
   eventId: string
   day: string
   uid: string
-  as: 'main' | 'backup' | 'apply'
+  as: 'main' | 'backup' | 'apply' | 'handover' | 'task'
 }
 
 /** A message between ministers (see worker/src/messages.ts); it lives for a day */
@@ -389,7 +390,9 @@ export const useWorkerStore = defineStore('worker', () => {
     text: string
     attachment?: Attachment | null
     replyTo?: string | null
-  }) => (await call<{ sent: number }>('POST', '/messages', draft)).sent
+  }) =>
+    // a reply to the message of a task, with a picture, a note or a topic: the task is done (submission)
+    call<{ sent: number; submission?: { approverName: string | null } }>('POST', '/messages', draft)
 
   // the number of unread messages is kept fresh while the app is open and visible
   let timer: ReturnType<typeof setInterval> | undefined

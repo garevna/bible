@@ -2,6 +2,9 @@ import type { Page, Route } from '@playwright/test'
 
 import { dialog, expect, openBible, signInLocally, test, withStores } from './fixtures'
 
+/** a picture of one pixel */
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+
 /** The worker (see playwright.config.ts): a publisher who writes, or a member of a ministry who reads */
 async function fakeWorker(
   page: Page,
@@ -59,7 +62,15 @@ async function fakeWorker(
     }
     // the posts of the channel: none here
     if (path === '/posts') return route.fulfill({ json: { submissions: [], tasks: [] } })
-    sent.push(request.postDataJSON())
+    // a picture kept: its id
+    if (path === '/posts/upload') return route.fulfill({ json: { image: 'tg:file-id-00001' } })
+    if (path.startsWith('/files/'))
+      return route.fulfill({ body: Buffer.from(PNG, 'base64'), contentType: 'image/png' })
+    const body = request.postDataJSON()
+    sent.push(body)
+    // a reply to the message of a task with a picture: the task is done
+    if (body?.attachment?.kind === 'image')
+      return route.fulfill({ json: { sent: 1, submission: { approverName: 'Пастор' } } })
     return route.fulfill({ json: { sent: 1 } })
   })
   return { sent, read }
@@ -335,4 +346,42 @@ test('a minister without a mobile number is asked for it; an empty group cannot 
   await expect(
     page.locator('.v-overlay--active .v-list-item', { hasText: 'Музичне служіння' })
   ).toContainText('Служителів: 1')
+})
+
+test('a task is answered by a reply with a picture: it goes for the approval', async ({ page }) => {
+  const task = {
+    id: 'm-task',
+    fromUid: 'pastor-uid',
+    fromName: 'Пастор',
+    toUid: 'e2e-uid',
+    toName: 'E2E',
+    text: '📝 Доручення від Пастор: підготувати публікацію для каналу — Заставка до анонсу.',
+    attachment: null,
+    replyTo: null,
+    asks: [{ eventId: 't1', day: '', uid: 'e2e-uid', as: 'task' }],
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 86_400_000,
+    readAt: null
+  }
+  const { sent } = await fakeWorker(page, 'member', [task])
+  await signIn(page)
+  await withStores(page, (stores) => stores.app.setPage('messages'))
+  const card = page.locator('.message', { hasText: 'Заставка до анонсу' })
+  // a task is not an invitation: no buttons of the days
+  await expect(card.getByRole('button', { name: 'Підтвердити' })).toHaveCount(0)
+  await card.getByRole('button', { name: 'Відповісти' }).click()
+  const reply = dialog(page)
+  await expect(reply).toContainText('Картинку буде зараховано як виконання доручення')
+  const chooser = page.waitForEvent('filechooser')
+  await reply.getByRole('button', { name: 'Додати картинку' }).click()
+  await (
+    await chooser
+  ).setFiles({ name: 'cover.png', mimeType: 'image/png', buffer: Buffer.from(PNG, 'base64') })
+  await expect(reply.locator('.attachment img')).toBeVisible()
+  await reply.getByRole('button', { name: 'Надіслати', exact: true }).click()
+  await expect(dialog(page)).toContainText('Відповідь надіслано, а матеріал — на затвердження: Пастор')
+  expect(sent.at(-1)).toMatchObject({
+    replyTo: 'm-task',
+    attachment: { kind: 'image', post: { image: 'tg:file-id-00001' } }
+  })
 })

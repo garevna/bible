@@ -69,8 +69,8 @@
 
           <p v-if="message.text" class="message__text">{{ message.text }}</p>
           <!-- an invitation: an answer for each of its days, right here -->
-          <div v-if="incoming(message) && message.asks?.length" class="asks">
-            <div v-for="ask of message.asks" :key="askKey(ask)" class="ask">
+          <div v-if="incoming(message) && invitationsOf(message).length" class="asks">
+            <div v-for="ask of invitationsOf(message)" :key="askKey(ask)" class="ask">
               <span class="ask__day">{{ dayLabel(ask.day) }}</span>
               <template v-if="stateOf(ask) === 'waiting'">
                 <v-btn
@@ -172,6 +172,8 @@ const incoming = (message: Message) => message.toUid === user.uid
 
 /** the people of the days the invitations ask about, as the calendar has them */
 const team = shallowRef<Participant[]>([])
+/** the invitations of a message (its days of the calendar); a task is answered by a reply instead */
+const invitationsOf = (message: Message) => (message.asks ?? []).filter((ask) => ask.as !== 'task')
 const askKey = (ask: Ask) => `${ask.eventId}|${ask.day}|${ask.uid}|${ask.as}`
 
 type AskState = 'waiting' | 'confirmed' | 'declined' | 'gone'
@@ -205,7 +207,7 @@ const dayLabel = (day: string) => formatDay(day, localeOf(user.lang))
 
 async function loadTeam() {
   const days = worker.messages
-    .flatMap((message) => (incoming(message) ? (message.asks ?? []) : []))
+    .flatMap((message) => (incoming(message) ? invitationsOf(message) : []))
     .map((ask) => ask.day)
   if (!days.length) return
   const from = days.reduce((a, b) => (a < b ? a : b))
@@ -248,8 +250,8 @@ async function sendDecline() {
 
 /** the user answered the message: by a message, or (an invitation) by the buttons of all its days */
 const answered = (message: Message) =>
-  message.asks?.length
-    ? message.asks.every((ask) => stateOf(ask) !== 'waiting')
+  invitationsOf(message).length
+    ? invitationsOf(message).every((ask) => stateOf(ask) !== 'waiting')
     : worker.messages.some((item) => item.replyTo === message.id && item.fromUid === user.uid)
 
 /**
@@ -286,7 +288,8 @@ const time = (ms: number) => formatDateTime(ms, localeOf(user.lang))
 /** the invitations that need nothing more: every day answered, or gone from the calendar */
 const stale = computed(() =>
   worker.messages.filter(
-    (message) => message.asks?.length && message.asks.every((ask) => stateOf(ask) !== 'waiting')
+    (message) =>
+      invitationsOf(message).length && invitationsOf(message).every((ask) => stateOf(ask) !== 'waiting')
   )
 )
 

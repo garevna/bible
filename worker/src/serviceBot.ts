@@ -20,7 +20,8 @@ export interface Ask {
   day: string
   /** the main person of the invitation (the backup answers for their place); '' for an application */
   uid: string
-  as: 'main' | 'backup' | 'apply' | 'handover'
+  /** task: a post asked of the user (eventId: the task), answered in the app, not in Telegram */
+  as: 'main' | 'backup' | 'apply' | 'handover' | 'task'
 }
 
 /** The texts are the message HTML of Telegram (parse_mode HTML): the callers escape what people wrote */

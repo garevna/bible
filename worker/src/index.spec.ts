@@ -767,6 +767,57 @@ describe('the posts of the channel', () => {
     )
   })
 
+  it('a task answered by a reply to its message, with a picture: it goes for the approval', async () => {
+    const { call, messages, clock, posts } = await church()
+    const task = await call('POST', '/post-tasks', 'pastor', {
+      assigneeUid: 'musician-uid',
+      text: 'Заставка до анонсу',
+      approverUid: 'pastor-uid'
+    })
+    const taskId = (task.body.task as { id: string }).id
+    // the message of the task asks to be answered in the app
+    const asked = (await messages.forUser('musician-uid', clock.now)).find(
+      (message) => message.toUid === 'musician-uid'
+    )!
+    expect(asked.asks).toEqual([{ eventId: taskId, day: '', uid: 'musician-uid', as: 'task' }])
+
+    // a picture of the device stays out of a message; one kept in Telegram goes
+    const picture = { kind: 'image', post: { title: '', items: [], image: 'tg:file-id-00001' } }
+    expect(
+      (
+        await call('POST', '/messages', 'musician', {
+          replyTo: asked.id,
+          text: 'Готово',
+          attachment: {
+            kind: 'image',
+            post: { title: '', items: [], image: 'data:image/jpeg;base64,/9j/4AAQSkZJRg==' }
+          }
+        })
+      ).status
+    ).toBe(400)
+    const reply = await call('POST', '/messages', 'musician', {
+      replyTo: asked.id,
+      text: 'Готово',
+      attachment: picture
+    })
+    expect(reply.body).toMatchObject({
+      sent: 1,
+      submission: {
+        kind: 'image',
+        status: 'pending',
+        approverUid: 'pastor-uid',
+        title: 'Заставка до анонсу',
+        taskId
+      }
+    })
+    expect((await posts.task(taskId))!.status).toBe('done')
+    // the pastor sees the picture in the reply too
+    const got = (await messages.forUser('pastor-uid', clock.now)).find(
+      (message) => message.text === 'Готово'
+    )!
+    expect(got.attachment).toMatchObject({ kind: 'image', post: { image: 'tg:file-id-00001' } })
+  })
+
   it('a pastor needs no approval of their own; returned with a word; a task says who approves', async () => {
     const { call, messages, clock } = await church()
     const own = await call('POST', '/posts', 'pastor', { kind: 'note', post: note })

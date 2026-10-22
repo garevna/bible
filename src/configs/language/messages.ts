@@ -1,4 +1,49 @@
 export const messages = {
+  addPicture: {
+    ua: 'Додати картинку',
+    ru: 'Добавить картинку',
+    en: 'Add a picture'
+  },
+  otherPicture: {
+    ua: 'Інша картинка',
+    ru: 'Другая картинка',
+    en: 'Another picture'
+  },
+  taskAnswerHint: {
+    ua: 'Картинку буде зараховано як виконання доручення.',
+    ru: 'Картинка будет засчитана как выполнение поручения.',
+    en: 'The picture does the task.'
+  },
+  taskDoneTitle: {
+    ua: 'Доручення виконано',
+    ru: 'Поручение выполнено',
+    en: 'The task is done'
+  },
+  taskDoneApprover: {
+    ua: 'Відповідь надіслано, а матеріал — на затвердження: {name}.',
+    ru: 'Ответ отправлен, а материал — на утверждение: {name}.',
+    en: 'The answer is sent, the material goes for approval to {name}.'
+  },
+  taskDoneQueue: {
+    ua: 'Відповідь надіслано, а матеріал — адміністратору каналу.',
+    ru: 'Ответ отправлен, а материал — администратору канала.',
+    en: 'The answer is sent, the material goes to the administrator of the channel.'
+  },
+  ok: {
+    ua: 'Добре',
+    ru: 'Хорошо',
+    en: 'OK'
+  },
+  noStorage: {
+    ua: 'Сховище картинок ще не підключено — попросіть адміністратора каналу підключити його.',
+    ru: 'Хранилище картинок ещё не подключено — попросите администратора канала подключить его.',
+    en: 'The pictures are not connected yet: ask the administrator of the channel.'
+  },
+  badPicture: {
+    ua: 'Не вдалося відкрити картинку. Виберіть інший файл (JPG або PNG).',
+    ru: 'Не удалось открыть картинку. Выберите другой файл (JPG или PNG).',
+    en: 'The picture could not be opened. Choose another file (JPG or PNG).'
+  },
   title: {
     ua: 'Повідомлення',
     ru: 'Сообщения',

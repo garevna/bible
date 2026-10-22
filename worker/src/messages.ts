@@ -13,8 +13,9 @@ const MAX_TEXT = 4000
 const MAX_RECIPIENTS = 100
 
 /** a note or a topic, as a post of the Telegram channel (its verses carry their refs) */
+/** a note or a topic of the user, or a picture (kept in Telegram: 'tg:…' in post.image) */
 export interface Attachment {
-  kind: 'note' | 'topic'
+  kind: 'note' | 'topic' | 'image'
   post: TopicPost
 }
 
@@ -78,10 +79,12 @@ export function parseDraft(body: unknown): MessageDraft | null {
   if (draft.attachment !== undefined && draft.attachment !== null) {
     const { kind, post } = draft.attachment as { kind?: unknown; post?: unknown }
     const parsed = parsePost(post)
-    if ((kind !== 'note' && kind !== 'topic') || !parsed) return null
-    // pictures stay out of the messages: they would make a message hundreds of kilobytes big
+    if ((kind !== 'note' && kind !== 'topic' && kind !== 'image') || !parsed) return null
+    // a picture kept in Telegram is its short id; a picture of the device stays out (hundreds of kilobytes)
+    const kept = parsed.image?.startsWith('tg:') ? parsed.image : undefined
+    if (kind === 'image' && !kept) return null
     const { image: _image, ...withoutImage } = parsed
-    attachment = { kind, post: withoutImage }
+    attachment = { kind, post: { ...withoutImage, ...(kept ? { image: kept } : {}) } }
   }
   if (!text && !attachment) return null
   return { to, ministries, roles, text, attachment, replyTo }

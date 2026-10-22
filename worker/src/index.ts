@@ -8,7 +8,7 @@ import {
   setEventTypes
 } from './eventTypes'
 import { d1Store, HOURLY_LIMIT, parseDraft, type Message, type MessagesStore } from './messages'
-import { parsePost } from './post'
+import { parsePost, type TopicPost } from './post'
 import {
   getRoles,
   OWNER_ROLE,
@@ -277,7 +277,16 @@ const rightsFor = (
  * A notice of the app from the user to some people, and the same in Telegram for the linked ones
  * (with buttons for the asks); it is kept a week
  */
-async function tell(env: Env, deps: Deps, me: UserRecord, uids: string[], text: string, asks?: Ask[]) {
+async function tell(
+  env: Env,
+  deps: Deps,
+  me: UserRecord,
+  uids: string[],
+  text: string,
+  asks?: Ask[],
+  /** what the message of the app asks (e.g. a task answered by a reply), not the buttons of Telegram */
+  appAsks?: Ask[]
+) {
   const to = [...new Set(uids)].filter((uid) => uid !== me.uid)
   if (!to.length) return
   const users = await listUsers(env.USERS, env.OWNERS, true)
@@ -295,7 +304,7 @@ async function tell(env: Env, deps: Deps, me: UserRecord, uids: string[], text: 
     text,
     attachment: null,
     replyTo: null,
-    asks: null,
+    asks: appAsks ?? null,
     createdAt: now,
     expiresAt: now + 7 * DAY,
     readAt: null
@@ -303,6 +312,77 @@ async function tell(env: Env, deps: Deps, me: UserRecord, uids: string[], text: 
   await (deps.messages ?? d1Store(env.DB)).insert(list)
   const bot = botFor(env, deps, users)
   await Promise.all(to.map((uid) => bot.send(uid, escape(text), asks)))
+}
+
+/**
+ * A task answered (from the page of the posts, or by a reply to its message): the answer goes to its
+ * approver, or to the queue of the channel; the one who asked is told. False when it is not the user's open task
+ */
+async function answerTask(
+  env: Env,
+  deps: Deps,
+  me: UserRecord,
+  taskId: string,
+  answer: { kind: Submission['kind']; post: TopicPost }
+): Promise<Submission | null> {
+  const store = deps.posts ?? d1Posts(env.DB)
+  const task = await store.task(taskId)
+  if (!task || task.assigneeUid !== me.uid || task.status !== 'open') return null
+  const now = deps.now?.() ?? Date.now()
+  const title = answer.post.title || task.text
+  const item: Submission = {
+    id: crypto.randomUUID(),
+    kind: answer.kind,
+    title,
+    post: { ...answer.post, title },
+    authorUid: me.uid,
+    authorName: nameOf(me),
+    approverUid: task.approverUid,
+    approverName: task.approverName,
+    status: task.approverUid ? 'pending' : 'approved',
+    comment: '',
+    taskId: task.id,
+    createdAt: now,
+    decidedAt: null,
+    publishedAt: null,
+    publishedBy: null
+  }
+  await store.putSubmission(item)
+  await store.putTask({ ...task, status: 'done' })
+  await tell(
+    env,
+    deps,
+    me,
+    [task.byUid],
+    `✅ ${nameOf(me)} виконав(ла) доручення «${task.text}». Розділ «Публікації».`
+  )
+  if (task.approverUid && task.approverUid !== task.byUid)
+    await tell(
+      env,
+      deps,
+      me,
+      [task.approverUid],
+      `📝 ${nameOf(me)} просить затвердити публікацію «${title}». Розділ «Публікації».`
+    )
+  if (!task.approverUid) {
+    // the administrators of the channel: it is in their queue
+    const roles = await getRoles(env.USERS)
+    const ministryRoles = await getMinistryRoles(env.USERS)
+    const handovers = await getHandovers(env.USERS, localDay(now))
+    const publishers = (await listUsers(env.USERS, env.OWNERS, true))
+      .filter(
+        (user) => rightsFor(roles, ministryRoles, roleOf(user, env.OWNERS), user.uid, handovers).publish
+      )
+      .map((user) => user.uid)
+    await tell(
+      env,
+      deps,
+      me,
+      publishers,
+      `📝 Нова публікація для каналу: «${title}» (${nameOf(me)}). Розділ «Публікації».`
+    )
+  }
+  return item
 }
 
 /** "до 1 листопада 2026 р." of a last day, or nothing */
@@ -1087,7 +1167,10 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         deps,
         me,
         [assignee.uid],
-        `📝 Доручення від ${nameOf(me)}: підготувати публікацію для каналу — ${text}.${due ? ` Термін:${untilText(due)}.` : ''}${approver ? ` Затверджує: ${nameOf(approver)}.` : ''} Розділ «Публікації».`
+        `📝 Доручення від ${nameOf(me)}: підготувати публікацію для каналу — ${text}.${due ? ` Термін:${untilText(due)}.` : ''}${approver ? ` Затверджує: ${nameOf(approver)}.` : ''} Розділ «Публікації».`,
+        undefined,
+        // the message of the app: answered by a reply with a picture, a note or a topic
+        [{ eventId: task.id, day: '', uid: assignee.uid, as: 'task' }]
       )
       return json({ task })
     }
@@ -1737,6 +1820,7 @@ async function handleMessages(
   if (!draft) return json({ error: 'bad-request' }, 400)
 
   let recipients: { uid: string; name: string }[]
+  let original: Message | null = null
   if (rights.send && !draft.replyTo) {
     const chosen = new Set(draft.to)
     const unknown = draft.to.filter((uid) => !receivers.some((user) => user.uid === uid))
@@ -1753,7 +1837,7 @@ async function handleMessages(
       .map((user) => ({ uid: user.uid, name: nameOf(user) }))
   } else {
     // an answer goes to the one who wrote, and only to a message the user got
-    const original = draft.replyTo ? await store.get(draft.replyTo) : null
+    original = draft.replyTo ? await store.get(draft.replyTo) : null
     if (!original || original.toUid !== me.uid || original.expiresAt <= now)
       return json({ error: 'forbidden' }, 403)
     recipients = [{ uid: original.fromUid, name: original.fromName }]
@@ -1784,14 +1868,18 @@ async function handleMessages(
   // the same in Telegram for the linked ones (the owners too): the text, and what is attached
   const bot = botFor(env, deps, await listUsers(env.USERS, env.OWNERS, true))
   const attached = draft.attachment
-    ? `\n\n📎 ${draft.attachment.post.title || (draft.attachment.kind === 'topic' ? 'Тема' : 'Нотатка')} — у застосунку`
+    ? `\n\n📎 ${draft.attachment.post.title || { topic: 'Тема', note: 'Нотатка', image: 'Картинка' }[draft.attachment.kind]} — у застосунку`
     : ''
   await Promise.all(
     messages.map((message) =>
       bot.send(message.toUid, escape(`✉ ${message.fromName}:\n${message.text}${attached}`))
     )
   )
-  return json({ sent: messages.length })
+  // a reply to the message of a task, with a picture, a note or a topic: the task is done by it
+  const task = original?.asks?.find((ask) => ask.as === 'task' && ask.uid === me.uid)
+  const answered =
+    task && draft.attachment ? await answerTask(env, deps, me, task.eventId, draft.attachment) : null
+  return json({ sent: messages.length, ...(answered ? { submission: answered } : {}) })
 }
 
 export default {

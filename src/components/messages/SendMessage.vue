@@ -95,6 +95,21 @@
 
     <v-textarea v-model="message" :label="text.text" rows="3" auto-grow counter="4000" />
 
+    <!-- a reply: a picture with it (a task is done by it, when the message asks for one) -->
+    <div v-if="replyTo" class="d-flex flex-wrap align-center ga-2 mb-2">
+      <v-btn
+        variant="tonal"
+        color="buttons"
+        class="text-none"
+        prepend-icon="mdi-image-plus"
+        :loading="uploading"
+        @click="addPicture"
+      >
+        {{ attachment?.kind === 'image' ? text.otherPicture : text.addPicture }}
+      </v-btn>
+      <span v-if="isTask" class="text-medium-emphasis text-body-2">{{ text.taskAnswerHint }}</span>
+    </div>
+
     <template v-if="attachment">
       <p class="text-medium-emphasis mb-1">{{ text.attached }}</p>
       <AttachmentView :attachment="attachment" />
@@ -113,6 +128,17 @@
   <v-snackbar v-model="done" color="success" timeout="3000">{{
     format(text.sent, { count: sent })
   }}</v-snackbar>
+
+  <!-- a task done by the reply: where it went -->
+  <AppDialog v-model="taskDone" :title="text.taskDoneTitle" icon="mdi-check-circle-outline" max-width="480">
+    <p class="lead">{{ taskDoneText }}</p>
+    <template #actions>
+      <v-spacer />
+      <v-btn variant="flat" color="primary" class="text-none px-6" @click="taskDone = false">{{
+        text.ok
+      }}</v-btn>
+    </template>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">
@@ -126,6 +152,7 @@ import AttachmentView from '@/components/messages/AttachmentView.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useWorkerStore, WorkerError, type Attachment, type Message, type Recipient } from '@/stores/worker'
 import { format } from '@/utils/format'
+import { pickImage, resizeImage } from '@/utils/image'
 
 /**
  * Writes to ministers: to people and whole ministries (publishers and administrators),
@@ -158,6 +185,33 @@ const attachment = shallowRef<Attachment | null>(null)
 
 const done = ref(false)
 const sent = ref(0)
+
+/** the message replied to asks for a task: a picture, a note or a topic does it */
+const isTask = computed(() => Boolean(props.replyTo?.asks?.some((ask) => ask.as === 'task')))
+const uploading = ref(false)
+/** a picture of the device: kept in the private channel of the pictures, then attached */
+async function addPicture() {
+  const file = await pickImage()
+  if (!file) return
+  uploading.value = true
+  error.value = ''
+  try {
+    const image = await resizeImage(file, { size: 1600 })
+    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image })).image
+    attachment.value = { kind: 'image', post: { title: '', items: [], image: kept } }
+  } catch (cause) {
+    error.value =
+      cause instanceof WorkerError && cause.message === 'no-storage'
+        ? text.value.noStorage
+        : cause instanceof DOMException || cause instanceof TypeError
+          ? text.value.badPicture
+          : format(text.value.failed, { name: reason(cause) })
+  } finally {
+    uploading.value = false
+  }
+}
+const taskDone = ref(false)
+const taskDoneText = ref('')
 
 /** the ministries with the number of their members (people who get messages) */
 const ministryOptions = computed(() =>
@@ -212,15 +266,22 @@ function openDialog() {
 
 const send = () =>
   run(async () => {
-    sent.value = await worker.sendMessage({
+    const answer = await worker.sendMessage({
       ...(props.replyTo
         ? { replyTo: props.replyTo.id }
         : { to: to.value, ministries: ministries.value, roles: roles.value }),
       text: (message.value ?? '').trim(),
       attachment: attachment.value
     })
+    sent.value = answer.sent
     open.value = false
-    done.value = true
+    // the task is done: a window says where it went; otherwise a short word
+    if (answer.submission) {
+      taskDoneText.value = answer.submission.approverName
+        ? format(text.value.taskDoneApprover, { name: answer.submission.approverName })
+        : text.value.taskDoneQueue
+      taskDone.value = true
+    } else done.value = true
     emit('sent')
     worker.loadMessages().catch(() => undefined)
   })

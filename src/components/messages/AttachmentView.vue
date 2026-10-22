@@ -1,7 +1,9 @@
 <template>
   <!-- a note or a topic sent in a message: its title, texts and verses -->
   <div class="attachment">
-    <div class="attachment__kind">
+    <!-- a picture: itself -->
+    <StoredImage v-if="attachment.kind === 'image'" :src="attachment.post.image" />
+    <div v-else class="attachment__kind">
       <v-icon :icon="attachment.kind === 'topic' ? '$topic' : '$note'" size="small" class="mr-1" />
       {{ attachment.post.title || text.attached }}
     </div>
@@ -20,6 +22,7 @@
 </template>
 
 <script setup lang="ts">
+import StoredImage from '@/components/posts/StoredImage.vue'
 import { storeToRefs } from 'pinia'
 
 import { useLanguageStore } from '@/stores/language'

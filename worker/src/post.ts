@@ -60,7 +60,8 @@ function isItem(value: unknown): value is TopicPostItem {
 export function parsePost(body: unknown): TopicPost | null {
   const post = body as TopicPost
   if (!post || !isText(post.title, 500)) return null
-  if (!post.title.trim() && !post.items?.length) return null
+  // a picture alone is a post too (a picture asked by a task)
+  if (!post.title.trim() && !post.items?.length && !post.image) return null
   if (!Array.isArray(post.items) || post.items.length > MAX_ITEMS || !post.items.every(isItem)) return null
   if (post.image !== undefined && !isImage(post.image)) return null
   return { title: post.title.trim(), items: post.items, ...(post.image ? { image: post.image } : {}) }
