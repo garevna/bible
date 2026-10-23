@@ -170,8 +170,7 @@ const resourceOf = (name: string) => {
   return chosenKind.value[name] !== undefined ? chosenKind.value[name]! : (slot?.kinds?.[0] ?? null)
 }
 /** what the role prepares: its kinds, and a word about them */
-const prepares = (slot: Slot) =>
-  [(slot.kinds ?? []).map(kindName).filter(Boolean).join(', '), slot.hint].filter(Boolean).join('; ')
+const prepares = (slot: Slot) => (slot.kinds ?? []).map(kindName).filter(Boolean).join(', ')
 const pictureOf = (url: string) => `https://i.ytimg.com/vi/${youTubeId(url)}/hqdefault.jpg`
 const materialsOf = (name: string) => props.occurrence.materials.filter((item) => item.role === name)
 const membersOf = (name: string) =>

@@ -724,11 +724,6 @@ export const admin = {
     ru: 'Готовит материалы',
     en: 'Prepares materials'
   },
-  slotHint: {
-    ua: 'Що підготувати, напр. «Перелік пісень хвали»',
-    ru: 'Что подготовить, напр. «Список песен хвалы»',
-    en: 'What to prepare, e.g. "A list of songs"'
-  },
   addSlot: {
     ua: 'Додати роль',
     ru: 'Добавить роль',

@@ -26,14 +26,6 @@
         hide-details
         class="flex-grow-0"
       />
-      <v-text-field
-        v-if="slot.materials"
-        v-model="slot.hint"
-        :label="text.slotHint"
-        density="compact"
-        hide-details
-        class="slot-hint"
-      />
       <!-- what it prepares: the kinds of the resources -->
       <v-chip-group
         v-if="slot.materials && schedule.materialKinds.length"
@@ -105,10 +97,6 @@ for (const slot of slots.value) slot.kinds ??= []
 
 .slot-count {
   flex: 0 0 90px;
-}
-
-.slot-hint {
-  flex: 1 1 220px;
 }
 
 .slot-kinds {

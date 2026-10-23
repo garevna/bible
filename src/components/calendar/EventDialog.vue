@@ -336,7 +336,8 @@ const save = () =>
           ...slot,
           name: slot.name.trim(),
           count: Math.min(50, Math.max(1, Number(slot.count) || 1)),
-          hint: slot.materials ? slot.hint.trim() : ''
+          // the kinds say what it prepares; the words of before are not kept
+          hint: ''
         }))
       },
       props.event?.id

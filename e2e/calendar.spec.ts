@@ -290,7 +290,9 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
 
   // the materials of the pastor: a note of the planner
   await communionCard.getByRole('button', { name: 'Методичні матеріали' }).click()
-  await expect(communionCard).toContainText('Пастор: Конспект проповіді; Нотатки, вірші')
+  // what the role prepares: its kinds (the words of before are not shown)
+  await expect(communionCard).toContainText('Пастор: Конспект проповіді')
+  await expect(communionCard).not.toContainText('Нотатки, вірші')
   await communionCard.getByRole('button', { name: 'Додати нотатку' }).click()
   await dialog(page).locator('.v-list-item', { hasText: 'Хліб і вино' }).click()
   await expect.poll(() => posted.at(-1)?.path).toBe('/schedule/materials')

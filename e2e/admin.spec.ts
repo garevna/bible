@@ -427,7 +427,8 @@ test('events of the calendar: the colors of the days, its filters, the types wit
   await panel.getByRole('button', { name: 'Додати роль' }).click()
   await panel.getByLabel('Роль', { exact: true }).fill('Пастор')
   await panel.getByLabel('Готує матеріали').check()
-  await panel.getByLabel('Що підготувати').fill('Нотатки, вірші')
+  // no words of what it prepares: the kinds of the resources say it
+  await expect(panel.getByLabel('Що підготувати')).toHaveCount(0)
   // what it prepares: the kinds of the resources
   await panel.locator('.slot-kinds .v-chip', { hasText: 'Конспект проповіді' }).click()
   await save.click()
@@ -440,7 +441,7 @@ test('events of the calendar: the colors of the days, its filters, the types wit
           name: 'Причастя',
           ministry: null,
           roles: 'fixed',
-          slots: [{ name: 'Пастор', count: 1, materials: true, kinds: ['k-sermon'], hint: 'Нотатки, вірші' }]
+          slots: [{ name: 'Пастор', count: 1, materials: true, kinds: ['k-sermon'], hint: '' }]
         }
       ]
     })
