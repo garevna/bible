@@ -186,20 +186,17 @@
                   class="field"
                   @update:model-value="change(item, { role: $event })"
                 />
-                <v-select
-                  :model-value="ministriesOf(item)"
-                  :items="ministries"
-                  :label="text.sectionMinistries"
-                  :disabled="saving === item.uid"
-                  multiple
-                  chips
-                  closable-chips
-                  density="compact"
-                  hide-details
-                  class="field field--wide"
-                  @update:model-value="change(item, { ministries: $event })"
-                />
               </div>
+
+              <!-- the ministries of the person -->
+              <TransferList
+                :model-value="ministriesOf(item)"
+                :items="ministries.map((ministry) => ({ value: ministry, title: ministry }))"
+                :right-label="text.sectionMinistries"
+                :disabled="saving === item.uid"
+                class="mt-2"
+                @update:model-value="(chosen: string[]) => change(item, { ministries: chosen })"
+              />
 
               <!-- the roles in the ministries: given in the ministries -->
               <div v-if="rolesOf(item).length" class="info">
@@ -246,6 +243,7 @@ import { storeToRefs } from 'pinia'
 import { useDisplay } from 'vuetify'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import TransferList from '@/components/TransferList.vue'
 import PhoneDialog from '@/components/PhoneDialog.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'

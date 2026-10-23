@@ -245,7 +245,7 @@ test('a minister lands on the calendar: the day is red until settled; answers an
 
   // the communion is not the user's: nothing to approve; the filters narrow the day
   await card(page, 'Причастя').getByRole('button', { name: 'Учасники' }).click()
-  await expect(card(page, 'Причастя').getByRole('button', { name: 'Затвердити обраного' })).toHaveCount(0)
+  await expect(card(page, 'Причастя').getByRole('button', { name: 'Затвердити обраного' })).toBeDisabled()
   await page.getByLabel('Лише мої').check()
   await expect(card(page, 'Причастя')).toHaveCount(0)
   await expect(page.locator(`.cell[data-day="${TODAY}"] .count`)).toHaveText('1')

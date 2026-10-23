@@ -36,61 +36,42 @@
       <p v-if="loaded && !people.length && !ministryItems.length" class="text-medium-emphasis">
         {{ text.noRecipients }}
       </p>
-      <v-autocomplete
-        v-model="to"
-        :items="people"
-        item-title="name"
-        item-value="uid"
-        :label="text.people"
-        multiple
-        chips
-        closable-chips
-        density="compact"
-        class="mb-2"
-      >
-        <template #item="{ props: item, item: { raw } }">
-          <v-list-item v-bind="item" :subtitle="[...raw.ministries, raw.phone].filter(Boolean).join(' · ')" />
-        </template>
-      </v-autocomplete>
-      <!-- all the people of roles the role of the user may write to -->
-      <v-select
-        v-if="roleItems.length"
-        v-model="roles"
-        :items="roleItems"
-        item-title="name"
-        item-value="id"
-        :label="text.roles"
-        multiple
-        chips
-        closable-chips
-        density="compact"
-        class="mb-2"
-      />
-      <!-- every ministry is listed; one without members cannot be chosen -->
-      <v-select
-        v-model="ministries"
-        :items="ministryOptions"
-        :label="text.ministries"
-        multiple
-        chips
-        closable-chips
-        density="compact"
-        class="mb-2"
-      >
-        <template #item="{ props: item, item: { raw } }">
-          <v-tooltip :text="text.emptyMinistry" :disabled="raw.members > 0" location="start">
-            <template #activator="{ props: tooltip }">
-              <div v-bind="tooltip">
-                <v-list-item
-                  v-bind="item"
-                  :disabled="raw.members === 0"
-                  :subtitle="format(text.members, { count: raw.members })"
-                />
-              </div>
-            </template>
-          </v-tooltip>
-        </template>
-      </v-select>
+      <!-- whom: one way at a time, each in its tab (the number: how many are chosen there) -->
+      <p class="label">{{ text.people }}</p>
+      <v-tabs v-model="whom" color="secondary" density="compact" grow class="mb-2">
+        <v-tab value="people" class="text-none">{{ text.toPeople }} ({{ to.length }})</v-tab>
+        <v-tab v-if="roleItems.length" value="statuses" class="text-none">
+          {{ text.toStatuses }} ({{ roles.length }})
+        </v-tab>
+        <v-tab value="ministries" class="text-none">{{ text.toMinistries }} ({{ ministries.length }})</v-tab>
+      </v-tabs>
+      <v-window v-model="whom" class="mb-2">
+        <v-window-item value="people">
+          <TransferList
+            v-model="to"
+            :items="
+              people.map((person) => ({
+                value: person.uid,
+                title: person.name,
+                subtitle: [...person.ministries, person.phone].filter(Boolean).join(' · ')
+              }))
+            "
+            :right-label="text.chosenPeople"
+          />
+        </v-window-item>
+        <!-- all the people of the statuses the user may write to -->
+        <v-window-item v-if="roleItems.length" value="statuses">
+          <TransferList
+            v-model="roles"
+            :items="roleItems.map((role) => ({ value: role.id, title: role.name }))"
+            :right-label="text.chosenStatuses"
+          />
+        </v-window-item>
+        <!-- every ministry is listed; one without members cannot be chosen -->
+        <v-window-item value="ministries">
+          <TransferList v-model="ministries" :items="ministryOptions" :right-label="text.ministries" />
+        </v-window-item>
+      </v-window>
     </template>
 
     <v-textarea v-model="message" :label="text.text" rows="3" auto-grow counter="4000" />
@@ -146,6 +127,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
+import TransferList from '@/components/TransferList.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
@@ -180,6 +162,8 @@ const roleItems = shallowRef<{ id: string; name: string }[]>([])
 const roles = ref<string[]>([])
 const to = ref<string[]>([])
 const ministries = ref<string[]>([])
+/** the tab of the recipients shown */
+const whom = ref<'people' | 'statuses' | 'ministries'>('people')
 const message = ref('')
 const attachment = shallowRef<Attachment | null>(null)
 
@@ -217,7 +201,12 @@ const taskDoneText = ref('')
 const ministryOptions = computed(() =>
   ministryItems.value.map((name) => {
     const members = people.value.filter((person) => person.ministries.includes(name)).length
-    return { value: name, title: name, members, props: { disabled: members === 0 } }
+    return {
+      value: name,
+      title: name,
+      subtitle: format(text.value.members, { count: members }),
+      disabled: members === 0
+    }
   })
 )
 
@@ -288,3 +277,11 @@ const send = () =>
 
 defineExpose({ show: openDialog })
 </script>
+
+<style scoped>
+.label {
+  color: var(--app-text-muted);
+  font-size: 13px;
+  margin: 0 0 4px;
+}
+</style>

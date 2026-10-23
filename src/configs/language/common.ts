@@ -1,4 +1,29 @@
 export const common = {
+  search: {
+    ua: 'Пошук',
+    ru: 'Поиск',
+    en: 'Search'
+  },
+  nothing: {
+    ua: 'Порожньо',
+    ru: 'Пусто',
+    en: 'Empty'
+  },
+  available: {
+    ua: 'Можна вибрати',
+    ru: 'Можно выбрать',
+    en: 'Available'
+  },
+  moveRight: {
+    ua: 'Додати вибране',
+    ru: 'Добавить выбранное',
+    en: 'Add the chosen one'
+  },
+  moveLeft: {
+    ua: 'Прибрати вибране',
+    ru: 'Убрать выбранное',
+    en: 'Remove the chosen one'
+  },
   langMenuTooltip: {
     ua: 'мова',
     ru: 'язык',

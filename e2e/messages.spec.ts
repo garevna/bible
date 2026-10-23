@@ -99,9 +99,10 @@ test('the pastor sends a note to a ministry from the Notes page', async ({ page 
   await note.getByRole('button', { name: 'Надіслати служителям' }).click()
   const send = dialog(page)
   await expect(send.locator('.attachment')).toContainText('Пісні на неділю')
-  await send.locator('.v-select', { hasText: 'Усім учасникам служіння' }).click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Музичне служіння' }).click()
-  await page.keyboard.press('Escape')
+  await send.getByRole('tab', { name: /Служінням/ }).click()
+  const ministries = send.locator('.transfer', { hasText: 'Усім учасникам служіння' })
+  await ministries.locator('.v-list-item', { hasText: 'Музичне служіння' }).click()
+  await ministries.getByRole('button', { name: 'Додати вибране' }).click()
   await send.getByLabel('Текст повідомлення').fill('Підготуйте, будь ласка')
   await send.getByRole('button', { name: 'Надіслати', exact: true }).click()
   await expect(page.getByText('Надіслано: 1')).toBeVisible()
@@ -339,13 +340,16 @@ test('a minister without a mobile number is asked for it; an empty group cannot 
   // the home group leaders have nobody yet
   await withStores(page, (stores) => stores.app.setPage('messages'))
   await page.getByRole('button', { name: 'Нове повідомлення' }).click()
-  await dialog(page).locator('.v-select', { hasText: 'Усім учасникам служіння' }).click()
-  const empty = page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер домашньої групи' })
+  await dialog(page)
+    .getByRole('tab', { name: /Служінням/ })
+    .click()
+  const ministries = dialog(page).locator('.transfer', { hasText: 'Усім учасникам служіння' })
+  const empty = ministries.locator('.v-list-item', { hasText: 'Лідер домашньої групи' })
   await expect(empty).toHaveClass(/v-list-item--disabled/)
   await expect(empty).toContainText('Служителів: 0')
-  await expect(
-    page.locator('.v-overlay--active .v-list-item', { hasText: 'Музичне служіння' })
-  ).toContainText('Служителів: 1')
+  await expect(ministries.locator('.v-list-item', { hasText: 'Музичне служіння' })).toContainText(
+    'Служителів: 1'
+  )
 })
 
 test('a task is answered by a reply with a picture: it goes for the approval', async ({ page }) => {

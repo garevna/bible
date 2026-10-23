@@ -1,107 +1,30 @@
 <template>
   <div class="team-panel">
     <!-- the applications on the left, the approved people on the right; the arrows move the chosen one -->
-    <div class="transfer" :class="{ 'transfer--stacked': stacked }">
-      <div class="column">
-        <p class="label">{{ text.applicants }} ({{ applicants.length }})</p>
-        <v-list density="compact" class="people" :aria-label="text.applicants">
-          <v-list-item
-            v-for="member of applicants"
-            :key="member.uid"
-            :title="member.name"
-            :active="chosen === member.uid"
-            color="secondary"
-            @click="choose(member.uid)"
-          >
-            <template v-if="stacked && canApprove" #append>
-              <v-btn
-                size="small"
-                variant="tonal"
-                color="buttons"
-                class="text-none"
-                @click.stop="approve(member.uid)"
-              >
-                {{ text.approve }}
-              </v-btn>
-            </template>
-          </v-list-item>
-          <p v-if="!applicants.length" class="empty">{{ text.noApplicants }}</p>
-        </v-list>
-      </div>
-
-      <div v-if="!stacked && canApprove" class="arrows">
-        <v-tooltip :text="text.moveRight" location="top">
-          <template #activator="{ props: tooltip }">
-            <v-btn
-              v-bind="tooltip"
-              icon="mdi-arrow-right-bold"
-              variant="tonal"
-              color="buttons"
-              size="small"
-              :aria-label="text.moveRight"
-              :disabled="!applicants.some((member) => member.uid === chosen) || busy"
-              @click="approve(chosen!)"
-            />
-          </template>
-        </v-tooltip>
-        <v-tooltip :text="text.moveLeft" location="top">
-          <template #activator="{ props: tooltip }">
-            <v-btn
-              v-bind="tooltip"
-              icon="mdi-arrow-left-bold"
-              variant="tonal"
-              color="secondary"
-              size="small"
-              :aria-label="text.moveLeft"
-              :disabled="
-                !approved.some((member) => member.uid === chosen && member.status === 'confirmed') || busy
-              "
-              @click="unapprove(chosen!)"
-            />
-          </template>
-        </v-tooltip>
-      </div>
-
-      <div class="column">
-        <p class="label">{{ text.approved }} ({{ approved.length }} / {{ occurrence.event.needed }})</p>
-        <v-list density="compact" class="people" :aria-label="text.approved">
-          <v-list-item
-            v-for="member of approved"
-            :key="member.uid"
-            :active="chosen === member.uid"
-            color="secondary"
-            @click="choose(member.uid)"
-          >
-            <v-list-item-title>{{ member.name }}</v-list-item-title>
-            <v-list-item-subtitle>
-              {{ text[member.status] }}<template v-if="member.role"> · {{ member.role }}</template>
-              <template v-if="member.backupName">
-                · {{ format(text.backupOf, { name: member.backupName }) }}</template
-              >
-            </v-list-item-subtitle>
-            <template #append>
-              <v-btn
-                v-if="stacked && canApprove && member.status === 'confirmed'"
-                size="small"
-                variant="text"
-                color="secondary"
-                class="text-none"
-                @click.stop="unapprove(member.uid)"
-              >
-                {{ text.returnBack }}
-              </v-btn>
-              <ConfirmButton
-                v-if="canInvite"
-                icon="$unlink"
-                :text="text.remove"
-                @confirm="run(() => schedule.removeFromTeam(occurrence.event.id, occurrence.day, member.uid))"
-              />
-            </template>
-          </v-list-item>
-          <p v-if="!approved.length" class="empty">{{ text.noApproved }}</p>
-        </v-list>
-      </div>
-    </div>
+    <TransferList
+      :items="transferItems"
+      :model-value="approved.map((member) => member.uid)"
+      :left-label="text.applicants"
+      :right-label="text.approved"
+      :empty-left="text.noApplicants"
+      :empty-right="text.noApproved"
+      :limit="occurrence.event.needed"
+      :right-action="text.moveRight"
+      :left-action="text.moveLeft"
+      :searchable="false"
+      :disabled="!canApprove || busy"
+      :keep="(uid: string) => approved.find((member) => member.uid === uid)?.status !== 'confirmed'"
+      @move="(uid: string, to: 'left' | 'right') => (to === 'right' ? approve(uid) : unapprove(uid))"
+    >
+      <template #append="{ item }">
+        <ConfirmButton
+          v-if="canInvite"
+          icon="$unlink"
+          :text="text.remove"
+          @confirm="run(() => schedule.removeFromTeam(occurrence.event.id, occurrence.day, item.value))"
+        />
+      </template>
+    </TransferList>
 
     <!-- the ones who could not, with their reasons -->
     <div v-if="declined.length" class="mt-2">
@@ -159,7 +82,6 @@
         hide-details
         class="field"
         @click:append-inner="addGuest"
-        @keyup.enter="addGuest"
       />
     </template>
     <v-alert v-if="error" type="error" variant="tonal" density="compact" class="mt-2">{{ error }}</v-alert>
@@ -169,9 +91,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useDisplay } from 'vuetify'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import TransferList from '@/components/TransferList.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore, type Occurrence } from '@/stores/schedule'
 import { WorkerError } from '@/stores/worker'
@@ -182,9 +104,7 @@ const props = defineProps<{ occurrence: Occurrence }>()
 
 const schedule = useScheduleStore()
 const { calendar: text, publish } = storeToRefs(useLanguageStore())
-const { smAndDown: stacked } = useDisplay()
 
-const chosen = ref<string | null>(null)
 const person = ref<string | null>(null)
 const guest = ref('')
 const backup = ref<string | null>(null)
@@ -210,7 +130,21 @@ const candidates = computed(() => {
     .sort((a, b) => Number(b.ministries.includes(ministry)) - Number(a.ministries.includes(ministry)))
 })
 
-const choose = (uid: string) => (chosen.value = chosen.value === uid ? null : uid)
+/** the applications and the approved people: their names, and the state and role of the approved ones */
+const transferItems = computed(() => [
+  ...applicants.value.map((member) => ({ value: member.uid, title: member.name })),
+  ...approved.value.map((member) => ({
+    value: member.uid,
+    title: member.name,
+    subtitle: [
+      text.value[member.status],
+      member.role,
+      member.backupName ? format(text.value.backupOf, { name: member.backupName }) : ''
+    ]
+      .filter(Boolean)
+      .join(' · ')
+  }))
+])
 
 async function run(action: () => Promise<unknown>) {
   busy.value = true
@@ -248,37 +182,6 @@ onMounted(() => canInvite.value && schedule.loadChoices().catch(() => undefined)
 </script>
 
 <style scoped>
-.transfer {
-  display: flex;
-  align-items: stretch;
-  gap: 12px;
-}
-
-.transfer--stacked {
-  flex-direction: column;
-}
-
-.column {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.people {
-  border: solid 1px var(--app-border);
-  border-radius: var(--app-radius);
-  min-height: 120px;
-  max-height: 280px;
-  overflow-y: auto;
-  background: var(--app-surface);
-}
-
-.arrows {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 8px;
-}
-
 .empty {
   color: var(--app-text-muted);
   font-size: 13px;

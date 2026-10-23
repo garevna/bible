@@ -55,38 +55,22 @@
                 @keydown.enter="rename(item.name)"
               />
               <!-- the leaders and their deputies: chosen here, in two fields -->
-              <div class="d-flex flex-wrap ga-2">
-                <v-autocomplete
-                  :model-value="peopleOf(item.name, 'lead')"
-                  :items="schedule.people"
-                  item-title="name"
-                  item-value="uid"
-                  :label="text.leaders"
-                  :disabled="saving"
-                  multiple
-                  chips
-                  closable-chips
-                  density="compact"
-                  hide-details
-                  class="people-field"
-                  @update:model-value="(uids: string[]) => setPeople(item.name, 'lead', uids)"
-                />
-                <v-autocomplete
-                  :model-value="peopleOf(item.name, 'deputy')"
-                  :items="schedule.people"
-                  item-title="name"
-                  item-value="uid"
-                  :label="text.deputies"
-                  :disabled="saving"
-                  multiple
-                  chips
-                  closable-chips
-                  density="compact"
-                  hide-details
-                  class="people-field"
-                  @update:model-value="(uids: string[]) => setPeople(item.name, 'deputy', uids)"
-                />
-              </div>
+              <TransferList
+                :model-value="peopleOf(item.name, 'lead')"
+                :items="personItems"
+                :right-label="text.leaders"
+                :disabled="saving"
+                class="mb-2"
+                @update:model-value="(uids: string[]) => setPeople(item.name, 'lead', uids)"
+              />
+              <TransferList
+                :model-value="peopleOf(item.name, 'deputy')"
+                :items="personItems"
+                :right-label="text.deputies"
+                :disabled="saving"
+                class="mb-2"
+                @update:model-value="(uids: string[]) => setPeople(item.name, 'deputy', uids)"
+              />
               <!-- the other roles inside the ministry -->
               <MinistryRolesEditor
                 :roles="(roles?.[item.name] ?? []).filter((role) => !role.lead && !role.deputy)"
@@ -217,6 +201,7 @@ import { useDisplay } from 'vuetify'
 
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import TransferList from '@/components/TransferList.vue'
 import EventDialog from '@/components/calendar/EventDialog.vue'
 import InvitationsDialog from '@/components/calendar/InvitationsDialog.vue'
 import LocationLink from '@/components/calendar/LocationLink.vue'
@@ -344,6 +329,11 @@ const saveRoles = (ministry: string, list: MinistryRole[]) =>
     roles.value = (await worker.setMinistryRoles({ ...roles.value, [ministry]: list })).ministryRoles
   })
 
+/** the people, to be chosen as the leaders and the deputies */
+const personItems = computed(() =>
+  schedule.people.map((person) => ({ value: person.uid, title: person.name }))
+)
+
 /** the leaders and the deputies: the people of the roles that lead, and of the roles of the deputies */
 const peopleOf = (ministry: string, kind: 'lead' | 'deputy') => [
   ...new Set((roles.value?.[ministry] ?? []).filter((role) => role[kind]).flatMap((role) => role.uids))
@@ -458,10 +448,6 @@ function openInvitations(event: ScheduleEvent) {
   flex-direction: column;
   gap: 12px;
   padding: 12px 4px;
-}
-
-.people-field {
-  flex: 1 1 280px;
 }
 
 .leaders {

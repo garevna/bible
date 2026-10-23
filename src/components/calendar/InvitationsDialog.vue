@@ -17,22 +17,18 @@
         {{ text.wholeMinistry }}
       </v-btn>
     </div>
-    <v-autocomplete
+    <TransferList
       v-model="uids"
-      :items="candidates"
-      item-title="name"
-      item-value="uid"
-      :label="text.people"
-      multiple
-      chips
-      closable-chips
-      density="compact"
+      :items="
+        candidates.map((person) => ({
+          value: person.uid,
+          title: person.name,
+          subtitle: person.ministries.join(', ')
+        }))
+      "
+      :right-label="text.people"
       class="mb-2"
-    >
-      <template #item="{ props: item, item: { raw } }">
-        <v-list-item v-bind="item" :subtitle="raw.ministries.join(', ')" />
-      </template>
-    </v-autocomplete>
+    />
 
     <p class="label">{{ text.daysLabel }}</p>
     <v-chip-group v-model="days" multiple column selected-class="text-secondary">
@@ -65,6 +61,7 @@ import { computed, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import AppDialog from '@/components/AppDialog.vue'
+import TransferList from '@/components/TransferList.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore, type ScheduleEvent } from '@/stores/schedule'

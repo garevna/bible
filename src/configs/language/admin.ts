@@ -1,8 +1,8 @@
 export const admin = {
   title: {
-    ua: 'Користувачі та ролі',
-    ru: 'Пользователи и роли',
-    en: 'Users and roles'
+    ua: 'Користувачі та статуси',
+    ru: 'Пользователи и статусы',
+    en: 'Users and statuses'
   },
   openDashboard: {
     ua: 'Адміністрування',
@@ -10,9 +10,9 @@ export const admin = {
     en: 'Administration'
   },
   hint: {
-    ua: 'Користувач з’являється в списку після першого входу в застосунок. Читач користується застосунком, публікатор ще й публікує теми в Telegram, адміністратор ще й призначає ролі.',
-    ru: 'Пользователь появляется в списке после первого входа в приложение. Читатель пользуется приложением, публикатор ещё и публикует темы в Telegram, администратор ещё и назначает роли.',
-    en: 'A user appears in the list after their first sign in. A reader uses the app, a publisher also posts topics to Telegram, an administrator also gives the roles.'
+    ua: 'Користувач з’являється в списку після першого входу в застосунок. Статус дає права в застосунку: читач лише користується ним, служитель ще й служить у служіннях, адміністратор ще й дає статуси.',
+    ru: 'Пользователь появляется в списке после первого входа в приложение. Статус даёт права в приложении: читатель только пользуется им, служитель ещё и служит в служениях, администратор ещё и даёт статусы.',
+    en: 'A user appears in the list after their first sign in. The status gives the rights in the app: a reader only uses it, a minister also serves in ministries, an administrator also gives the statuses.'
   },
   search: {
     ua: 'Ім’я або email',
@@ -55,9 +55,9 @@ export const admin = {
     en: 'Last seen: {name}'
   },
   changedBy: {
-    ua: 'роль дав(ла) {name}',
-    ru: 'роль дал(а) {name}',
-    en: 'role given by {name}'
+    ua: 'статус дав(ла) {name}',
+    ru: 'статус дал(а) {name}',
+    en: 'status given by {name}'
   },
   remove: {
     ua: 'Прибрати зі списку',
@@ -65,9 +65,9 @@ export const admin = {
     en: 'Remove from the list'
   },
   removeHint: {
-    ua: 'користувач втратить роль; якщо увійде знову — буде читачем',
-    ru: 'пользователь потеряет роль; если войдёт снова — будет читателем',
-    en: 'the user loses the role; signed in again, they are a reader'
+    ua: 'користувач втратить статус; якщо увійде знову — буде читачем',
+    ru: 'пользователь потеряет статус; если войдёт снова — будет читателем',
+    en: 'the user loses the status; signed in again, they are a reader'
   },
   ministries: {
     ua: 'Служіння',
@@ -240,9 +240,9 @@ export const admin = {
     en: 'Statuses'
   },
   manageUsers: {
-    ua: 'Служителі: ролі, служіння, телефони',
-    ru: 'Служители: роли, служения, телефоны',
-    en: 'Ministers: roles, ministries, phones'
+    ua: 'Служителі: статуси, служіння, телефони',
+    ru: 'Служители: статусы, служения, телефоны',
+    en: 'Ministers: statuses, ministries, phones'
   },
   manageDirectories: {
     ua: 'Довідники служінь і локацій',
@@ -430,9 +430,9 @@ export const admin = {
     en: 'Show the readers'
   },
   usersHint: {
-    ua: 'Служителі — усі, крім читачів. Щоб зробити читача служителем, увімкніть «Показати читачів» і дайте йому роль.',
-    ru: 'Служители — все, кроме читателей. Чтобы сделать читателя служителем, включите «Показать читателей» и дайте ему роль.',
-    en: 'Ministers are everyone but the readers. To make a reader a minister, show the readers and give them a role.'
+    ua: 'Служителі — усі, крім читачів. Щоб зробити читача служителем, увімкніть «Показати читачів» і дайте йому статус «Служитель».',
+    ru: 'Служители — все, кроме читателей. Чтобы сделать читателя служителем, включите «Показать читателей» и дайте ему статус «Служитель».',
+    en: 'Ministers are everyone but the readers. To make a reader a minister, show the readers and give them the status of a minister.'
   },
   newItem: {
     ua: 'Додати: нова назва',

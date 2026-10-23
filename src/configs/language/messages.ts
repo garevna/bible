@@ -1,4 +1,29 @@
 export const messages = {
+  toPeople: {
+    ua: 'Людям',
+    ru: 'Людям',
+    en: 'People'
+  },
+  toStatuses: {
+    ua: 'За статусом',
+    ru: 'По статусу',
+    en: 'By status'
+  },
+  toMinistries: {
+    ua: 'Служінням',
+    ru: 'Служениям',
+    en: 'Ministries'
+  },
+  chosenPeople: {
+    ua: 'Отримають',
+    ru: 'Получат',
+    en: 'Will get it'
+  },
+  chosenStatuses: {
+    ua: 'Усім зі статусом',
+    ru: 'Всем со статусом',
+    en: 'Everyone with the status'
+  },
   addPicture: {
     ua: 'Додати картинку',
     ru: 'Добавить картинку',
@@ -70,9 +95,9 @@ export const messages = {
     en: 'To'
   },
   roles: {
-    ua: 'Усім з ролі',
-    ru: 'Всем с ролью',
-    en: 'Everyone with the role'
+    ua: 'Усім зі статусом',
+    ru: 'Всем со статусом',
+    en: 'Everyone with the status'
   },
   ministries: {
     ua: 'Усім учасникам служіння',
@@ -150,9 +175,9 @@ export const messages = {
     en: 'No messages in the last day'
   },
   noRecipients: {
-    ua: 'Немає кому писати: адміністратор має дати людям ролі або служіння',
-    ru: 'Некому писать: администратор должен дать людям роли или служения',
-    en: 'Nobody to write to: an administrator gives people roles or ministries'
+    ua: 'Немає кому писати: адміністратор має дати людям статуси або служіння',
+    ru: 'Некому писать: администратор должен дать людям статусы или служения',
+    en: 'Nobody to write to: an administrator gives people statuses or ministries'
   },
   failed: {
     ua: 'Не вдалося: {name}',

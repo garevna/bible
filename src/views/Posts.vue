@@ -1,5 +1,5 @@
 <template>
-  <div class="page mx-auto" style="max-width: 860px">
+  <div v-touch="swipe" class="page mx-auto" style="max-width: 860px">
     <v-alert
       v-if="error"
       type="error"
@@ -312,6 +312,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, shallowRef } from 'vue'
 import { storeToRefs } from 'pinia'
+import { Touch as vTouch } from 'vuetify/directives'
 
 import AppDialog from '@/components/AppDialog.vue'
 import ConfirmButton from '@/components/ConfirmButton.vue'
@@ -321,6 +322,7 @@ import MaterialPicker from '@/components/calendar/MaterialPicker.vue'
 import PostCard from '@/components/posts/PostCard.vue'
 import { useLanguageStore } from '@/stores/language'
 import { usePostsStore, type PostTask, type Submission } from '@/stores/posts'
+import { useSwipeTabs } from '@/composables/useSwipeTabs'
 import { useUserStore } from '@/stores/user'
 import { useWorkerStore, WorkerError } from '@/stores/worker'
 import { fullDateFormat, localeOf, toISODateString } from '@/utils/dates'
@@ -337,6 +339,13 @@ const worker = useWorkerStore()
 const { posts: text, publish: publishText } = storeToRefs(useLanguageStore())
 
 const tab = ref<'mine' | 'approve' | 'queue' | 'tasks'>('mine')
+/** a swipe on a phone: the next tab or the one before (of the tabs the user has) */
+const swipe = useSwipeTabs(tab, () => [
+  'mine',
+  ...(posts.canApprove ? (['approve'] as const) : []),
+  ...(posts.canPublish ? (['queue'] as const) : []),
+  'tasks'
+])
 const busy = ref(false)
 const error = ref('')
 

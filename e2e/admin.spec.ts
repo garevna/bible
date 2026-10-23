@@ -487,9 +487,13 @@ test('the lists of ministries and locations', async ({ page }) => {
   await expect(details.locator('.event')).toContainText('Ранкова молитва')
   await expect(details.locator('.event')).toContainText('Онлайн')
   await expect(details.locator('.day')).toContainText('1 / 2')
-  // the leader and the deputy: two fields of people
-  await details.locator('.people-field', { hasText: 'Лідери служіння' }).click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Лідер' }).click()
+  // the leader and the deputy: two lists of people, chosen on the left and moved by the arrow
+  const leaders = details.locator('.transfer', { hasText: 'Лідери служіння' })
+  const addLeader = leaders.getByRole('button', { name: 'Додати вибране' })
+  await expect(addLeader).toBeDisabled()
+  await leaders.locator('.v-list-item', { hasText: 'Лідер' }).first().click()
+  await expect(leaders.getByRole('button', { name: 'Прибрати вибране' })).toBeDisabled()
+  await addLeader.click()
   await expect
     .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
     .toMatchObject({
@@ -499,9 +503,9 @@ test('the lists of ministries and locations', async ({ page }) => {
         ]
       }
     })
-  await page.keyboard.press('Escape')
-  await details.locator('.people-field', { hasText: 'Заступники лідера' }).click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'pastor@example.com' }).click()
+  const deputies = details.locator('.transfer', { hasText: 'Заступники лідера' })
+  await deputies.locator('.v-list-item', { hasText: 'pastor@example.com' }).click()
+  await deputies.getByRole('button', { name: 'Додати вибране' }).click()
   await expect
     .poll(() => requests.filter((request) => request.path === '/admin/ministry-roles').at(-1)?.body)
     .toMatchObject({
@@ -512,7 +516,6 @@ test('the lists of ministries and locations', async ({ page }) => {
         ]
       }
     })
-  await page.keyboard.press('Escape')
   // another role: added by the icon of its field; the leader and the deputy stay as they are
   await details.getByRole('textbox', { name: 'Нова роль' }).fill('Музикант')
   await details.locator('.new-role .mdi-plus-thick').click()

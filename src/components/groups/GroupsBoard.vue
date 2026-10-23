@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div v-touch="swipe">
     <v-alert
       v-if="error"
       type="error"
@@ -60,6 +60,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
+import { Touch as vTouch } from 'vuetify/directives'
 
 import GroupDialog from '@/components/groups/GroupDialog.vue'
 import GroupRow from '@/components/groups/GroupRow.vue'
@@ -70,6 +71,7 @@ import NewGroupDialog from '@/components/groups/NewGroupDialog.vue'
 import { useGroupsStore, type GroupsVisibility, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore } from '@/stores/schedule'
+import { useSwipeTabs } from '@/composables/useSwipeTabs'
 import { WorkerError } from '@/stores/worker'
 
 /**
@@ -81,6 +83,12 @@ const schedule = useScheduleStore()
 const { groups: text, publish } = storeToRefs(useLanguageStore())
 
 const tab = ref<'week' | 'map' | 'search' | 'list'>('week')
+/** a swipe on a phone changes the tab; on the map it moves the map */
+const swipe = useSwipeTabs(
+  tab,
+  () => ['week', 'map', 'search', 'list'],
+  () => tab.value === 'map'
+)
 const busy = ref(false)
 const error = ref('')
 

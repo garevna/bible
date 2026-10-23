@@ -46,18 +46,11 @@
         </v-chip>
       </v-chip-group>
 
-      <v-autocomplete
+      <TransferList
         :model-value="role.uids"
-        :items="people"
-        item-title="name"
-        item-value="uid"
-        :label="text.ministryRolePeople"
+        :items="people.map((person) => ({ value: person.uid, title: person.name }))"
+        :right-label="text.ministryRolePeople"
         :disabled="disabled || fixed(role)"
-        multiple
-        chips
-        closable-chips
-        density="compact"
-        hide-details
         @update:model-value="
           (uids: string[]) => save(roles.map((item) => (item.id === role.id ? { ...item, uids } : item)))
         "
@@ -83,6 +76,7 @@ import { computed, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import ConfirmButton from '@/components/ConfirmButton.vue'
+import TransferList from '@/components/TransferList.vue'
 import { useLanguageStore } from '@/stores/language'
 import type { MinistryRole } from '@/stores/worker'
 
