@@ -74,6 +74,8 @@ export interface DayChange {
   needed: number | null
   cancelled: boolean
   note: string
+  /** the roles of this day (a feast, guests), instead of the ones of the event; null: the ones of the event */
+  slots: Slot[] | null
 }
 
 /** An event of the schedule of ministries (see worker/src/schedule.ts); days and times are the church's */
@@ -177,6 +179,10 @@ export interface Occurrence {
   needed: number
   cancelled: boolean
   note: string
+  /** the roles of the day: of its change, or of the event */
+  slots: Slot[]
+  /** the day has roles of its own */
+  ownSlots: boolean
   team: Participant[]
   materials: MaterialItem[]
   issues: Issue[]
@@ -207,15 +213,16 @@ export function issuesOf(
   event: ScheduleEvent,
   team: Participant[],
   materials: MaterialItem[],
-  needed = event.needed
+  needed = event.needed,
+  slots = event.slots
 ): Issue[] {
   const confirmed = team.filter(serving)
   const issues: Issue[] = []
   if (confirmed.length < needed) issues.push('people')
-  if (event.slots.some((slot) => confirmed.filter((item) => item.role === slot.name).length < slot.count))
+  if (slots.some((slot) => confirmed.filter((item) => item.role === slot.name).length < slot.count))
     issues.push('roles')
   const missing = confirmed.some((person) => {
-    const slot = event.slots.find((item) => item.name === person.role)
+    const slot = slots.find((item) => item.name === person.role)
     return slot?.materials && !materials.some((item) => item.uid === person.uid && item.role === slot.name)
   })
   if (missing) issues.push('materials')
@@ -354,6 +361,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       const prepared = materials.value.filter((item) => item.eventId === eventId && item.day === day)
       const needed = change?.needed ?? event.needed
       const cancelled = Boolean(change?.cancelled)
+      const slots = change?.slots ?? event.slots
       return [
         {
           event,
@@ -363,10 +371,12 @@ export const useScheduleStore = defineStore('schedule', () => {
           needed,
           cancelled,
           note: change?.note ?? '',
+          slots,
+          ownSlots: Boolean(change?.slots),
           team,
           materials: prepared,
           // a cancelled day asks for nothing
-          issues: cancelled ? [] : issuesOf(event, team, prepared, needed)
+          issues: cancelled ? [] : issuesOf(event, team, prepared, needed, slots)
         }
       ]
     })
@@ -536,7 +546,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const saveDay = (
     eventId: string,
     day: string,
-    change: Pick<DayChange, 'time' | 'location' | 'needed' | 'cancelled' | 'note'>
+    change: Pick<DayChange, 'time' | 'location' | 'needed' | 'cancelled' | 'note' | 'slots'>
   ) => act('PUT', '/schedule/days', { eventId, day, ...change })
 
   /** somebody without the app (a guest) serves, written by name */

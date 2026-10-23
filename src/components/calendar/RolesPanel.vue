@@ -63,7 +63,7 @@ const { calendar: text, publish } = storeToRefs(useLanguageStore())
 const busy = ref(false)
 const error = ref('')
 
-const slots = computed(() => props.occurrence.event.slots)
+const slots = computed(() => props.occurrence.slots)
 const members = computed(() =>
   props.occurrence.team.filter((member) => member.status === 'confirmed' || member.status === 'invited')
 )

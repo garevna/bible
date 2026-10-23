@@ -286,10 +286,10 @@ const issueLabels: Record<Issue, 'issuePeople' | 'issueRoles' | 'issueMaterials'
 
 const sections = computed(() => [
   { value: 'team' as const, icon: 'mdi-account-group-outline', title: text.value.participants },
-  ...(event.value.slots.length
+  ...(props.occurrence.slots.length
     ? [
         { value: 'roles' as const, icon: 'mdi-badge-account-outline', title: text.value.rolesButton },
-        ...(event.value.slots.some((slot) => slot.materials)
+        ...(props.occurrence.slots.some((slot) => slot.materials)
           ? [
               {
                 value: 'materials' as const,

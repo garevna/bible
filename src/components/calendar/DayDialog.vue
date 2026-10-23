@@ -24,6 +24,7 @@
           class="field"
         />
         <v-text-field
+          v-if="!ownSlots"
           v-model.number="needed"
           :label="text.needed"
           :placeholder="String(usual.needed)"
@@ -46,6 +47,19 @@
         clearable
         class="mb-2"
       />
+      <!-- the roles of this day only: a feast, guests -->
+      <v-switch
+        v-model="ownSlots"
+        inset
+        :label="text.dayOwnRoles"
+        color="secondary"
+        density="compact"
+        hide-details
+      />
+      <template v-if="ownSlots">
+        <p class="hint">{{ text.dayOwnRolesHint }}</p>
+        <SlotsEditor v-model="slots" class="mb-2" />
+      </template>
     </template>
     <v-textarea v-model="note" :label="text.dayNote" rows="2" auto-grow density="compact" />
 
@@ -65,8 +79,9 @@ import { storeToRefs } from 'pinia'
 import AppDialog from '@/components/AppDialog.vue'
 import TimeField from '@/components/TimeField.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
+import SlotsEditor from '@/components/calendar/SlotsEditor.vue'
 import { useLanguageStore } from '@/stores/language'
-import { timeOf, useScheduleStore, type Occurrence } from '@/stores/schedule'
+import { timeOf, useScheduleStore, type Occurrence, type Slot } from '@/stores/schedule'
 import { WorkerError } from '@/stores/worker'
 import { format } from '@/utils/format'
 
@@ -85,6 +100,9 @@ const location = ref<string | null>(null)
 const needed = ref<number | null>(null)
 const note = ref('')
 const cancelled = ref(false)
+/** the roles of this day only, instead of the ones of the event */
+const ownSlots = ref(false)
+const slots = ref<Slot[]>([])
 const busy = ref(false)
 const error = ref('')
 
@@ -111,6 +129,9 @@ watch(open, (value) => {
   time.value = item.time !== usual.value.time ? item.time : null
   location.value = item.location !== usual.value.location ? item.location : null
   needed.value = item.needed !== usual.value.needed ? item.needed : null
+  // the roles of the day to begin with: its own, or a copy of the ones of the event
+  ownSlots.value = item.ownSlots
+  slots.value = item.slots.map((slot) => ({ ...slot, kinds: [...(slot.kinds ?? [])] }))
 })
 
 async function run(change: Parameters<typeof schedule.saveDay>[2]) {
@@ -134,13 +155,20 @@ const save = () =>
   run({
     time: cancelled.value ? null : time.value || null,
     location: cancelled.value ? null : location.value?.trim() || null,
-    needed: cancelled.value ? null : Number(needed.value) || null,
+    needed: cancelled.value || ownSlots.value ? null : Number(needed.value) || null,
     cancelled: cancelled.value,
-    note: note.value.trim()
+    note: note.value.trim(),
+    // the roles of the day: as many people as their places (counted by the server)
+    slots:
+      !cancelled.value && ownSlots.value
+        ? slots.value
+            .filter((slot) => slot.name.trim())
+            .map((slot) => ({ ...slot, name: slot.name.trim(), count: Number(slot.count) || 1, hint: '' }))
+        : null
   })
 
 /** as the event again */
-const reset = () => run({ time: null, location: null, needed: null, cancelled: false, note: '' })
+const reset = () => run({ time: null, location: null, needed: null, cancelled: false, note: '', slots: null })
 </script>
 
 <style scoped>

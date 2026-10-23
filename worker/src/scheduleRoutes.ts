@@ -11,6 +11,7 @@ import {
   isOver,
   localDay,
   parseChange,
+  slotsOf,
   parseEvent,
   timeOf,
   type DayChange,
@@ -453,7 +454,7 @@ export async function handleSchedule(
     const parsed = parseChange(body)
     if (!parsed) return json({ error: 'bad-request' }, 400)
     const next: DayChange = { eventId: event.id, day, ...parsed }
-    const empty = !next.time && !next.location && !next.needed && !next.cancelled && !next.note
+    const empty = !next.time && !next.location && !next.needed && !next.cancelled && !next.note && !next.slots
     if (empty) await schedule.deleteChange(event.id, day)
     else await schedule.putChange(next)
     const team = (await schedule.participants(day, day)).filter(
@@ -495,12 +496,14 @@ export async function handleSchedule(
     await schedule.putParticipant(participant)
     return json({ participant })
   }
-  const slotOf = (role: unknown) => event.slots.find((slot) => slot.name === role)
-  /** what a role prepares: its kinds of materials, and a word about them */
-  const toPrepare = (slot: Slot) => {
-    const kinds = slot.kinds.map((id) => materialKinds.find((item) => item.id === id)?.name).filter(Boolean)
-    return [kinds.join(', '), slot.hint].filter(Boolean).join('; ') || 'матеріали'
-  }
+  // the roles of the day: of its change (a feast, guests), or of the event
+  const slotOf = (role: unknown) => slotsOf(event, change).find((slot) => slot.name === role)
+  /** what a role prepares: its kinds of materials */
+  const toPrepare = (slot: Slot) =>
+    slot.kinds
+      .map((id) => materialKinds.find((item) => item.id === id)?.name)
+      .filter(Boolean)
+      .join(', ') || 'матеріали'
 
   /** a role may be given: it is a role of the event and not all its places are taken by others */
   async function roleIsFree(role: string, uid: string) {

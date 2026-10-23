@@ -368,7 +368,36 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
         location: 'Церква',
         needed: null,
         cancelled: false,
-        note: 'Цього разу офлайн'
+        note: 'Цього разу офлайн',
+        slots: null
+      }
+    })
+
+  // a feast: the roles of this day only, the ones of the event to begin with
+  await communionCard.locator('[aria-label="Змінити цей день"]').click()
+  const feast = dialog(page)
+  await expect(feast.getByRole('spinbutton', { name: 'Скільки людей потрібно' })).toBeVisible()
+  await feast.getByLabel('Інші ролі цього дня').check()
+  // the people of the day are the places of the roles
+  await expect(feast.getByRole('spinbutton', { name: 'Скільки людей потрібно' })).toHaveCount(0)
+  await expect(feast.getByLabel('Роль', { exact: true }).first()).toHaveValue('Пастор')
+  await feast.getByRole('button', { name: 'Додати роль' }).click()
+  await feast.getByLabel('Роль', { exact: true }).last().fill('Гість')
+  await feast.getByLabel('Людей').last().fill('3')
+  await feast.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toMatchObject({
+      path: '/schedule/days',
+      body: {
+        eventId: 'communion',
+        day: TODAY,
+        needed: null,
+        slots: [
+          { name: 'Пастор', count: 1, materials: true },
+          { name: 'Учасник', count: 2, materials: false },
+          { name: 'Гість', count: 3, materials: false, kinds: [], hint: '' }
+        ]
       }
     })
 

@@ -1,4 +1,14 @@
 export const calendar = {
+  dayOwnRoles: {
+    ua: 'Інші ролі цього дня',
+    ru: 'Другие роли этого дня',
+    en: 'Other roles this day'
+  },
+  dayOwnRolesHint: {
+    ua: 'Лише для цієї дати (свято, гості): ролі та скільки людей у кожній. Кількість учасників дня — їхня сума.',
+    ru: 'Только для этой даты (праздник, гости): роли и сколько людей в каждой. Число участников дня — их сумма.',
+    en: 'For this date only (a feast, guests): the roles and how many people each. The people of the day are their sum.'
+  },
   title: {
     ua: 'Календар служінь',
     ru: 'Календарь служений',

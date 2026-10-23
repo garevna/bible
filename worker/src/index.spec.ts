@@ -1485,7 +1485,7 @@ describe('the schedule of ministries', () => {
     const toMusician = (await call('GET', '/messages', 'musician')).body.messages as { text: string }[]
     expect(toMusician.map((message) => message.text)).toContainEqual(
       expect.stringContaining(
-        'Підготуйте, будь ласка: Конспект проповіді (тези проповіді), Слово (конспект Слова); Нотатки, вірші з Біблії'
+        'Підготуйте, будь ласка: Конспект проповіді (тези проповіді), Слово (конспект Слова).'
       )
     )
 
@@ -1787,6 +1787,45 @@ describe('the schedule of ministries', () => {
     expect(
       (await call('PUT', '/schedule/days', 'owner', { eventId, day: '2026-10-17' })).body.change
     ).toBeNull()
+  })
+
+  it('a day with roles of its own (a feast): the roles given there, the people counted by them', async () => {
+    const { call } = await church()
+    const eventId = (
+      (
+        await call('POST', '/schedule/events', 'owner', {
+          ...prayer,
+          slots: [{ name: 'Ведучий', count: 1, materials: false, hint: '' }]
+        })
+      ).body.event as { id: string }
+    ).id
+    const day = '2026-10-17'
+    const feast = await call('PUT', '/schedule/days', 'owner', {
+      eventId,
+      day,
+      slots: [
+        { name: 'Ведучий', count: 1, materials: false, kinds: [], hint: '' },
+        { name: 'Гість', count: 4, materials: false, kinds: [], hint: '' }
+      ]
+    })
+    // as many people as the places of the roles
+    expect(feast.body.change).toMatchObject({
+      needed: 5,
+      slots: [{ name: 'Ведучий' }, { name: 'Гість', count: 4 }]
+    })
+    const { body } = await call('GET', '/schedule?from=2026-10-17&to=2026-10-17', 'leader')
+    expect((body.changes as { slots: unknown[] }[])[0]!.slots).toHaveLength(2)
+
+    await call('POST', '/schedule/team', 'owner', { eventId, day, uid: 'musician-uid' })
+    const role = (name: string, at = day) =>
+      call('POST', '/schedule/role', 'owner', { eventId, day: at, uid: 'musician-uid', role: name })
+    // the role of the day only
+    expect((await role('Гість')).status).toBe(200)
+    await call('POST', '/schedule/team', 'owner', { eventId, day: '2026-10-16', uid: 'musician-uid' })
+    expect((await role('Гість', '2026-10-16')).status).toBe(400)
+
+    // no roles of its own: as the event again
+    expect((await call('PUT', '/schedule/days', 'owner', { eventId, day, slots: [] })).body.change).toBeNull()
   })
 
   it('a guest is written by name; who applies is the choice of the event', async () => {

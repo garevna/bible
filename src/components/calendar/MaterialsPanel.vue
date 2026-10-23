@@ -152,7 +152,7 @@ const role = ref('')
 /** the notes and verses of the materials, loaded when the panel opens */
 const full = ref<Record<string, Attachment>>({})
 
-const slots = computed(() => props.occurrence.event.slots.filter((slot) => slot.materials))
+const slots = computed(() => props.occurrence.slots.filter((slot) => slot.materials))
 
 /** the kind chosen for the next material of a role */
 const chosenKind = ref<Record<string, string | null>>({})

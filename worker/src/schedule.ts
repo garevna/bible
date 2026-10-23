@@ -53,7 +53,13 @@ export interface DayChange {
   cancelled: boolean
   /** a word for the people, e.g. "Цього разу — у малому залі" */
   note: string
+  /** the roles of this day (a feast, guests), instead of the ones of the event; null: the ones of the event */
+  slots: Slot[] | null
 }
+
+/** The roles of a day of an event: of the change of the day, or of the event */
+export const slotsOf = (event: Pick<ScheduleEvent, 'slots'>, change?: Pick<DayChange, 'slots'> | null) =>
+  change?.slots ?? event.slots
 
 export type Status = 'invited' | 'applied' | 'confirmed' | 'declined'
 
@@ -260,12 +266,16 @@ export function parseChange(body: unknown): Omit<DayChange, 'eventId' | 'day'> |
   if (needed !== null && (!Number.isInteger(needed) || needed < 1 || needed > 100)) return null
   if (note === null || (change.location !== null && change.location !== undefined && location === null))
     return null
+  // the roles of the day: as many people as their places
+  const slots = Array.isArray(change.slots) && change.slots.length ? parseSlots(change.slots) : null
+  if (Array.isArray(change.slots) && change.slots.length && !slots) return null
   return {
     time: time as string | null,
     location: location || null,
-    needed,
+    needed: slots ? slots.reduce((sum, slot) => sum + slot.count, 0) : needed,
     cancelled: change.cancelled === true,
-    note
+    note,
+    slots
   }
 }
 
@@ -417,6 +427,7 @@ interface ChangeRow {
   needed: number | null
   cancelled: number
   note: string
+  slots: string | null
 }
 
 const changeOf = (row: ChangeRow): DayChange => ({
@@ -426,7 +437,8 @@ const changeOf = (row: ChangeRow): DayChange => ({
   location: row.location,
   needed: row.needed,
   cancelled: Boolean(row.cancelled),
-  note: row.note
+  note: row.note,
+  slots: row.slots ? withKinds(JSON.parse(row.slots) as Slot[]) : null
 })
 
 const MATERIAL_ITEM = 'id, event_id, day, role, uid, name, kind, resource, url, title, created_at'
@@ -589,9 +601,18 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async putChange(c) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO day_changes (event_id, day, time, location, needed, cancelled, note) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO day_changes (event_id, day, time, location, needed, cancelled, note, slots) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
         )
-        .bind(c.eventId, c.day, c.time, c.location, c.needed, c.cancelled ? 1 : 0, c.note)
+        .bind(
+          c.eventId,
+          c.day,
+          c.time,
+          c.location,
+          c.needed,
+          c.cancelled ? 1 : 0,
+          c.note,
+          c.slots ? JSON.stringify(c.slots) : null
+        )
         .run()
     },
     async deleteChange(eventId, day) {
