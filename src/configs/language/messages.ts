@@ -1,4 +1,19 @@
 export const messages = {
+  acceptInvitation: {
+    ua: 'Підтвердити згоду на участь',
+    ru: 'Подтвердить согласие на участие',
+    en: 'Agree to serve'
+  },
+  acceptBackup: {
+    ua: 'Підтвердити згоду бути дублером',
+    ru: 'Подтвердить согласие быть дублёром',
+    en: 'Agree to be the backup'
+  },
+  declineInvitation: {
+    ua: 'Відхилити запрошення',
+    ru: 'Отклонить приглашение',
+    en: 'Decline the invitation'
+  },
   toPeople: {
     ua: 'Людям',
     ru: 'Людям',

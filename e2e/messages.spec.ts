@@ -255,7 +255,20 @@ test('an invitation is answered right in the message, a day at a time', async ({
     expiresAt: now + 86_400_000,
     readAt: now
   }
-  await fakeWorker(page, 'member', [invitation])
+  // a handover (no day of the calendar) and a request to be a backup, in the same mailbox
+  const handover = {
+    ...invitation,
+    id: 'handover',
+    text: 'Передача служіння',
+    asks: [{ eventId: 'Молитовне служіння', day: '', uid: 'e2e-uid', as: 'handover' }]
+  }
+  const backup = {
+    ...invitation,
+    id: 'backup',
+    text: 'Вас просять бути дублером (Співачка): Вечірня молитва',
+    asks: [{ eventId: 'evening', day: '2026-11-04', uid: 'singer-uid', as: 'backup' }]
+  }
+  await fakeWorker(page, 'member', [invitation, handover, backup])
   // the calendar: who answered what (the answers change it)
   const status: Record<string, string> = { '2026-11-02': 'invited', '2026-11-03': 'invited' }
   const answers: unknown[] = []
@@ -272,18 +285,32 @@ test('an invitation is answered right in the message, a day at a time', async ({
         events: [],
         days: [],
         today: '2026-11-01',
-        participants: Object.entries(status).map(([day, value]) => ({
-          eventId: 'prayer',
-          day,
-          uid: 'e2e-uid',
-          name: 'E2E',
-          status: value,
-          backupUid: null,
-          backupName: null,
-          backupStatus: null,
-          reason: null,
-          role: null
-        }))
+        participants: [
+          {
+            eventId: 'evening',
+            day: '2026-11-04',
+            uid: 'singer-uid',
+            name: 'Співачка',
+            status: 'invited',
+            backupUid: 'e2e-uid',
+            backupName: 'E2E',
+            backupStatus: 'invited',
+            reason: null,
+            role: null
+          },
+          ...Object.entries(status).map(([day, value]) => ({
+            eventId: 'prayer',
+            day,
+            uid: 'e2e-uid',
+            name: 'E2E',
+            status: value,
+            backupUid: null,
+            backupName: null,
+            backupStatus: null,
+            reason: null,
+            role: null
+          }))
+        ]
       }
     })
   })
@@ -295,9 +322,16 @@ test('an invitation is answered right in the message, a day at a time', async ({
   const days = card.locator('.ask')
   await expect(days).toHaveCount(2)
 
-  await days.first().getByRole('button', { name: 'Підтвердити' }).click()
+  // answered by the buttons, not by a message
+  await expect(card.getByRole('button', { name: 'Відповісти' })).toHaveCount(0)
+  // the request to be a backup waits for its answer too (a handover beside it changes nothing)
+  const asBackup = page.locator('.message', { hasText: 'Вас просять бути дублером' })
+  await expect(asBackup.getByRole('button', { name: 'Підтвердити згоду бути дублером' })).toBeVisible()
+  await expect(asBackup.getByRole('button', { name: 'Відхилити запрошення' })).toBeVisible()
+
+  await days.first().getByRole('button', { name: 'Підтвердити згоду на участь' }).click()
   await expect(days.first()).toContainText('✅ Ви підтвердили')
-  await days.last().getByRole('button', { name: 'Не можу' }).click()
+  await days.last().getByRole('button', { name: 'Відхилити запрошення' }).click()
   await dialog(page).getByRole('button', { name: 'Не можу' }).click()
   await expect(days.last()).toContainText('❌ Ви не можете')
   // every day answered: the message is answered
@@ -372,7 +406,7 @@ test('a task is answered by a reply with a picture: it goes for the approval', a
   await withStores(page, (stores) => stores.app.setPage('messages'))
   const card = page.locator('.message', { hasText: 'Заставка до анонсу' })
   // a task is not an invitation: no buttons of the days
-  await expect(card.getByRole('button', { name: 'Підтвердити' })).toHaveCount(0)
+  await expect(card.getByRole('button', { name: 'Підтвердити згоду на участь' })).toHaveCount(0)
   await card.getByRole('button', { name: 'Відповісти' }).click()
   const reply = dialog(page)
   await expect(reply).toContainText('Картинку буде зараховано як виконання доручення')

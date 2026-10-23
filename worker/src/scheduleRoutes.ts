@@ -265,7 +265,9 @@ export async function handleSchedule(
   if (route === 'GET /schedule') {
     const from = url.searchParams.get('from') ?? today
     const to = url.searchParams.get('to') ?? addDays(from, 30)
-    if (to < from || to > addDays(from, MAX_DAYS)) return json({ error: 'bad-request' }, 400)
+    const valid = /^\d{4}-\d{2}-\d{2}$/
+    if (!valid.test(from) || !valid.test(to) || to < from || to > addDays(from, MAX_DAYS))
+      return json({ error: 'bad-request' }, 400)
     // a reader: the open events for everyone only
     const events = (await schedule.events(from, to)).filter(
       (event) => !context.reader || (event.mode === 'open' && event.applicants === 'everyone')

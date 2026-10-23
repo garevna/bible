@@ -80,10 +80,10 @@
                   class="text-none"
                   @click="answer(ask, 'confirm')"
                 >
-                  {{ ask.as === 'backup' ? calendar.confirmBackup : calendar.confirm }}
+                  {{ ask.as === 'backup' ? text.acceptBackup : text.acceptInvitation }}
                 </v-btn>
                 <v-btn size="small" variant="tonal" color="delete" class="text-none" @click="decline(ask)">
-                  {{ calendar.cannot }}
+                  {{ text.declineInvitation }}
                 </v-btn>
               </template>
               <v-chip v-else size="small" variant="tonal" :color="stateColor(stateOf(ask))">
@@ -94,7 +94,8 @@
           <AttachmentView v-if="message.attachment" :attachment="message.attachment" class="mb-2" />
 
           <div v-if="incoming(message)" class="d-flex flex-wrap ga-2">
-            <SendMessage :reply-to="message" />
+            <!-- an invitation is answered by its buttons, not by a message -->
+            <SendMessage v-if="!invitationsOf(message).length" :reply-to="message" />
             <v-btn
               v-if="message.attachment"
               variant="text"
@@ -151,7 +152,7 @@ import AttachmentView from '@/components/messages/AttachmentView.vue'
 import SendMessage from '@/components/messages/SendMessage.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useUserStore } from '@/stores/user'
-import type { Participant } from '@/stores/schedule'
+import { daysBetween, type Participant } from '@/stores/schedule'
 import { useWorkerStore, WorkerError, type Ask, type Message } from '@/stores/worker'
 import { formatDateTime, formatDay, localeOf } from '@/utils/dates'
 import { format } from '@/utils/format'
@@ -173,7 +174,9 @@ const incoming = (message: Message) => message.toUid === user.uid
 /** the people of the days the invitations ask about, as the calendar has them */
 const team = shallowRef<Participant[]>([])
 /** the invitations of a message (its days of the calendar); a task is answered by a reply instead */
-const invitationsOf = (message: Message) => (message.asks ?? []).filter((ask) => ask.as !== 'task')
+/** the invitations of a message (to serve, or to be a backup) on days of the calendar; tasks and handovers are not */
+const invitationsOf = (message: Message) =>
+  (message.asks ?? []).filter((ask) => (ask.as === 'main' || ask.as === 'backup') && Boolean(ask.day))
 const askKey = (ask: Ask) => `${ask.eventId}|${ask.day}|${ask.uid}|${ask.as}`
 
 type AskState = 'waiting' | 'confirmed' | 'declined' | 'gone'
@@ -210,13 +213,20 @@ async function loadTeam() {
     .flatMap((message) => (incoming(message) ? invitationsOf(message) : []))
     .map((ask) => ask.day)
   if (!days.length) return
-  const from = days.reduce((a, b) => (a < b ? a : b))
-  const to = days.reduce((a, b) => (a > b ? a : b))
-  const answer = await worker.request<{ participants: Participant[] }>(
-    'GET',
-    `/schedule?from=${from}&to=${to}`
+  // the days asked about, by stretches of 60 days at most (the calendar gives no more at once)
+  const sorted = [...new Set(days)].sort()
+  const stretches: [string, string][] = []
+  for (const day of sorted) {
+    const last = stretches.at(-1)
+    if (last && daysBetween(last[0], day) <= 60) last[1] = day
+    else stretches.push([day, day])
+  }
+  const answers = await Promise.all(
+    stretches.map(([from, to]) =>
+      worker.request<{ participants: Participant[] }>('GET', `/schedule?from=${from}&to=${to}`)
+    )
   )
-  team.value = answer.participants
+  team.value = answers.flatMap((answer) => answer.participants)
 }
 
 async function answer(ask: Ask, reply: 'confirm' | 'decline', why?: string) {
