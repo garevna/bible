@@ -54,7 +54,14 @@
         class="field"
         @update:model-value="(value: string | null) => (day = value ?? '')"
       />
-      <TimeField v-model="draft.time" :label="text.time" density="compact" class="field" />
+      <TimeField
+        v-model="draft.time"
+        :label="hourly ? text.hourlyFrom : text.time"
+        density="compact"
+        class="field"
+      />
+      <!-- a marathon: to this time -->
+      <TimeField v-if="hourly" v-model="hourlyTo" :label="text.hourlyTo" density="compact" class="field" />
       <DateField
         v-if="kind === 'repeated'"
         v-model="until"
@@ -64,6 +71,32 @@
         class="field"
       />
     </div>
+    <!-- a marathon (e.g. of prayer): every hour a role of its own, with its people -->
+    <template v-if="canHourly">
+      <v-switch
+        :model-value="hourly"
+        inset
+        :label="text.hourly"
+        color="secondary"
+        density="compact"
+        hide-details
+        @update:model-value="setHourly"
+      />
+      <div v-if="hourly" class="d-flex flex-wrap align-center ga-2 mb-2">
+        <v-text-field
+          v-model.number="perHour"
+          :label="text.perHour"
+          type="number"
+          min="1"
+          max="50"
+          density="compact"
+          hide-details
+          class="field"
+        />
+        <p class="hint flex-grow-1 mb-0">{{ text.hourlyHint }}</p>
+      </div>
+    </template>
+
     <div v-if="kind === 'repeated'" class="mb-4">
       <p class="label">{{ text.weekdays }}</p>
       <v-chip-group v-model="weekdays" multiple column selected-class="text-secondary">
@@ -73,6 +106,7 @@
       </v-chip-group>
       <!-- e.g. the morning prayer: 06:45 on weekdays, 08:00 on Saturday -->
       <v-switch
+        v-if="!hourly"
         v-model="perDay"
         inset
         :label="text.timePerDay"
@@ -81,7 +115,7 @@
         hide-details
         class="mt-1"
       />
-      <div v-if="perDay" class="d-flex flex-wrap ga-2 mt-1">
+      <div v-if="perDay && !hourly" class="d-flex flex-wrap ga-2 mt-1">
         <TimeField
           v-for="item of weekdayItems.filter((weekday) => weekdays.includes(weekday.value))"
           :key="item.value"
@@ -118,6 +152,15 @@
         <v-chip v-for="slot of type.slots" :key="slot.name" size="small" variant="tonal" color="secondary">
           {{ slot.count > 1 ? `${slot.name} ×${slot.count}` : slot.name }}
           <v-icon v-if="slot.materials" icon="mdi-file-document-edit-outline" size="small" class="ml-1" />
+        </v-chip>
+      </div>
+    </template>
+    <!-- the hours of a marathon: made of the times -->
+    <template v-else-if="hourly">
+      <p class="label">{{ text.eventSlots }}</p>
+      <div class="d-flex flex-wrap ga-1 mb-4">
+        <v-chip v-for="slot of draft.slots" :key="slot.name" size="small" variant="tonal" color="secondary">
+          {{ slot.count > 1 ? `${slot.name} ×${slot.count}` : slot.name }}
         </v-chip>
       </div>
     </template>
@@ -197,6 +240,7 @@ import { useScheduleStore, type EventDraft, type ScheduleEvent } from '@/stores/
 import { useUserStore } from '@/stores/user'
 import { WorkerError } from '@/stores/worker'
 import { format } from '@/utils/format'
+import { hourlyOf, hourlySlots } from '@/utils/hourly'
 
 /** A new event, or a change of one (event); a new one is passed on for its invitations */
 const open = defineModel<boolean>({ default: false })
@@ -239,6 +283,11 @@ const error = ref('')
 const perDay = ref(false)
 const times = ref<Record<string, string>>({})
 
+/** a marathon: every hour from the time of the event to this one, so many people an hour */
+const hourly = ref(false)
+const hourlyTo = ref('')
+const perHour = ref(1)
+
 /** the ministries the user plans (a leader plans their own); a changed event keeps its own */
 const ministryItems = computed(() => {
   const own = schedule.ministries.filter((ministry) => schedule.plans(ministry))
@@ -257,6 +306,19 @@ const typeItems = computed(() => [
   ...schedule.types.map((item) => ({ title: item.name, value: item.id }))
 ])
 const type = computed(() => schedule.typeOf(draft.value))
+/** a type of its own roles or of none has no hours */
+const canHourly = computed(() => type.value?.roles !== 'fixed' && type.value?.roles !== 'none')
+
+// the hours of a marathon are its roles, made of its times
+watch([() => draft.value.time, hourlyTo, perHour], () => {
+  if (hourly.value) draft.value.slots = hourlySlots(draft.value.time, hourlyTo.value, perHour.value)
+})
+/** the switch of the marathon: the hours, or the roles of the type again */
+function setHourly(on: boolean | null) {
+  hourly.value = Boolean(on)
+  if (hourly.value) draft.value.slots = hourlySlots(draft.value.time, hourlyTo.value, perHour.value)
+  else chooseType()
+}
 
 /** a type gives its ministry, and a type whose roles are given to each event suggests its own */
 function chooseType() {
@@ -290,6 +352,10 @@ watch(open, (value) => {
   weekdays.value = event?.weekdays ? [...event.weekdays] : []
   perDay.value = Boolean(event?.times)
   times.value = { ...event?.times }
+  const hours = event ? hourlyOf(event.slots) : null
+  hourly.value = Boolean(hours)
+  hourlyTo.value = hours?.to ?? ''
+  perHour.value = hours?.perHour ?? 1
   schedule.loadChoices().catch(() => undefined)
 })
 
@@ -297,6 +363,7 @@ const ready = computed(
   () =>
     Boolean(draft.value.ministry && draft.value.time && draft.value.responsibleUid) &&
     (kind.value === 'single' ? Boolean(day.value) : weekdays.value.length > 0) &&
+    (!hourly.value || draft.value.slots.length > 0) &&
     draft.value.slots.every((slot) => slot.name.trim() && Number(slot.count) >= 1)
 )
 
@@ -327,7 +394,7 @@ const save = () =>
         weekdays: kind.value === 'repeated' ? weekdays.value : null,
         // the times of the weekdays: an empty one is the time of the event
         times:
-          kind.value === 'repeated' && perDay.value
+          kind.value === 'repeated' && perDay.value && !hourly.value
             ? Object.fromEntries(weekdays.value.map((day) => [day, times.value[day] || draft.value.time]))
             : null,
         until: kind.value === 'repeated' ? until.value || null : null,
@@ -356,6 +423,11 @@ const remove = () => run(() => schedule.deleteEvent(props.event!.id))
 
 .day-time {
   flex: 0 1 140px;
+}
+
+.hint {
+  color: var(--app-text-muted);
+  font-size: 13px;
 }
 
 .label {

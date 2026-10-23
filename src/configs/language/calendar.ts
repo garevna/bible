@@ -1,4 +1,29 @@
 export const calendar = {
+  hourly: {
+    ua: 'Щогодини (марафон)',
+    ru: 'Каждый час (марафон)',
+    en: 'Every hour (a marathon)'
+  },
+  hourlyFrom: {
+    ua: 'З',
+    ru: 'С',
+    en: 'From'
+  },
+  hourlyTo: {
+    ua: 'До',
+    ru: 'До',
+    en: 'To'
+  },
+  perHour: {
+    ua: 'Людей щогодини',
+    ru: 'Людей каждый час',
+    en: 'People an hour'
+  },
+  hourlyHint: {
+    ua: 'Кожна година — окрема роль: на неї запрошують і затверджують своїх людей.',
+    ru: 'Каждый час — отдельная роль: на неё приглашают и утверждают своих людей.',
+    en: 'Every hour is a role of its own, with its own people.'
+  },
   dayOwnRoles: {
     ua: 'Інші ролі цього дня',
     ru: 'Другие роли этого дня',

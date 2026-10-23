@@ -120,7 +120,7 @@ const name = (value: unknown, max: number) =>
 
 /** Up to twenty roles with distinct names, or null */
 export function parseSlots(value: unknown): Slot[] | null {
-  if (!Array.isArray(value) || value.length > 20) return null
+  if (!Array.isArray(value) || value.length > 30) return null
   const slots: Slot[] = []
   for (const item of value as Record<string, unknown>[]) {
     const slotName = name(item?.name, 60)

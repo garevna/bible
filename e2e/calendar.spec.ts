@@ -424,3 +424,35 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
     })
   await expect(page.getByText('Запрошень надіслано: 1')).toBeVisible()
 })
+
+test('a marathon of prayer: every hour a role of its own, with its people', async ({ page }) => {
+  const posted = await fakeWorker(page, true)
+  await signIn(page)
+  await page.getByRole('button', { name: 'Календар служінь' }).click()
+  await page.getByRole('button', { name: 'Додати подію' }).click()
+  const form = dialog(page)
+  await form.locator('.v-select', { hasText: 'Служіння' }).first().click()
+  await page.locator('.v-overlay--active .v-list-item').first().click()
+  await form.getByLabel('Час', { exact: true }).fill('20:00')
+  await form.getByLabel('Щогодини (марафон)').check()
+  await form.getByLabel('До', { exact: true }).fill('23:00')
+  await form.getByLabel('Людей щогодини').fill('2')
+  // the hours, made of the times
+  await expect(form.locator('.v-chip', { hasText: '–' })).toHaveText([
+    '20:00–21:00 ×2',
+    '21:00–22:00 ×2',
+    '22:00–23:00 ×2'
+  ])
+  await form.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => posted.find((item) => item.path === '/schedule/events')?.body)
+    .toMatchObject({
+      time: '20:00',
+      times: null,
+      slots: [
+        { name: '20:00–21:00', count: 2, materials: false },
+        { name: '21:00–22:00', count: 2, materials: false },
+        { name: '22:00–23:00', count: 2, materials: false }
+      ]
+    })
+})
