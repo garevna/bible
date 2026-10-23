@@ -42,7 +42,9 @@ import type { Addresses, UserRecord, UserView } from './users'
  *   POST   /schedule/answer           { eventId, day, uid, as: 'main' | 'backup', answer: 'confirm' | 'decline', reason? }
  *   GET    /schedule/materials?eventId&day   the materials of one day of an event, with their posts
  *   POST   /schedule/materials        { eventId, day, role, kind, post }   the person of the role, the approvers
+ *   PUT    /schedule/materials/:id    { post }: a note or a topic changed       its author, the approvers
  *   DELETE /schedule/materials/:id    its author, the approvers
+ *   PUT    /schedule/marks            { eventId, day, role, resource, done }: a kind of materials ready   the person of the role, the approvers
  *   PUT    /schedule/days             { eventId, day, time?, location?, needed?, cancelled?, note? }: one day changed
  *                                     (all left empty: as the event)                the managers of the event
  *   POST   /schedule/guest            { eventId, day, name }: somebody without the app (a guest) serves   the approvers
@@ -178,6 +180,29 @@ export async function handleSchedule(
     typeof uid === 'string' ? servants.find((user) => user.uid === uid) : undefined
 
   /**
+   * The materials the user sees: all of an event they approve (the leaders, the administrators);
+   * otherwise only the ones of the roles they take that day (their own, and what the leader sent them)
+   */
+  const seen = async <T extends Pick<Material, 'eventId' | 'day' | 'role'>>(
+    list: T[],
+    events: ScheduleEvent[],
+    from: string,
+    to: string
+  ) => {
+    const team = (await schedule.participants(from, to)).filter(
+      (item) => item.uid === me.uid && item.role && item.status !== 'declined' && item.status !== 'applied'
+    )
+    return list.filter((item) => {
+      const event = events.find((one) => one.id === item.eventId)
+      if (!event) return false
+      return (
+        approves(event) ||
+        team.some((own) => own.eventId === item.eventId && own.day === item.day && own.role === item.role)
+      )
+    })
+  }
+
+  /**
    * A message from the user to some people (the events speak through the messages), and the same in
    * Telegram for the linked ones; an invitation gets buttons there for its answers
    */
@@ -290,7 +315,8 @@ export async function handleSchedule(
       days,
       changes,
       participants: (await schedule.participants(from, to)).filter((item) => ids.has(item.eventId)),
-      materials: context.reader ? [] : await schedule.materials(from, to),
+      materials: context.reader ? [] : await seen(await schedule.materials(from, to), events, from, to),
+      marks: context.reader ? [] : (await schedule.marks(from, to)).filter((item) => ids.has(item.eventId)),
       types: eventTypes,
       materialKinds,
       calendar,
@@ -316,10 +342,29 @@ export async function handleSchedule(
   if (route === 'GET /schedule/materials') {
     const found = await eventDay(url.searchParams.get('eventId'), url.searchParams.get('day'))
     if (found instanceof Response) return found
-    return json({ materials: await schedule.materialsOf(found.event.id, found.day) })
+    const { event, day } = found
+    return json({ materials: await seen(await schedule.materialsOf(event.id, day), [event], day, day) })
   }
 
   const materialId = url.pathname.match(/^\/schedule\/materials\/([^/]+)$/)?.[1]
+  // a note or a topic of a role changed: by its author, the person of the role, or an approver
+  if (materialId && request.method === 'PUT') {
+    const material = await schedule.material(decodeURIComponent(materialId))
+    const event = material ? await schedule.event(material.eventId) : null
+    if (!material || !event) return json({ error: 'not-found' }, 404)
+    // a participant changes only their own; the leaders and the administrators any
+    if (material.uid !== me.uid && !approves(event)) return json({ error: 'forbidden' }, 403)
+    const post = material.kind === 'note' || material.kind === 'topic' ? parsePost(body.post) : null
+    if (!post) return json({ error: 'bad-request' }, 400)
+    const { image: _image, ...withoutImage } = post
+    const changed: Material = {
+      ...material,
+      post: withoutImage,
+      title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : '')
+    }
+    await schedule.putMaterial(changed)
+    return json({ material: changed })
+  }
   if (materialId && request.method === 'DELETE') {
     const material = await schedule.material(decodeURIComponent(materialId))
     const event = material ? await schedule.event(material.eventId) : null
@@ -645,7 +690,9 @@ export async function handleSchedule(
   if (route === 'POST /schedule/materials') {
     const slot = slotOf(body.role)
     const kind =
-      body.kind === 'topic' ? 'topic' : body.kind === 'note' ? 'note' : body.kind === 'video' ? 'video' : null
+      body.kind === 'topic' || body.kind === 'note' || body.kind === 'video' || body.kind === 'image'
+        ? body.kind
+        : null
     // the kind of the material: one of the resources, or none
     const resource =
       body.resource === undefined || body.resource === null
@@ -655,12 +702,18 @@ export async function handleSchedule(
           : undefined
     // a video: a link to YouTube with a few words; the rest: a note or a topic of the app
     const videoTitle = typeof body.title === 'string' ? body.title.trim().slice(0, 120) : ''
+    // a picture: kept in Telegram already (POST /posts/upload), its id here
+    const picture = typeof body.url === 'string' && /^tg:[\w-]{10,300}$/.test(body.url)
     const post =
       kind === 'video'
         ? isYouTube(body.url)
           ? { title: videoTitle, items: [] }
           : null
-        : parsePost(body.post)
+        : kind === 'image'
+          ? picture
+            ? { title: videoTitle, items: [] }
+            : null
+          : parsePost(body.post)
     if (!slot || !kind || !post || resource === undefined) return json({ error: 'bad-request' }, 400)
     const own = await schedule.participant(event.id, day, me.uid)
     const ofTheRole = own && own.role === slot.name && own.status !== 'declined' && own.status !== 'applied'
@@ -676,18 +729,54 @@ export async function handleSchedule(
       name: nameOf(me),
       kind,
       resource,
-      url: kind === 'video' ? (body.url as string) : null,
+      url: kind === 'video' || kind === 'image' ? (body.url as string) : null,
       title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : ''),
       post: withoutImage,
       createdAt: now
     }
     await schedule.putMaterial(material)
+    // a material of a kind: the kind is ready
+    await schedule.putMark({
+      eventId: event.id,
+      day,
+      role: slot.name,
+      resource: resource ?? '',
+      uid: me.uid,
+      name: nameOf(me),
+      updatedAt: now
+    })
     ofTheRole &&
       (await notify(
         [event.responsibleUid, event.deputyUid],
         `${nameOf(me)} підготував(ла) ${resource ? `«${materialKinds.find((item) => item.id === resource)!.name}»` : 'матеріали'} («${slot.name}»): ${label}`
       ))
     return json({ material })
+  }
+
+  // a kind of the materials of a role marked ready, or not: by the person of the role or an approver
+  if (route === 'PUT /schedule/marks') {
+    const slot = slotOf(body.role)
+    const resource = typeof body.resource === 'string' ? body.resource : ''
+    if (!slot || !slot.materials || (resource && !slot.kinds.includes(resource)))
+      return json({ error: 'bad-request' }, 400)
+    const own = await schedule.participant(event.id, day, me.uid)
+    const ofTheRole = own?.role === slot.name && own.status !== 'declined' && own.status !== 'applied'
+    if (!ofTheRole && !approves(event)) return json({ error: 'forbidden' }, 403)
+    if (body.done === true) {
+      const mark = {
+        eventId: event.id,
+        day,
+        role: slot.name,
+        resource,
+        uid: me.uid,
+        name: nameOf(me),
+        updatedAt: now
+      }
+      await schedule.putMark(mark)
+      return json({ mark })
+    }
+    await schedule.deleteMark(event.id, day, slot.name, resource)
+    return json({ mark: null })
   }
 
   if (route === 'POST /schedule/answer') {

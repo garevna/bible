@@ -49,7 +49,7 @@ const communion = {
   ministry: 'Пасторське',
   roles: 'fixed',
   slots: [
-    { name: 'Пастор', count: 1, materials: true, kinds: ['k-sermon'], hint: 'Нотатки, вірші' },
+    { name: 'Пастор', count: 1, materials: true, kinds: ['k-sermon', 'k-plan'], hint: 'Нотатки, вірші' },
     { name: 'Учасник', count: 2, materials: false, hint: '' }
   ]
 }
@@ -57,6 +57,8 @@ const communion = {
 /** The worker (see playwright.config.ts): a minister of the prayer ministry, or a planner of the schedule */
 async function fakeWorker(page: Page, planner = false) {
   const posted: { path: string; body: unknown }[] = []
+  // the materials sent: the calendar has them (without their posts), the window of a kind with them
+  const materials: Record<string, unknown>[] = []
   await page.route('**/worker-test/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
@@ -103,7 +105,7 @@ async function fakeWorker(page: Page, planner = false) {
     }
     if (path === '/youtube') return route.fulfill({ json: { title: 'Слово на неділю', author: 'ХХЦ' } })
     if (path === '/schedule/materials' && request.method() === 'GET') {
-      return route.fulfill({ json: { materials: [] } })
+      return route.fulfill({ json: { materials } })
     }
     if (path === '/schedule') {
       return route.fulfill({
@@ -140,7 +142,7 @@ async function fakeWorker(page: Page, planner = false) {
             participant('communion', { uid: 'pastor-uid', name: 'Пастор Іван', status: 'confirmed' }),
             participant('communion', { uid: 'singer-uid', name: 'Співачка', status: 'applied' })
           ],
-          materials: [],
+          materials: materials.map(({ post: _post, ...item }) => item),
           addresses: { Церква: { address: 'Харків, вул. Сумська, 1', lat: 49.99, lng: 36.23 } },
           types: [communion],
           materialKinds: [
@@ -153,6 +155,23 @@ async function fakeWorker(page: Page, planner = false) {
       })
     }
     posted.push({ path, body: request.postDataJSON() })
+    if (path === '/schedule/materials' && request.method() === 'POST') {
+      const body = request.postDataJSON()
+      const title = body.post?.title || body.post?.items?.[0]?.text?.slice(0, 80) || body.title || ''
+      materials.push({
+        id: `m${materials.length + 1}`,
+        uid: 'e2e-uid',
+        name: 'E2E',
+        url: null,
+        ...body,
+        title
+      })
+    }
+    if (path.startsWith('/schedule/materials/') && request.method() === 'PUT') {
+      const material = materials.find((item) => path.endsWith(`/${item.id}`))!
+      const body = request.postDataJSON()
+      Object.assign(material, { post: body.post, title: body.post.title || body.post.items[0]?.text || '' })
+    }
     if (path === '/schedule/events') {
       return route.fulfill({
         json: { event: event('new', { day: TODAY, ministry: 'Пасторське', typeId: 'communion' }) }
@@ -288,27 +307,60 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
       body: { eventId: 'communion', day: TODAY, uid: 'pastor-uid', role: 'Пастор' }
     })
 
-  // the materials of the pastor: a note of the planner
+  // the materials of the pastor: the role and its person, then its kinds, each ready or not
   await communionCard.getByRole('button', { name: 'Методичні матеріали' }).click()
-  // what the role prepares: its kinds (the words of before are not shown)
-  await expect(communionCard).toContainText('Пастор: Конспект проповіді')
-  await expect(communionCard).not.toContainText('Нотатки, вірші')
-  await communionCard.getByRole('button', { name: 'Додати нотатку' }).click()
-  await dialog(page).locator('.v-list-item', { hasText: 'Хліб і вино' }).click()
-  await expect.poll(() => posted.at(-1)?.path).toBe('/schedule/materials')
-  expect(posted.at(-1)!.body).toMatchObject({
-    eventId: 'communion',
-    day: TODAY,
-    role: 'Пастор',
-    kind: 'note',
-    resource: 'k-sermon',
-    post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино' }] }
-  })
+  const materials = communionCard.locator('.materials-panel')
+  await expect(materials.locator('.role-head')).toContainText('Пастор:')
+  // no list of the kinds in a line, no buttons and no field of kinds
+  await expect(materials).not.toContainText('Нотатки, вірші')
+  await expect(materials.getByRole('button', { name: 'Додати нотатку' })).toHaveCount(0)
+  await expect(materials.locator('.v-select')).toHaveCount(0)
+  const sermon = materials.locator('.v-list-item', { hasText: 'Конспект проповіді' })
+  const plan = materials.locator('.v-list-item', { hasText: 'План служіння' })
+  await expect(sermon).toContainText('Матеріалів ще немає')
+  await expect(sermon.getByRole('checkbox')).not.toBeChecked()
 
-  // a video of YouTube: its title comes by itself; another kind is chosen for it
-  await communionCard.locator('.kind-select').click()
-  await page.locator('.v-overlay--active .v-list-item', { hasText: 'План служіння' }).click()
-  await communionCard.getByRole('button', { name: 'Відео YouTube' }).click()
+  // a kind opens its window: a new note written right there
+  await sermon.click()
+  const window = dialog(page)
+  await expect(window).toContainText('Конспект проповіді · Пастор')
+  await window.getByLabel('Нова нотатка').fill('Хліб і вино — тіло і кров')
+  await window.getByRole('button', { name: 'Зберегти нотатку' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toMatchObject({
+      path: '/schedule/materials',
+      body: {
+        eventId: 'communion',
+        day: TODAY,
+        role: 'Пастор',
+        kind: 'note',
+        resource: 'k-sermon',
+        post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино — тіло і кров' }] }
+      }
+    })
+  // there now, and changed in place
+  await expect(window.locator('.material')).toContainText('Хліб і вино — тіло і кров')
+  await window.getByRole('button', { name: 'Редагувати' }).click()
+  await window.locator('.material textarea').first().fill('Хліб і вино: Лука 22')
+  await window.getByRole('button', { name: 'Зберегти зміни' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toMatchObject({
+      path: '/schedule/materials/m1',
+      body: { post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино: Лука 22' }] } }
+    })
+  // one of my notes: chosen in its own window
+  await window.getByRole('button', { name: 'Вибрати з моїх нотаток' }).click()
+  await dialog(page).locator('.v-list-item', { hasText: 'Хліб і вино' }).click()
+  await expect.poll(() => posted.length).toBeGreaterThan(0)
+  await expect
+    .poll(() => posted.at(-1)?.body)
+    .toMatchObject({ kind: 'note', resource: 'k-sermon', post: { items: [{ text: 'Хліб і вино' }] } })
+
+  // a video of YouTube: its title comes by itself
+  await window.getByRole('tab', { name: 'Відео YouTube' }).click()
+  await window.getByRole('button', { name: 'Вставити посилання' }).click()
   const video = dialog(page)
   await video.getByRole('textbox', { name: 'Посилання на відео YouTube' }).fill('https://vimeo.com/1234567')
   await expect(video).toContainText('Це не посилання на відео YouTube')
@@ -324,7 +376,19 @@ test('a planner approves, gives roles, adds materials, and invites after creatin
       kind: 'video',
       url: 'https://www.youtube.com/watch?v=SBwe2oTBqB4',
       title: 'Слово на неділю',
-      resource: 'k-plan'
+      resource: 'k-sermon'
+    })
+  await window.getByRole('button', { name: 'Готово' }).click()
+
+  // the kind with materials is ready by itself; another one is ticked by hand
+  await expect(sermon.getByRole('checkbox')).toBeChecked()
+  await expect(sermon).toContainText('і ще 2')
+  await plan.getByRole('checkbox').click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/marks',
+      body: { eventId: 'communion', day: TODAY, role: 'Пастор', resource: 'k-plan', done: true }
     })
 
   // the evening prayer is open: a call for applications in the service channel

@@ -86,8 +86,8 @@ export interface Material {
   role: string
   uid: string
   name: string
-  /** a note or a topic of the app (its post), or a video of YouTube (its url) */
-  kind: 'note' | 'topic' | 'video'
+  /** a note or a topic of the app (its post), a video of YouTube (its url), a picture kept in Telegram ('tg:…') */
+  kind: 'note' | 'topic' | 'video' | 'image'
   /** the kind of the material: an id of the resources of a ministry, or null */
   resource: string | null
   url: string | null
@@ -98,6 +98,17 @@ export interface Material {
 
 /** a material without its post: the list of the calendar */
 export type MaterialItem = Omit<Material, 'post'>
+
+/** A kind of the materials of a role marked ready ('' : the materials of a role of no kinds) */
+export interface MaterialMark {
+  eventId: string
+  day: string
+  role: string
+  resource: string
+  uid: string
+  name: string
+  updatedAt: number
+}
 
 /** the time zone of the church: "today" and the past are counted in it */
 export const TIME_ZONE = 'Europe/Kyiv'
@@ -298,6 +309,10 @@ export interface ScheduleStore {
   material(id: string): Promise<Material | null>
   putMaterial(material: Material): Promise<void>
   deleteMaterial(id: string): Promise<void>
+  /** the kinds of materials marked ready on some days */
+  marks(from: string, to: string): Promise<MaterialMark[]>
+  putMark(mark: MaterialMark): Promise<void>
+  deleteMark(eventId: string, day: string, role: string, resource: string): Promise<void>
   /** a location or a ministry got another name: the events (and the changes of days) keep up */
   rename(field: 'location' | 'ministry', from: string, to: string): Promise<void>
   /** the changes of some days */
@@ -443,6 +458,16 @@ const changeOf = (row: ChangeRow): DayChange => ({
 
 const MATERIAL_ITEM = 'id, event_id, day, role, uid, name, kind, resource, url, title, created_at'
 
+interface MarkRow {
+  event_id: string
+  day: string
+  role: string
+  resource: string
+  uid: string
+  name: string
+  updated_at: number
+}
+
 export function d1Schedule(db: D1Database): ScheduleStore {
   return {
     async events(from, to) {
@@ -492,6 +517,7 @@ export function d1Schedule(db: D1Database): ScheduleStore {
       await db.batch([
         db.prepare('DELETE FROM participants WHERE event_id = ?').bind(id),
         db.prepare('DELETE FROM materials WHERE event_id = ?').bind(id),
+        db.prepare('DELETE FROM material_marks WHERE event_id = ?').bind(id),
         db.prepare('DELETE FROM day_changes WHERE event_id = ?').bind(id),
         db.prepare('DELETE FROM events WHERE id = ?').bind(id)
       ])
@@ -618,11 +644,41 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async deleteChange(eventId, day) {
       await db.prepare('DELETE FROM day_changes WHERE event_id = ? AND day = ?').bind(eventId, day).run()
     },
+    async marks(from, to) {
+      const { results } = await db
+        .prepare('SELECT * FROM material_marks WHERE day BETWEEN ? AND ?')
+        .bind(from, to)
+        .all<MarkRow>()
+      return results.map((row) => ({
+        eventId: row.event_id,
+        day: row.day,
+        role: row.role,
+        resource: row.resource,
+        uid: row.uid,
+        name: row.name,
+        updatedAt: row.updated_at
+      }))
+    },
+    async putMark(m) {
+      await db
+        .prepare(
+          'INSERT OR REPLACE INTO material_marks (event_id, day, role, resource, uid, name, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+        )
+        .bind(m.eventId, m.day, m.role, m.resource, m.uid, m.name, m.updatedAt)
+        .run()
+    },
+    async deleteMark(eventId, day, role, resource) {
+      await db
+        .prepare('DELETE FROM material_marks WHERE event_id = ? AND day = ? AND role = ? AND resource = ?')
+        .bind(eventId, day, role, resource)
+        .run()
+    },
     async deletePast(today) {
       await db.batch([
         db.prepare('DELETE FROM day_changes WHERE day < ?').bind(today),
         db.prepare('DELETE FROM participants WHERE day < ?').bind(today),
         db.prepare('DELETE FROM materials WHERE day < ?').bind(today),
+        db.prepare('DELETE FROM material_marks WHERE day < ?').bind(today),
         db
           .prepare(
             'DELETE FROM events WHERE (day IS NOT NULL AND day < ?1) OR (until IS NOT NULL AND until < ?1)'
@@ -639,6 +695,9 @@ export function memorySchedule(): ScheduleStore {
   let participants: Participant[] = []
   let materials: Material[] = []
   let changes: DayChange[] = []
+  let marks: MaterialMark[] = []
+  const markKey = (m: Pick<MaterialMark, 'eventId' | 'day' | 'role' | 'resource'>) =>
+    `${m.eventId}|${m.day}|${m.role}|${m.resource}`
   const key = (p: Pick<Participant, 'eventId' | 'day' | 'uid'>) => `${p.eventId}|${p.day}|${p.uid}`
   return {
     events: async (from, to) =>
@@ -649,6 +708,7 @@ export function memorySchedule(): ScheduleStore {
       events = events.filter((e) => e.id !== id)
       participants = participants.filter((p) => p.eventId !== id)
       materials = materials.filter((m) => m.eventId !== id)
+      marks = marks.filter((m) => m.eventId !== id)
       changes = changes.filter((c) => c.eventId !== id)
     },
     participants: async (from, to) => participants.filter((p) => p.day >= from && p.day <= to),
@@ -665,6 +725,10 @@ export function memorySchedule(): ScheduleStore {
     putMaterial: async (material) =>
       void (materials = [...materials.filter((m) => m.id !== material.id), material]),
     deleteMaterial: async (id) => void (materials = materials.filter((m) => m.id !== id)),
+    marks: async (from, to) => marks.filter((m) => m.day >= from && m.day <= to),
+    putMark: async (mark) => void (marks = [...marks.filter((m) => markKey(m) !== markKey(mark)), mark]),
+    deleteMark: async (eventId, day, role, resource) =>
+      void (marks = marks.filter((m) => markKey(m) !== markKey({ eventId, day, role, resource }))),
     rename: async (field, from, to) => {
       events = events.map((e) => (e[field] === from ? { ...e, [field]: to } : e))
       if (field === 'location')
@@ -683,6 +747,7 @@ export function memorySchedule(): ScheduleStore {
       changes = changes.filter((c) => c.day >= today)
       participants = participants.filter((p) => p.day >= today)
       materials = materials.filter((m) => m.day >= today)
+      marks = marks.filter((m) => m.day >= today)
       events = events.filter((e) => !(e.day && e.day < today) && !(e.until && e.until < today))
     }
   }

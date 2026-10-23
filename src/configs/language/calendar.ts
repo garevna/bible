@@ -1,4 +1,144 @@
 export const calendar = {
+  materialsGeneric: {
+    ua: 'Матеріали',
+    ru: 'Материалы',
+    en: 'Materials'
+  },
+  noOneYet: {
+    ua: 'ще нікого не призначено',
+    ru: 'ещё никто не назначен',
+    en: 'nobody yet'
+  },
+  readyMark: {
+    ua: 'Готово',
+    ru: 'Готово',
+    en: 'Ready'
+  },
+  readyOf: {
+    ua: 'Готово: {name}',
+    ru: 'Готово: {name}',
+    en: 'Ready: {name}'
+  },
+  materialAdded: {
+    ua: 'Матеріал додано',
+    ru: 'Материал добавлен',
+    en: 'A material is there'
+  },
+  tabNote: {
+    ua: 'Нотатка',
+    ru: 'Заметка',
+    en: 'Note'
+  },
+  tabTopic: {
+    ua: 'Тема',
+    ru: 'Тема',
+    en: 'Topic'
+  },
+  tabVideo: {
+    ua: 'Відео YouTube',
+    ru: 'Видео YouTube',
+    en: 'YouTube video'
+  },
+  tabPicture: {
+    ua: 'Картинка',
+    ru: 'Картинка',
+    en: 'Picture'
+  },
+  newNote: {
+    ua: 'Нова нотатка',
+    ru: 'Новая заметка',
+    en: 'A new note'
+  },
+  saveNote: {
+    ua: 'Зберегти нотатку',
+    ru: 'Сохранить заметку',
+    en: 'Save the note'
+  },
+  pickMyNote: {
+    ua: 'Вибрати з моїх нотаток',
+    ru: 'Выбрать из моих заметок',
+    en: 'Choose of my notes'
+  },
+  topicTitle: {
+    ua: 'Назва теми',
+    ru: 'Название темы',
+    en: 'The title of the topic'
+  },
+  topicText: {
+    ua: 'Текст',
+    ru: 'Текст',
+    en: 'Text'
+  },
+  saveTopic: {
+    ua: 'Зберегти тему',
+    ru: 'Сохранить тему',
+    en: 'Save the topic'
+  },
+  pickMyTopic: {
+    ua: 'Вибрати з моїх тем',
+    ru: 'Выбрать из моих тем',
+    en: 'Choose of my topics'
+  },
+  videoHint: {
+    ua: 'Вставте посилання на відео YouTube — назва і картинка підставляться самі.',
+    ru: 'Вставьте ссылку на видео YouTube — название и картинка подставятся сами.',
+    en: 'Paste a link to a YouTube video: its title and picture come by themselves.'
+  },
+  pasteVideo: {
+    ua: 'Вставити посилання',
+    ru: 'Вставить ссылку',
+    en: 'Paste a link'
+  },
+  pictureHint: {
+    ua: 'Картинка з телефону чи комп’ютера.',
+    ru: 'Картинка с телефона или компьютера.',
+    en: 'A picture of the phone or the computer.'
+  },
+  choosePicture: {
+    ua: 'Вибрати картинку',
+    ru: 'Выбрать картинку',
+    en: 'Choose a picture'
+  },
+  editMaterial: {
+    ua: 'Редагувати',
+    ru: 'Редактировать',
+    en: 'Edit'
+  },
+  saveChanges: {
+    ua: 'Зберегти зміни',
+    ru: 'Сохранить изменения',
+    en: 'Save the changes'
+  },
+  addMaterialHeading: {
+    ua: 'Додати матеріал',
+    ru: 'Добавить материал',
+    en: 'Add a material'
+  },
+  addMore: {
+    ua: 'Додати ще',
+    ru: 'Добавить ещё',
+    en: 'Add more'
+  },
+  noStorage: {
+    ua: 'Сховище картинок ще не підключено — попросіть адміністратора каналу підключити його.',
+    ru: 'Хранилище картинок ещё не подключено — попросите администратора канала подключить его.',
+    en: 'The pictures are not connected yet: ask the administrator of the channel.'
+  },
+  badPicture: {
+    ua: 'Не вдалося відкрити картинку. Виберіть інший файл (JPG або PNG).',
+    ru: 'Не удалось открыть картинку. Выберите другой файл (JPG или PNG).',
+    en: 'The picture could not be opened. Choose another file (JPG or PNG).'
+  },
+  done: {
+    ua: 'Готово',
+    ru: 'Готово',
+    en: 'Done'
+  },
+  andMore: {
+    ua: 'і ще {count}',
+    ru: 'и ещё {count}',
+    en: 'and {count} more'
+  },
   hourly: {
     ua: 'Щогодини (марафон)',
     ru: 'Каждый час (марафон)',
@@ -419,16 +559,6 @@ export const calendar = {
     ru: 'Сначала утвердите участников',
     en: 'Approve people first'
   },
-  materialsFor: {
-    ua: '{role}: {hint}',
-    ru: '{role}: {hint}',
-    en: '{role}: {hint}'
-  },
-  addNote: {
-    ua: 'Додати нотатку',
-    ru: 'Добавить заметку',
-    en: 'Add a note'
-  },
   addVideo: {
     ua: 'Відео YouTube',
     ru: 'Видео YouTube',
@@ -448,16 +578,6 @@ export const calendar = {
     ua: 'Це не посилання на відео YouTube',
     ru: 'Это не ссылка на видео YouTube',
     en: 'This is not a link of a YouTube video'
-  },
-  materialKind: {
-    ua: 'Вид матеріалу',
-    ru: 'Вид материала',
-    en: 'Kind of material'
-  },
-  addTopic: {
-    ua: 'Додати тему',
-    ru: 'Добавить тему',
-    en: 'Add a topic'
   },
   noMaterials: {
     ua: 'Матеріалів ще немає',

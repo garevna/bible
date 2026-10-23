@@ -146,8 +146,8 @@ export interface MaterialItem {
   role: string
   uid: string
   name: string
-  /** a note or a topic of the app, or a video of YouTube */
-  kind: 'note' | 'topic' | 'video'
+  /** a note or a topic of the app, a video of YouTube, or a picture kept in Telegram ('tg:…' in url) */
+  kind: 'note' | 'topic' | 'video' | 'image'
   /** the kind of the material (an id of the resources), or null */
   resource: string | null
   url: string | null
@@ -158,6 +158,29 @@ export interface MaterialItem {
 export interface Material extends MaterialItem {
   post: TopicPost
 }
+
+/** A kind of the materials of a role marked ready ('': the materials of a role of no kinds) */
+export interface MaterialMark {
+  eventId: string
+  day: string
+  role: string
+  resource: string
+  uid: string
+  name: string
+}
+
+/** The kinds a role prepares: its kinds, or one '' for the materials of a role of no kinds */
+export const kindsOf = (slot: Slot) => (slot.kinds?.length ? slot.kinds : [''])
+
+/** A kind of the materials of a role is ready: marked so, or a material of it is there (whoever sent it) */
+export const isReady = (
+  role: string,
+  resource: string,
+  materials: Pick<MaterialItem, 'role' | 'resource'>[],
+  marks: Pick<MaterialMark, 'role' | 'resource'>[]
+) =>
+  marks.some((mark) => mark.role === role && mark.resource === resource) ||
+  materials.some((item) => item.role === role && (resource === '' || item.resource === resource))
 
 /** A minister to choose from */
 export interface Person {
@@ -185,6 +208,8 @@ export interface Occurrence {
   ownSlots: boolean
   team: Participant[]
   materials: MaterialItem[]
+  /** the kinds of materials marked ready */
+  marks: MaterialMark[]
   issues: Issue[]
 }
 
@@ -208,13 +233,14 @@ export interface Filters {
 
 const serving = (participant: Participant) => participant.status === 'confirmed'
 
-/** The issues of one day of an event: too few people confirmed, roles not given, materials not sent */
+/** The issues of one day of an event: too few people confirmed, roles not given, materials not ready */
 export function issuesOf(
   event: ScheduleEvent,
   team: Participant[],
   materials: MaterialItem[],
   needed = event.needed,
-  slots = event.slots
+  slots = event.slots,
+  marks: MaterialMark[] = []
 ): Issue[] {
   const confirmed = team.filter(serving)
   const issues: Issue[] = []
@@ -223,7 +249,7 @@ export function issuesOf(
     issues.push('roles')
   const missing = confirmed.some((person) => {
     const slot = slots.find((item) => item.name === person.role)
-    return slot?.materials && !materials.some((item) => item.uid === person.uid && item.role === slot.name)
+    return slot?.materials && kindsOf(slot).some((kind) => !isReady(slot.name, kind, materials, marks))
   })
   if (missing) issues.push('materials')
   return issues
@@ -332,6 +358,7 @@ export const useScheduleStore = defineStore('schedule', () => {
   const days = shallowRef<{ eventId: string; day: string }[]>([])
   const participants = shallowRef<Participant[]>([])
   const materials = shallowRef<MaterialItem[]>([])
+  const marks = shallowRef<MaterialMark[]>([])
   const changes = shallowRef<DayChange[]>([])
   const types = shallowRef<EventType[]>([])
   /** the resources of the ministries: the kinds of materials */
@@ -359,6 +386,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       if (day === today.value && isOver(time, now.value)) return []
       const team = participants.value.filter((item) => item.eventId === eventId && item.day === day)
       const prepared = materials.value.filter((item) => item.eventId === eventId && item.day === day)
+      const marked = marks.value.filter((item) => item.eventId === eventId && item.day === day)
       const needed = change?.needed ?? event.needed
       const cancelled = Boolean(change?.cancelled)
       const slots = change?.slots ?? event.slots
@@ -375,8 +403,9 @@ export const useScheduleStore = defineStore('schedule', () => {
           ownSlots: Boolean(change?.slots),
           team,
           materials: prepared,
+          marks: marked,
           // a cancelled day asks for nothing
-          issues: cancelled ? [] : issuesOf(event, team, prepared, needed, slots)
+          issues: cancelled ? [] : issuesOf(event, team, prepared, needed, slots, marked)
         }
       ]
     })
@@ -454,6 +483,7 @@ export const useScheduleStore = defineStore('schedule', () => {
       days: { eventId: string; day: string }[]
       participants: Participant[]
       materials?: MaterialItem[]
+      marks?: MaterialMark[]
       types?: EventType[]
       materialKinds?: MaterialKind[]
       calendar?: CalendarSettings
@@ -471,6 +501,7 @@ export const useScheduleStore = defineStore('schedule', () => {
     days.value = answer.days
     participants.value = answer.participants.map((item) => ({ ...item, role: item.role ?? null }))
     materials.value = answer.materials ?? []
+    marks.value = answer.marks ?? []
     types.value = answer.types ?? []
     if (answer.materialKinds) materialKinds.value = answer.materialKinds
     changes.value = answer.changes ?? []
@@ -610,6 +641,24 @@ export const useScheduleStore = defineStore('schedule', () => {
 
   const deleteMaterial = (id: string) => act('DELETE', `/schedule/materials/${encodeURIComponent(id)}`, {})
 
+  /** a note or a topic of a role changed */
+  const updateMaterial = (id: string, post: TopicPost) =>
+    act('PUT', `/schedule/materials/${encodeURIComponent(id)}`, { post })
+
+  /** a picture as a material: kept in Telegram first ('tg:…') */
+  const addImage = (
+    eventId: string,
+    day: string,
+    role: string,
+    url: string,
+    title: string,
+    resource: string | null
+  ) => act('POST', '/schedule/materials', { eventId, day, role, kind: 'image', url, title, resource })
+
+  /** a kind of the materials of a role ready, or not ('': a role of no kinds) */
+  const setMark = (eventId: string, day: string, role: string, resource: string, done: boolean) =>
+    act('PUT', '/schedule/marks', { eventId, day, role, resource, done })
+
   return {
     materialKinds,
     addVideo,
@@ -653,6 +702,9 @@ export const useScheduleStore = defineStore('schedule', () => {
     answer,
     loadMaterials,
     addMaterial,
-    deleteMaterial
+    deleteMaterial,
+    updateMaterial,
+    addImage,
+    setMark
   }
 })

@@ -71,8 +71,16 @@ describe('what is not settled at an event', () => {
     }
     const given = [member('a', { role: 'Пастор' }), member('b', { role: 'Учасник' })]
     expect(issuesOf(event({ slots }), given, [material])).toEqual([])
-    // the materials of somebody else (the responsible person) do not stand for the pastor's
-    expect(issuesOf(event({ slots }), given, [{ ...material, uid: 'p' }])).toEqual(['materials'])
+    // the materials sent for the role by somebody else (the leader) stand for the pastor's
+    expect(issuesOf(event({ slots }), given, [{ ...material, uid: 'p' }])).toEqual([])
+    // a role of kinds: each kind ready, by a material of it or marked so
+    const kinds = [{ ...slots[0]!, kinds: ['k-plan', 'k-word'] }, slots[1]!]
+    const planned = [{ ...material, resource: 'k-plan' }]
+    expect(issuesOf(event({ slots: kinds }), given, planned, 2, kinds)).toEqual(['materials'])
+    const marked = [
+      { eventId: 'e1', day: '2026-10-18', role: 'Пастор', resource: 'k-word', uid: 'a', name: 'a' }
+    ]
+    expect(issuesOf(event({ slots: kinds }), given, planned, 2, kinds, marked)).toEqual([])
   })
 })
 

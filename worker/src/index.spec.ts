@@ -1501,15 +1501,74 @@ describe('the schedule of ministries', () => {
       ...material,
       post: { ...post, title: 'Від пастора' }
     })
-    const list = (await call('GET', `/schedule?from=${day}&to=${day}`, 'leader')).body.materials as {
-      name: string
-      post?: unknown
-    }[]
+    // the responsible person sees all; the person of the role their own and what was sent for it
+    const listOf = async (token: string) =>
+      (await call('GET', `/schedule?from=${day}&to=${day}`, token)).body.materials as {
+        name: string
+        post?: unknown
+      }[]
+    const list = await listOf('pastor')
     expect(list.map((item) => item.name)).toEqual(['Музикант', 'pastor@example.com'])
     expect(list[0]).not.toHaveProperty('post')
-    const full = (await call('GET', `/schedule/materials?eventId=${eventId}&day=${day}`, 'leader')).body
-      .materials as { post: unknown }[]
+    expect((await listOf('musician')).map((item) => item.name)).toEqual(['Музикант', 'pastor@example.com'])
+    // another member of the team, without the role: none of them
+    expect(await listOf('leader')).toEqual([])
+    const fullOf = async (token: string) =>
+      (await call('GET', `/schedule/materials?eventId=${eventId}&day=${day}`, token)).body.materials as {
+        id: string
+        post: unknown
+      }[]
+    expect(await fullOf('leader')).toEqual([])
+    const full = await fullOf('pastor')
     expect(full[0]!.post).toEqual(post)
+
+    // changed by its author or the responsible person; not by the person of the role, if not theirs
+    const [own, sent] = full as { id: string }[]
+    const changed = { title: '', items: [{ kind: 'note', text: 'Хліб і вино: Лука 22', verses: [] }] }
+    expect((await call('PUT', `/schedule/materials/${sent!.id}`, 'musician', { post: changed })).status).toBe(
+      403
+    )
+    expect((await call('DELETE', `/schedule/materials/${sent!.id}`, 'musician', {})).status).toBe(403)
+    expect((await call('PUT', `/schedule/materials/${own!.id}`, 'leader', { post: changed })).status).toBe(
+      403
+    )
+    expect(
+      (await call('PUT', `/schedule/materials/${own!.id}`, 'musician', { post: changed })).body.material
+    ).toMatchObject({ title: 'Хліб і вино: Лука 22' })
+    expect((await call('PUT', `/schedule/materials/${own!.id}`, 'pastor', { post: changed })).status).toBe(
+      200
+    )
+
+    // a kind ready: marked by the person of the role (a material of the kind marks it by itself)
+    const marksOf = async () =>
+      (await call('GET', `/schedule?from=${day}&to=${day}`, 'pastor')).body.marks as { resource: string }[]
+    expect((await marksOf()).map((mark) => mark.resource)).toEqual([''])
+    const mark = { eventId, day, role: 'Пастор', resource: 'k-sermon', done: true }
+    expect((await call('PUT', '/schedule/marks', 'leader', mark)).status).toBe(403)
+    expect(
+      (await call('PUT', '/schedule/marks', 'musician', { ...mark, resource: 'k-nothing' })).status
+    ).toBe(400)
+    expect((await call('PUT', '/schedule/marks', 'musician', mark)).body.mark).toMatchObject({
+      resource: 'k-sermon'
+    })
+    expect((await marksOf()).map((item) => item.resource).sort()).toEqual(['', 'k-sermon'])
+    await call('PUT', '/schedule/marks', 'musician', { ...mark, done: false })
+    expect((await marksOf()).map((item) => item.resource)).toEqual([''])
+
+    // a picture kept in Telegram; not a picture of the device
+    const picture = { eventId, day, role: 'Пастор', kind: 'image', resource: 'k-sermon', title: 'Заставка' }
+    expect(
+      (await call('POST', '/schedule/materials', 'musician', { ...picture, url: 'tg:file-id-00001' })).body
+        .material
+    ).toMatchObject({ kind: 'image', url: 'tg:file-id-00001', title: 'Заставка' })
+    expect(
+      (
+        await call('POST', '/schedule/materials', 'musician', {
+          ...picture,
+          url: 'data:image/png;base64,AAAA'
+        })
+      ).status
+    ).toBe(400)
 
     // a video of YouTube, of a kind of the resources; not another link, not an unknown kind
     const video = { eventId, day, role: 'Пастор', kind: 'video', resource: 'k-word', title: 'Слово' }
