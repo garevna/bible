@@ -22,6 +22,9 @@
         <v-icon icon="mdi-account-star-outline" size="small" />
         {{ text.leader }}: {{ group.leaderName }}
       </p>
+      <v-alert v-if="group.unregistered && groups.manage" type="warning" variant="tonal" density="compact">
+        {{ format(text.leaderUnregistered, { name: group.leaderName }) }}
+      </v-alert>
       <p v-if="group.description" class="description">{{ group.description }}</p>
 
       <h4 class="label">{{ format(text.membersCount, { count: group.members.length }) }}</h4>
@@ -309,9 +312,8 @@ async function save() {
   }
   if (groups.manage) {
     if ((draft.name ?? '').trim() !== item.name) change.name = (draft.name ?? '').trim()
-    const { leaderUid, leaderName } = leader.value
-    if (leaderUid ? leaderUid !== item.leaderUid : leaderName && leaderName !== item.leaderName)
-      Object.assign(change, { leaderUid, leaderName })
+    const { leaderUid } = leader.value
+    if (leaderUid && leaderUid !== item.leaderUid) change.leaderUid = leaderUid
   }
   busy.value = true
   error.value = ''

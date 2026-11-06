@@ -1186,11 +1186,10 @@ describe('home groups', () => {
     })
   })
 
-  it('a group with its day, time and place; a leader without the app is given by name', async () => {
-    const { call } = await church()
+  it('a group with its day, time and place; its leader a user of the app, not a name', async () => {
+    const { call, env } = await church()
     const created = await call('POST', '/groups', 'owner', {
-      leaderUid: '',
-      leaderName: 'Петренко Петро Петрович',
+      leaderUid: 'musician-uid',
       weekday: 4,
       time: '19:00',
       address: 'вул. Сумська, 1',
@@ -1198,25 +1197,51 @@ describe('home groups', () => {
       lng: 36.2
     })
     expect(created.body.group).toMatchObject({
-      leaderUid: '',
-      leaderName: 'Петренко Петро Петрович',
+      leaderUid: 'musician-uid',
+      leaderName: 'Музикант',
+      unregistered: false,
       weekday: 4,
       time: '19:00',
       address: 'вул. Сумська, 1',
       own: true
     })
-    // a leader: a user of the app or a name
-    expect((await call('POST', '/groups', 'owner', { leaderUid: '', weekday: 1 })).status).toBe(400)
+    // a name typed in is not a leader
+    expect(
+      (await call('POST', '/groups', 'owner', { leaderUid: '', leaderName: 'Петренко Петро', weekday: 1 }))
+        .status
+    ).toBe(400)
     expect((await call('POST', '/groups', 'owner', { leaderUid: 'nobody' })).status).toBe(400)
+    // a group made before, with a name typed in: the administrators see its leader is to be chosen
+    const id = 'g-old'
+    const groups = JSON.parse((await env.USERS.get('settings:homeGroups')) as string)
+    await env.USERS.put(
+      'settings:homeGroups',
+      JSON.stringify([
+        ...groups,
+        {
+          ...(created.body.group as object),
+          id,
+          leaderUid: '',
+          leaderName: 'Петренко Петро Петрович',
+          own: undefined,
+          unregistered: undefined
+        }
+      ])
+    )
+    expect((await call('GET', '/groups', 'owner')).body.groups).toContainEqual(
+      expect.objectContaining({ id, leaderName: 'Петренко Петро Петрович', unregistered: true })
+    )
+    expect((await call('PUT', `/groups/${id}`, 'owner', { leaderUid: '' })).status).toBe(400)
     // then a user of the app leads it
-    const id = (created.body.group as { id: string }).id
     expect(
       (await call('PUT', `/groups/${id}`, 'owner', { leaderUid: 'leader-uid' })).body.group
     ).toMatchObject({
       leaderUid: 'leader-uid',
       leaderName: 'Лідер'
     })
-    expect((await call('GET', '/groups', 'leader')).body.groups).toMatchObject([{ id, own: true }])
+    expect((await call('GET', '/groups', 'leader')).body.groups).toContainEqual(
+      expect.objectContaining({ id, own: true, unregistered: false })
+    )
   })
 
   it('who sees the groups: the servants or the administrators only; a reader none', async () => {

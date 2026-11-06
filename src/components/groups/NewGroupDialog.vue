@@ -99,12 +99,7 @@ const weekdayItems = computed(() =>
 )
 
 /** a leader, a day and a time at least */
-const ready = computed(
-  () =>
-    Boolean(leader.value.leaderUid || leader.value.leaderName) &&
-    weekday.value !== null &&
-    Boolean(time.value)
-)
+const ready = computed(() => Boolean(leader.value.leaderUid) && weekday.value !== null && Boolean(time.value))
 
 function picked(place: Place) {
   address.value = place.address
@@ -117,7 +112,7 @@ async function save() {
   error.value = ''
   try {
     const group = await groups.create({
-      ...leader.value,
+      leaderUid: leader.value.leaderUid,
       name: (name.value ?? '').trim(),
       weekday: weekday.value,
       time: time.value ?? '',

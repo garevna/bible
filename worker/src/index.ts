@@ -54,6 +54,7 @@ import {
   publicGroup,
   setGroups,
   setGroupsVisibility,
+  type GroupHead,
   type HomeGroup
 } from './groups'
 import { d1Posts, type PostsStore, type PostTask, type Submission } from './posts'
@@ -1302,7 +1303,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     /** the private part of a group: its leader and the supervisors */
     const own = (group: HomeGroup) => mighty || (Boolean(group.leaderUid) && group.leaderUid === me.uid)
     const users = await listUsers(env.USERS, env.OWNERS, true)
-    /** the leader: a user of the app, or the name of one without it */
+    /** the leader: a user of the app, or the name typed in for a group made before that was required */
     const leaderNameOf = (group: HomeGroup) => {
       const user = group.leaderUid ? users.find((item) => item.uid === group.leaderUid) : null
       return user ? nameOf(user) : (group.leaderName ?? '')
@@ -1310,10 +1311,12 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const show = (group: HomeGroup) => ({
       ...(own(group) ? group : publicGroup(group, seesAll)),
       leaderName: leaderNameOf(group),
+      // the administrators see that the leader is still to be chosen among the users of the app
+      unregistered: !group.leaderUid || !users.some((user) => user.uid === group.leaderUid),
       own: own(group)
     })
     /** a user given as the leader is a user of the app */
-    const knownLeader = (head: { leaderUid?: string }) =>
+    const knownLeader = (head: GroupHead) =>
       !head.leaderUid || users.some((user) => user.uid === head.leaderUid)
 
     // the servants choose their own group: they get the groups (without their people unless they may see them)
@@ -1338,8 +1341,7 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       const payload = await body()
       const head = parseGroupHead(payload)
       const rest = parseLeaderChange(payload)
-      if (!head || !rest || (!head.leaderUid && !head.leaderName) || !knownLeader(head))
-        return json({ error: 'bad-request' }, 400)
+      if (!head || !rest || !head.leaderUid || !knownLeader(head)) return json({ error: 'bad-request' }, 400)
       const group: HomeGroup = { ...newGroup(head), ...rest, members: [], meetingNote: '' }
       await setGroups(env.USERS, [...groups, group])
       return json({ group: show(group) })
@@ -1363,8 +1365,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     const head = parseGroupHead(change)
     const rest = parseLeaderChange(change)
     if (!head || !rest) return json({ error: 'bad-request' }, 400)
-    const leaderChanged = head.leaderUid !== undefined || head.leaderName !== undefined
-    if ((head.name !== undefined || leaderChanged) && !manage) return json({ error: 'forbidden' }, 403)
+    if ((head.name !== undefined || head.leaderUid !== undefined) && !manage)
+      return json({ error: 'forbidden' }, 403)
     if (!knownLeader(head)) return json({ error: 'bad-request' }, 400)
     if (Object.keys(rest).length && !leads && !manage) return json({ error: 'forbidden' }, 403)
     // the members and the notes are the leader's (the others do not even see them whole)

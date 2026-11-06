@@ -35,6 +35,22 @@
       />
     </div>
 
+    <!-- the administrators: the groups whose leader is still to be chosen among the users of the app -->
+    <v-alert
+      v-if="groups.manage && unregistered.length"
+      type="warning"
+      variant="tonal"
+      density="compact"
+      class="mb-4 unregistered"
+    >
+      {{ text.unregisteredGroups }}
+      <div class="d-flex flex-wrap ga-2 mt-2">
+        <v-chip v-for="group of unregistered" :key="group.id" @click="openGroup(group)">
+          {{ groupTitle(group) }}
+        </v-chip>
+      </div>
+    </v-alert>
+
     <v-tabs v-model="tab" grow class="mb-3" color="secondary">
       <v-tab value="week" prepend-icon="mdi-calendar-week-outline">{{ text.tabWeek }}</v-tab>
       <v-tab value="map" prepend-icon="mdi-map-outline">{{ text.tabMap }}</v-tab>
@@ -68,7 +84,7 @@ import GroupsMap from '@/components/groups/GroupsMap.vue'
 import GroupsSearch from '@/components/groups/GroupsSearch.vue'
 import GroupsWeek from '@/components/groups/GroupsWeek.vue'
 import NewGroupDialog from '@/components/groups/NewGroupDialog.vue'
-import { useGroupsStore, type GroupsVisibility, type HomeGroup } from '@/stores/groups'
+import { groupTitle, useGroupsStore, type GroupsVisibility, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore } from '@/stores/schedule'
 import { useSwipeTabs } from '@/composables/useSwipeTabs'
@@ -91,6 +107,8 @@ const swipe = useSwipeTabs(
 )
 const busy = ref(false)
 const error = ref('')
+
+const unregistered = computed(() => groups.groups.filter((group) => group.unregistered))
 
 const dialog = ref(false)
 const openedId = ref<string | null>(null)

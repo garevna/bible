@@ -75,9 +75,19 @@ export const groups = {
     en: 'Find your group by its leader, its day or its address.'
   },
   leaderHint: {
-    ua: 'Виберіть зі списку або впишіть ПІБ лідера, який не користується застосунком',
-    ru: 'Выберите из списка или впишите ФИО лидера, который не пользуется приложением',
-    en: 'Choose from the list, or type the full name of a leader without the app'
+    ua: 'Лідер групи має бути зареєстрований у застосунку: так він отримує теми зустрічей',
+    ru: 'Лидер группы должен быть зарегистрирован в приложении: так он получает темы встреч',
+    en: 'The leader must be a user of the app: so the leader gets the topics of the meetings'
+  },
+  leaderUnregistered: {
+    ua: '{name} не зареєстрований у застосунку: виберіть лідера зі списку',
+    ru: '{name} не зарегистрирован в приложении: выберите лидера из списка',
+    en: '{name} is not a user of the app: choose the leader from the list'
+  },
+  unregisteredGroups: {
+    ua: 'Лідери цих груп не зареєстровані в застосунку. Відкрийте групу і виберіть лідера зі списку:',
+    ru: 'Лидеры этих групп не зарегистрированы в приложении. Откройте группу и выберите лидера из списка:',
+    en: 'The leaders of these groups are not users of the app. Open a group and choose its leader from the list:'
   },
   pointChosen: {
     ua: 'Точку на карті вибрано',

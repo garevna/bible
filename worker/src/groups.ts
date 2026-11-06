@@ -21,9 +21,9 @@ export interface HomeGroup {
   id: string
   /** optional: a group is known by its leader, its place and its people */
   name: string
-  /** the leader, a user of the app (who keeps the group); '' for a leader without the app */
+  /** the leader, a user of the app (who keeps the group); '' only in a group made before that was required */
   leaderUid: string
-  /** the full name of a leader without the app */
+  /** the full name of a leader typed in before the leader had to be a user of the app */
   leaderName?: string
   /** the place where the group meets, and its point on the map when it was chosen there */
   address: string
@@ -148,13 +148,11 @@ export function parseLeaderChange(
 export interface GroupHead {
   name?: string
   leaderUid?: string
-  leaderName?: string
 }
 
 /**
  * the name and the leader of a group, as the administrators give them: the leader is a user of the
- * app (leaderUid), or the full name of one without it (leaderName, with leaderUid ''); null when it
- * is not that
+ * app (leaderUid; a leader who is not one cannot get the topics of the meetings); null when it is not that
  */
 export function parseGroupHead(value: unknown): GroupHead | null {
   if (!value || typeof value !== 'object') return null
@@ -168,16 +166,9 @@ export function parseGroupHead(value: unknown): GroupHead | null {
   if (body.leaderUid !== undefined) {
     const uid = text(body.leaderUid, 200)
     if (uid === null) return null
+    if (!uid) return null
     head.leaderUid = uid
   }
-  if (body.leaderName !== undefined) {
-    const name = text(body.leaderName, 120)
-    if (name === null) return null
-    head.leaderName = name
-  }
-  // a user of the app, or a name: one of them
-  if (head.leaderUid === '' && !head.leaderName) return null
-  if (head.leaderUid) head.leaderName = ''
   return head
 }
 
@@ -185,7 +176,6 @@ export const newGroup = (head: GroupHead): HomeGroup => ({
   id: `g-${crypto.randomUUID().slice(0, 8)}`,
   name: head.name ?? '',
   leaderUid: head.leaderUid ?? '',
-  ...(head.leaderUid ? {} : { leaderName: head.leaderName ?? '' }),
   address: '',
   weekday: null,
   time: '',

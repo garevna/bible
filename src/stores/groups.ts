@@ -16,9 +16,11 @@ export interface GroupMember {
 export interface HomeGroup {
   id: string
   name: string
-  /** a user of the app (who keeps the group), or '' for a leader without the app */
+  /** a user of the app (who keeps the group); '' in a group made before that was required */
   leaderUid: string
   leaderName: string
+  /** its leader is not a user of the app (yet): the administrators choose one */
+  unregistered?: boolean
   address: string
   lat?: number
   lng?: number

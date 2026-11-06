@@ -24,8 +24,10 @@ const GROUPS = [
   {
     id: 'g-other',
     name: '',
-    leaderUid: 'leader-uid',
+    // made when a leader could be a name typed in: the administrators choose a user of the app
+    leaderUid: '',
     leaderName: 'Лідер',
+    unregistered: true,
     address: 'вул. Сумська, 1',
     weekday: (today.getDay() + 1) % 7,
     time: '19:00',
@@ -69,7 +71,12 @@ async function fakeWorker(page: Page, admin = false) {
       })
     if (path === '/schedule/people')
       return route.fulfill({
-        json: { people: [{ uid: 'leader-uid', name: 'Лідер', ministries: [], phone: null }] }
+        json: {
+          people: [
+            { uid: 'ivan-uid', name: 'Іваненко Іван', ministries: [], phone: null },
+            { uid: 'olena-uid', name: 'Коваленко Олена', ministries: [], phone: null }
+          ]
+        }
       })
     if (path === '/schedule')
       return route.fulfill({ json: { events: [], days: [], participants: [], changes: [] } })
@@ -90,7 +97,7 @@ async function fakeWorker(page: Page, admin = false) {
           group: {
             ...body,
             id: 'g-new',
-            leaderName: body.leaderName,
+            leaderName: 'Коваленко Олена',
             description: '',
             members: [],
             meetingNote: '',
@@ -212,32 +219,37 @@ test('the home groups: by the week, on the map and as a list; the leader keeps t
     })
   await page.keyboard.press('Escape')
 
-  // the list: another's group (no name: its leader); an administrator changes its day, time and leader
-  await page.getByRole('tab', { name: 'Список' }).click()
-  await expect(page.locator('.group-row')).toHaveCount(2)
-  await page.locator('.group-row', { hasText: 'Лідер' }).click()
+  // a group whose leader is not a user of the app: the administrators are told, and choose one
+  const unregistered = page.locator('.unregistered')
+  await expect(unregistered).toContainText('Лідери цих груп не зареєстровані')
+  await unregistered.locator('.v-chip', { hasText: 'Лідер' }).click()
   const other = dialog(page)
   await expect(other).toContainText('Петро')
+  await expect(other).toContainText('Лідер не зареєстрований у застосунку')
   await other.getByRole('button', { name: 'Змінити' }).click()
   // the people and the notes stay the leader's
   await expect(other.getByText('Члени групи', { exact: true })).toHaveCount(0)
   await other.getByRole('textbox', { name: 'Час' }).fill('1930')
-  await other.locator('.v-combobox input').fill('Іваненко Іван')
-  await other.getByRole('textbox', { name: 'Час' }).click()
+  // a name cannot be typed in: a user of the app is chosen
+  await other.locator('.v-autocomplete').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Іваненко Іван' }).click()
   await other.getByRole('button', { name: 'Зберегти' }).click()
   await expect
     .poll(() => requests.at(-1))
     .toMatchObject({
       method: 'PUT',
       path: '/groups/g-other',
-      body: { time: '19:30', leaderUid: '', leaderName: 'Іваненко Іван' }
+      body: { time: '19:30', leaderUid: 'ivan-uid' }
     })
   await page.keyboard.press('Escape')
+  await page.getByRole('tab', { name: 'Список' }).click()
+  await expect(page.locator('.group-row')).toHaveCount(2)
 
-  // a new group: its leader (a name typed in), the day, the time and the place
+  // a new group: its leader (a user of the app), the day, the time and the place
   await page.getByRole('button', { name: 'Нова група' }).click()
   const fresh = dialog(page)
-  await fresh.locator('.v-combobox input').fill('Коваленко Олена')
+  await fresh.locator('.v-autocomplete').click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Коваленко Олена' }).click()
   await fresh.locator('.v-select', { hasText: 'День тижня' }).click()
   await page.locator('.v-overlay--active .v-list-item', { hasText: 'четвер' }).click()
   await fresh.getByRole('textbox', { name: 'Час' }).fill('1800')
@@ -248,8 +260,7 @@ test('the home groups: by the week, on the map and as a list; the leader keeps t
     .toMatchObject({
       path: '/groups',
       body: {
-        leaderUid: '',
-        leaderName: 'Коваленко Олена',
+        leaderUid: 'olena-uid',
         weekday: 4,
         time: '18:00',
         address: 'вул. Пушкінська, 5'
