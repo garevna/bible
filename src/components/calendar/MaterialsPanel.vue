@@ -28,9 +28,15 @@
             <!-- ready: ticked by the person of the role; a material of the kind ticks it by itself -->
             <v-checkbox-btn
               :model-value="ready(slot.name, kind)"
-              :disabled="!mayAdd(slot.name) || hasMaterial(slot.name, kind) || busy"
+              :disabled="!mayAdd(slot.name) || hasMaterial(slot.name, kind) || needsApproval || busy"
               :aria-label="format(text.readyOf, { name: kindTitle(kind) })"
-              :title="hasMaterial(slot.name, kind) ? text.materialAdded : text.readyMark"
+              :title="
+                needsApproval
+                  ? text.readyByApproval
+                  : hasMaterial(slot.name, kind)
+                    ? text.materialAdded
+                    : text.readyMark
+              "
               color="primary"
               @click.stop
               @update:model-value="(done: boolean) => mark(slot.name, kind, done)"
@@ -81,6 +87,7 @@ const slots = computed(() =>
     (slot) =>
       slot.materials &&
       (schedule.approves(props.occurrence.event) ||
+        schedule.reviews(props.occurrence.event) ||
         membersOf(slot.name).some((member) => member.uid === user.uid))
   )
 )
@@ -117,8 +124,17 @@ const summaryOf = (role: string, kind: string) => {
   const list = materialsOf(role, kind)
   if (!list.length) return text.value.noMaterials
   const first = list[0]!.title || kindTitle(kind)
-  return list.length > 1 ? `${first} ${format(text.value.andMore, { count: list.length - 1 })}` : first
+  const all = list.length > 1 ? `${first} ${format(text.value.andMore, { count: list.length - 1 })}` : first
+  // where a pastor approves: what waits, or was returned
+  const waiting = list.some((item) => item.status === 'pending')
+  const returned = list.some((item) => item.status === 'returned')
+  return [all, waiting ? text.value.statusPending : '', returned ? text.value.statusReturned : '']
+    .filter(Boolean)
+    .join(' · ')
 }
+
+/** the materials of the event count once a pastor approves them: no kind is ticked by hand */
+const needsApproval = computed(() => Boolean(props.occurrence.event.approverUid))
 
 /** the person of the role, or an approver of the event */
 const mayAdd = (name: string) =>

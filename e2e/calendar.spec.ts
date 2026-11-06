@@ -55,10 +55,29 @@ const communion = {
 }
 
 /** The worker (see playwright.config.ts): a minister of the prayer ministry, or a planner of the schedule */
-async function fakeWorker(page: Page, planner = false) {
+async function fakeWorker(page: Page, planner = false, pastor = false) {
   const posted: { path: string; body: unknown }[] = []
   // the materials sent: the calendar has them (without their posts), the window of a kind with them
   const materials: Record<string, unknown>[] = []
+  // a pastor: the communion waits for their approval of a material of the pastor of the day
+  if (pastor)
+    materials.push({
+      id: 'm-pending',
+      eventId: 'communion',
+      day: TODAY,
+      role: 'Пастор',
+      uid: 'pastor-uid',
+      name: 'Пастор Іван',
+      kind: 'note',
+      resource: 'k-sermon',
+      url: null,
+      title: 'Хліб і вино',
+      status: 'pending',
+      reviewNote: null,
+      reviewedBy: null,
+      createdAt: 0,
+      post: { title: '', items: [{ kind: 'note', text: 'Хліб і вино', verses: [] }] }
+    })
   await page.route('**/worker-test/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
@@ -74,7 +93,8 @@ async function fakeWorker(page: Page, planner = false) {
             sendToRoles: [],
             approve: planner,
             invite: planner ? ['*'] : [],
-            manage: planner ? ['schedule'] : []
+            manage: planner ? ['schedule'] : [],
+            approveMaterials: pastor
           },
           ministries: ['Молитовне'],
           canSend: false,
@@ -99,8 +119,14 @@ async function fakeWorker(page: Page, planner = false) {
             { uid: 'e2e-uid', name: 'E2E', ministries: ['Молитовне'], phone: null },
             { uid: 'pastor-uid', name: 'Пастор Іван', ministries: ['Пасторське'], phone: null },
             { uid: 'singer-uid', name: 'Співачка', ministries: ['Пасторське'], phone: null }
-          ]
+          ],
+          pastors: pastor ? ['e2e-uid', 'pastor-uid'] : []
         }
+      })
+    }
+    if (path === '/approval-forward' && request.method() === 'GET') {
+      return route.fulfill({
+        json: { forward: null, pastors: [{ uid: 'pastor-uid', name: 'Пастор Іван' }] }
       })
     }
     if (path === '/youtube') return route.fulfill({ json: { title: 'Слово на неділю', author: 'ХХЦ' } })
@@ -120,6 +146,7 @@ async function fakeWorker(page: Page, planner = false) {
               time: '23:58',
               needed: 3,
               slots: communion.slots,
+              ...(pastor ? { approverUid: 'e2e-uid', approverName: 'E2E', approvers: ['e2e-uid'] } : {}),
               responsibleUid: 'pastor-uid',
               responsibleName: 'Пастор Іван'
             })
@@ -519,4 +546,72 @@ test('a marathon of prayer: every hour a role of its own, with its people', asyn
         { name: '22:00–23:00', count: 2, materials: false }
       ]
     })
+})
+
+test('a pastor approves the materials of a service, or returns them; away, forwards the approval', async ({
+  page
+}) => {
+  const posted = await fakeWorker(page, true, true)
+  await signIn(page)
+  await page.getByRole('button', { name: 'Календар служінь' }).click()
+
+  // what waits for the pastor: above the calendar
+  const pending = page.locator('.pending')
+  await expect(pending).toContainText('Чекають вашого затвердження: 1')
+  await pending.locator('.v-list-item', { hasText: 'Хліб і вино' }).click()
+  const window = dialog(page)
+  await expect(window.locator('.material')).toContainText('на затвердженні')
+  // returned with a word of what to change
+  await window.getByRole('button', { name: 'Повернути на доопрацювання' }).click()
+  const back = window.getByRole('button', { name: 'Повернути автору' })
+  await expect(back).toBeDisabled()
+  await window.getByLabel('Що виправити').fill('Додайте вірші')
+  await back.click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({
+      path: '/schedule/materials/m-pending/review',
+      body: { approve: false, note: 'Додайте вірші' }
+    })
+  await window.getByRole('button', { name: 'Затвердити' }).click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({ path: '/schedule/materials/m-pending/review', body: { approve: true, note: '' } })
+  await window.getByRole('button', { name: 'Готово' }).click()
+
+  // the kinds of a service a pastor approves are not ticked by hand
+  const communionCard = card(page, 'Причастя')
+  await communionCard.getByRole('button', { name: 'Методичні матеріали' }).click()
+  await expect(
+    communionCard.locator('.v-list-item', { hasText: 'План служіння' }).getByRole('checkbox')
+  ).toBeDisabled()
+
+  // a new event: its materials approved by a pastor, the user first
+  await page.getByRole('button', { name: 'Додати подію' }).click()
+  const form = dialog(page)
+  await form.locator('.v-select', { hasText: 'Тип події' }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Причастя' }).click()
+  await form.getByLabel('Час', { exact: true }).fill('11:00')
+  await form.getByLabel('Матеріали потребують затвердження пастором').check()
+  await expect(form.locator('.v-select', { hasText: 'Хто затверджує' })).toContainText('E2E')
+  await form.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => posted.find((item) => item.path === '/schedule/events')?.body)
+    .toMatchObject({ typeId: 'communion', approverUid: 'e2e-uid' })
+  await dialog(page).getByRole('button', { name: 'Пізніше' }).click()
+
+  // away: another pastor approves meanwhile; a window says to whom it goes
+  await page.getByRole('button', { name: 'E2E', exact: true }).click()
+  await page.locator('.v-overlay--active .v-list-item', { hasText: 'Переадресація затверджень' }).click()
+  const forward = dialog(page)
+  await forward.getByLabel('Переадресувати затвердження').check()
+  const save = forward.getByRole('button', { name: 'Зберегти' })
+  await expect(save).toBeDisabled()
+  await forward.locator('.transfer .v-list-item', { hasText: 'Пастор Іван' }).click()
+  await forward.getByRole('button', { name: 'Додати вибране' }).click()
+  await save.click()
+  await expect
+    .poll(() => posted.at(-1))
+    .toEqual({ path: '/approval-forward', body: { toUids: ['pastor-uid'], until: null } })
+  await expect(dialog(page)).toContainText('Матеріали на затвердження надходитимуть: Пастор Іван')
 })

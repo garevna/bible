@@ -103,6 +103,11 @@ export interface ScheduleEvent {
   responsibleName: string
   deputyUid: string | null
   deputyName: string | null
+  /** the pastor who approves its materials; null: they need no approval */
+  approverUid: string | null
+  approverName: string | null
+  /** who approves them now: the pastor, and the pastors standing in for them */
+  approvers?: string[]
 }
 
 export type EventDraft = Pick<
@@ -123,6 +128,7 @@ export type EventDraft = Pick<
   | 'applicants'
   | 'responsibleUid'
   | 'deputyUid'
+  | 'approverUid'
 >
 
 export interface Participant {
@@ -148,6 +154,11 @@ export interface MaterialItem {
   name: string
   /** a note or a topic of the app, a video of YouTube, or a picture kept in Telegram ('tg:…' in url) */
   kind: 'note' | 'topic' | 'video' | 'image'
+  /** approved by the pastor of the event (or needing no approval), waiting for it, or returned */
+  status?: 'approved' | 'pending' | 'returned'
+  /** the word of the pastor who returned it */
+  reviewNote?: string | null
+  reviewedBy?: string | null
   /** the kind of the material (an id of the resources), or null */
   resource: string | null
   url: string | null
@@ -172,15 +183,23 @@ export interface MaterialMark {
 /** The kinds a role prepares: its kinds, or one '' for the materials of a role of no kinds */
 export const kindsOf = (slot: Slot) => (slot.kinds?.length ? slot.kinds : [''])
 
-/** A kind of the materials of a role is ready: marked so, or a material of it is there (whoever sent it) */
+/**
+ * A kind of the materials of a role is ready: marked so, or a material of it is there (whoever sent it);
+ * where a pastor approves them, an approved one
+ */
 export const isReady = (
   role: string,
   resource: string,
-  materials: Pick<MaterialItem, 'role' | 'resource'>[],
+  materials: Pick<MaterialItem, 'role' | 'resource' | 'status'>[],
   marks: Pick<MaterialMark, 'role' | 'resource'>[]
 ) =>
   marks.some((mark) => mark.role === role && mark.resource === resource) ||
-  materials.some((item) => item.role === role && (resource === '' || item.resource === resource))
+  materials.some(
+    (item) =>
+      item.role === role &&
+      (resource === '' || item.resource === resource) &&
+      (item.status ?? 'approved') === 'approved'
+  )
 
 /** A minister to choose from */
 export interface Person {
@@ -358,6 +377,8 @@ export const useScheduleStore = defineStore('schedule', () => {
   const days = shallowRef<{ eventId: string; day: string }[]>([])
   const participants = shallowRef<Participant[]>([])
   const materials = shallowRef<MaterialItem[]>([])
+  /** the people who approve the materials of the services */
+  const pastors = shallowRef<string[]>([])
   const marks = shallowRef<MaterialMark[]>([])
   const changes = shallowRef<DayChange[]>([])
   const types = shallowRef<EventType[]>([])
@@ -470,6 +491,10 @@ export const useScheduleStore = defineStore('schedule', () => {
     worker.rights.invite.includes(ANY_MINISTRY) ||
     worker.rights.invite.includes(event.ministry)
 
+  /** the user approves the materials of the event: its pastor, or one standing in */
+  const reviews = (event: Pick<ScheduleEvent, 'approvers'>) =>
+    Boolean(event.approvers?.includes(user.uid ?? ''))
+
   const typeOf = (event: Pick<ScheduleEvent, 'typeId'>) =>
     types.value.find((item) => item.id === event.typeId)
 
@@ -496,7 +521,9 @@ export const useScheduleStore = defineStore('schedule', () => {
       typeId: event.typeId ?? null,
       slots: event.slots ?? [],
       times: event.times ?? null,
-      applicants: event.applicants ?? 'ministry'
+      applicants: event.applicants ?? 'ministry',
+      approverUid: event.approverUid ?? null,
+      approverName: event.approverName ?? null
     }))
     days.value = answer.days
     participants.value = answer.participants.map((item) => ({ ...item, role: item.role ?? null }))
@@ -526,13 +553,14 @@ export const useScheduleStore = defineStore('schedule', () => {
   /** the ministers, ministries and locations to choose from when planning */
   async function loadChoices() {
     const [answer, lists] = await Promise.all([
-      worker.request<{ people: Person[] }>('GET', '/schedule/people'),
+      worker.request<{ people: Person[]; pastors?: string[] }>('GET', '/schedule/people'),
       worker.request<{ ministries: string[]; locations?: string[]; addresses?: Record<string, Place> }>(
         'GET',
         '/ministries'
       )
     ])
     people.value = answer.people
+    pastors.value = answer.pastors ?? []
     ministries.value = lists.ministries
     locations.value = lists.locations ?? []
     addresses.value = lists.addresses ?? {}
@@ -655,6 +683,10 @@ export const useScheduleStore = defineStore('schedule', () => {
     resource: string | null
   ) => act('POST', '/schedule/materials', { eventId, day, role, kind: 'image', url, title, resource })
 
+  /** a pastor approves a material, or returns it to its author with a word */
+  const reviewMaterial = (id: string, approve: boolean, note = '') =>
+    act('POST', `/schedule/materials/${encodeURIComponent(id)}/review`, { approve, note })
+
   /** a kind of the materials of a role ready, or not ('': a role of no kinds) */
   const setMark = (eventId: string, day: string, role: string, resource: string, done: boolean) =>
     act('PUT', '/schedule/marks', { eventId, day, role, resource, done })
@@ -705,6 +737,9 @@ export const useScheduleStore = defineStore('schedule', () => {
     deleteMaterial,
     updateMaterial,
     addImage,
-    setMark
+    setMark,
+    pastors,
+    reviews,
+    reviewMaterial
   }
 })

@@ -1887,6 +1887,114 @@ describe('the schedule of ministries', () => {
     expect((await call('PUT', '/schedule/days', 'owner', { eventId, day, slots: [] })).body.change).toBeNull()
   })
 
+  it('the materials of an event approved by its pastor; a pastor away forwards the approval', async () => {
+    const { call } = await church()
+    // the pastors: a status that approves the materials of the services
+    const roles = (await call('GET', '/admin/settings', 'owner')).body.roles as { id: string }[]
+    const pastorStatus = {
+      id: 'status-pastor',
+      name: 'Пастор',
+      publish: false,
+      send: false,
+      sendToRoles: [],
+      sendToPeople: false,
+      messageDays: 1,
+      manage: [],
+      approveMaterials: true
+    }
+    await call('PUT', '/admin/roles', 'owner', { roles: [...roles, pastorStatus] })
+    for (const uid of ['pastor-uid', 'leader-uid'])
+      await call('PUT', `/admin/users/${uid}`, 'owner', { role: 'status-pastor' })
+    expect((await call('GET', '/me', 'pastor')).body.rights).toMatchObject({ approveMaterials: true })
+    expect(((await call('GET', '/schedule/people', 'owner')).body.pastors as string[]).sort()).toEqual([
+      'leader-uid',
+      'owner-uid',
+      'pastor-uid'
+    ])
+
+    const slots = [{ name: 'Ведучий', count: 1, materials: true, kinds: ['k-word'], hint: '' }]
+    // the pastor of the event is one of the pastors
+    expect(
+      (await call('POST', '/schedule/events', 'owner', { ...prayer, slots, approverUid: 'musician-uid' }))
+        .status
+    ).toBe(400)
+    const event = (
+      await call('POST', '/schedule/events', 'owner', { ...prayer, slots, approverUid: 'pastor-uid' })
+    ).body.event as { id: string; approverName: string }
+    expect(event.approverName).toBe('pastor@example.com')
+    const eventId = event.id
+    const day = '2026-10-17'
+    await call('POST', '/schedule/team', 'owner', { eventId, day, uid: 'musician-uid', role: 'Ведучий' })
+    const inbox = async (token: string) =>
+      ((await call('GET', '/messages', token)).body.messages as { text: string }[]).map((item) => item.text)
+
+    // a material waits for the pastor, who is told; no kind is ticked by hand
+    const note = { title: '', items: [{ kind: 'note', text: 'План молитви', verses: [] }] }
+    const sent = (
+      await call('POST', '/schedule/materials', 'musician', {
+        eventId,
+        day,
+        role: 'Ведучий',
+        kind: 'note',
+        resource: 'k-word',
+        post: note
+      })
+    ).body.material as { id: string; status: string }
+    expect(sent.status).toBe('pending')
+    expect(await inbox('pastor')).toContainEqual(
+      expect.stringContaining('На затвердження (новий): «План молитви»')
+    )
+    expect(
+      (
+        await call('PUT', '/schedule/marks', 'musician', {
+          eventId,
+          day,
+          role: 'Ведучий',
+          resource: 'k-word',
+          done: true
+        })
+      ).status
+    ).toBe(409)
+
+    // returned with a word (not without one); not by the author
+    const review = (token: string, decision: Record<string, unknown>) =>
+      call('POST', `/schedule/materials/${sent.id}/review`, token, decision)
+    expect((await review('musician', { approve: true })).status).toBe(403)
+    expect((await review('pastor', { approve: false })).status).toBe(400)
+    expect((await review('pastor', { approve: false, note: 'Додайте вірші' })).body.material).toMatchObject({
+      status: 'returned',
+      reviewNote: 'Додайте вірші'
+    })
+    expect(await inbox('musician')).toContainEqual(expect.stringContaining('Повернуто на доопрацювання'))
+    // changed by its author: it waits again
+    const changed = { ...note, items: [{ kind: 'note', text: 'План молитви: Пс 23', verses: [] }] }
+    expect(
+      (await call('PUT', `/schedule/materials/${sent.id}`, 'musician', { post: changed })).body.material
+    ).toMatchObject({ status: 'pending', reviewNote: null })
+
+    // the pastor away: another pastor approves meanwhile, and is told so
+    expect((await call('PUT', '/approval-forward', 'musician', { toUids: ['leader-uid'] })).status).toBe(403)
+    expect((await call('PUT', '/approval-forward', 'pastor', { toUids: ['musician-uid'] })).status).toBe(400)
+    const forward = await call('PUT', '/approval-forward', 'pastor', {
+      toUids: ['leader-uid'],
+      until: '2026-10-30'
+    })
+    expect(forward.body.forward).toMatchObject({ toUids: ['leader-uid'], until: '2026-10-30' })
+    expect(await inbox('leader')).toContainEqual(
+      expect.stringContaining('доручає вам затвердження матеріалів служінь')
+    )
+    const schedule = (await call('GET', `/schedule?from=${day}&to=${day}`, 'leader')).body
+    expect((schedule.events as { approvers: string[] }[])[0]!.approvers).toEqual(['pastor-uid', 'leader-uid'])
+    // the one standing in sees the materials, and approves them
+    expect((schedule.materials as { id: string }[]).map((item) => item.id)).toEqual([sent.id])
+    expect((await review('leader', { approve: true })).body.material).toMatchObject({ status: 'approved' })
+
+    // back: the one standing in is told, and approves no more
+    await call('DELETE', '/approval-forward', 'pastor')
+    expect(await inbox('leader')).toContainEqual(expect.stringContaining('повернувся(лася)'))
+    expect((await review('leader', { approve: true })).status).toBe(403)
+  })
+
   it('a guest is written by name; who applies is the choice of the event', async () => {
     const { call } = await church()
     const open = (applicants: string) =>

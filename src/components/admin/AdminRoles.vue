@@ -37,6 +37,15 @@
               density="compact"
               hide-details
             />
+            <!-- a pastor: the materials of the services that need an approval go to them -->
+            <v-switch
+              v-model="role.approveMaterials"
+              inset
+              :label="text.rightApproveMaterials"
+              color="secondary"
+              density="compact"
+              hide-details
+            />
             <v-switch
               v-model="role.publish"
               inset

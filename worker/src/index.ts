@@ -58,6 +58,7 @@ import {
 } from './groups'
 import { d1Posts, type PostsStore, type PostTask, type Submission } from './posts'
 import { getMaterialKinds, isYouTube, parseMaterialKinds, setMaterialKinds, videoOf } from './materialKinds'
+import { getForwards, setForwards } from './approvals'
 import { getHandovers, parseUntil, renameHandover, setHandovers, type Handovers } from './handovers'
 import {
   byLeader,
@@ -249,6 +250,8 @@ const ROUTES = [
   /^GET \/schedule(\/people|\/materials)?$/,
   /^POST \/schedule\/materials$/,
   /^(PUT|DELETE) \/schedule\/materials\/[^/]+$/,
+  /^POST \/schedule\/materials\/[^/]+\/review$/,
+  /^(GET|PUT|DELETE) \/approval-forward$/,
   /^PUT \/schedule\/marks$/,
   /^(POST|PUT|DELETE) \/schedule\/events(\/[^/]+)?$/,
   /^(POST|DELETE) \/schedule\/team$/,
@@ -264,6 +267,10 @@ const nameOf = (record: UserRecord) => record.name ?? record.email ?? record.uid
 /** what the people of a role may do; the owners may do everything */
 const rightsOf = (roles: RoleDef[], roleId: string) =>
   roleId === 'owner' ? OWNER_ROLE : roleDefOf(roles, roleId)
+
+/** the pastors: the people whose status approves the materials of the services */
+const pastorsOf = (roles: RoleDef[], users: { uid: string; role: string }[]) =>
+  users.filter((user) => rightsOf(roles, user.role).approveMaterials).map((user) => user.uid)
 
 /** what a user may do: their status, and their roles in the ministries */
 const rightsFor = (
@@ -470,6 +477,8 @@ async function scheduleContext(
     planners: users
       .filter((user) => rightsOf(roles, user.role).manage.includes('schedule'))
       .map((user) => user.uid),
+    pastors: pastorsOf(roles, users),
+    forwards: await getForwards(env.USERS, localDay(deps.now?.() ?? Date.now())),
     eventTypes: await getEventTypes(env.USERS),
     materialKinds: await getMaterialKinds(env.USERS),
     calendar: await getCalendar(env.USERS),
@@ -843,7 +852,8 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
         approveIn: rights.approveIn,
         invite: rights.invite,
         sendToMinistries: rights.sendToMinistries,
-        manage: rights.manage
+        manage: rights.manage,
+        approveMaterials: Boolean(rights.approveMaterials)
       },
       // the roles of the user in the ministries: { ministry: ['Музикант', …] }
       ministryRoles: Object.fromEntries(
@@ -1406,6 +1416,67 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     if (!isYouTube(url)) return json({ error: 'bad-request' }, 400)
     const video = await videoOf(url, deps.fetcher).catch(() => null)
     return video ? json(video) : json({ error: 'not-found' }, 404)
+  }
+
+  // a pastor away: the approval of the materials of the services goes to other pastors
+  if (pathname === '/approval-forward') {
+    if (!rights.approveMaterials) return json({ error: 'forbidden' }, 403)
+    const users = await listUsers(env.USERS, env.OWNERS, true)
+    const pastors = pastorsOf(roles, users).filter((uid) => uid !== me.uid)
+    const forwards = await getForwards(env.USERS, today)
+    const mine = forwards[me.uid] ?? null
+    const people = (uids: string[]) =>
+      uids.map((uid) => {
+        const user = users.find((item) => item.uid === uid)
+        return { uid, name: user ? (user.name ?? user.email ?? uid) : uid }
+      })
+    if (route === 'GET /approval-forward') return json({ forward: mine, pastors: people(pastors) })
+
+    if (route === 'PUT /approval-forward') {
+      const payload = ((await body()) ?? {}) as { toUids?: unknown; until?: unknown }
+      const until = parseUntil(payload.until, today)
+      const toUids = Array.isArray(payload.toUids) ? [...new Set(payload.toUids)] : []
+      if (
+        until === false ||
+        !toUids.length ||
+        toUids.length > 20 ||
+        !toUids.every((uid) => typeof uid === 'string' && pastors.includes(uid))
+      )
+        return json({ error: 'bad-request' }, 400)
+      const next = { toUids: toUids as string[], until, at: deps.now?.() ?? Date.now() }
+      await setForwards(env.USERS, { ...forwards, [me.uid]: next })
+      // the ones newly asked to stand in are told
+      const added = next.toUids.filter((uid) => !mine?.toUids.includes(uid))
+      await tell(
+        env,
+        deps,
+        me,
+        added,
+        `🔁 ${nameOf(me)} доручає вам затвердження матеріалів служінь на час своєї відсутності${untilText(until)}. Матеріали на затвердження надходитимуть вам.`
+      )
+      const gone = (mine?.toUids ?? []).filter((uid) => !next.toUids.includes(uid))
+      await tell(
+        env,
+        deps,
+        me,
+        gone,
+        `↩️ ${nameOf(me)} більше не доручає вам затвердження матеріалів служінь.`
+      )
+      return json({ forward: next })
+    }
+
+    // DELETE: the pastor is back
+    if (!mine) return json({ forward: null })
+    const { [me.uid]: _gone, ...rest } = forwards
+    await setForwards(env.USERS, rest)
+    await tell(
+      env,
+      deps,
+      me,
+      mine.toUids,
+      `↩️ ${nameOf(me)} повернувся(лася): матеріали служінь знову затверджує він (вона).`
+    )
+    return json({ forward: null })
   }
 
   // the duties of a leader handed over to a deputy, who accepts them first

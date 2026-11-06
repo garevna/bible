@@ -1,4 +1,69 @@
 export const calendar = {
+  needsApproval: {
+    ua: 'Матеріали потребують затвердження пастором',
+    ru: 'Материалы нуждаются в утверждении пастором',
+    en: 'The materials need the approval of a pastor'
+  },
+  approverField: {
+    ua: 'Хто затверджує',
+    ru: 'Кто утверждает',
+    en: 'Approved by'
+  },
+  noPastors: {
+    ua: 'Пасторів ще немає: супервайзер дає статус із правом «Затверджує матеріали служінь».',
+    ru: 'Пасторов ещё нет: супервайзер даёт статус с правом «Утверждает материалы служений».',
+    en: 'No pastors yet: a supervisor gives a status with the right to approve the materials.'
+  },
+  statusPending: {
+    ua: 'на затвердженні',
+    ru: 'на утверждении',
+    en: 'waiting for approval'
+  },
+  statusReturned: {
+    ua: 'повернуто',
+    ru: 'возвращено',
+    en: 'returned'
+  },
+  statusApproved: {
+    ua: 'затверджено',
+    ru: 'утверждено',
+    en: 'approved'
+  },
+  returnedBy: {
+    ua: 'Повернуто ({name}):',
+    ru: 'Возвращено ({name}):',
+    en: 'Returned ({name}):'
+  },
+  approveMaterial: {
+    ua: 'Затвердити',
+    ru: 'Утвердить',
+    en: 'Approve'
+  },
+  returnMaterial: {
+    ua: 'Повернути на доопрацювання',
+    ru: 'Вернуть на доработку',
+    en: 'Return'
+  },
+  returnNote: {
+    ua: 'Що виправити',
+    ru: 'Что исправить',
+    en: 'What to change'
+  },
+  returnToAuthor: {
+    ua: 'Повернути автору',
+    ru: 'Вернуть автору',
+    en: 'Return to the author'
+  },
+  pendingTitle: {
+    ua: 'Чекають вашого затвердження: {count}',
+    ru: 'Ждут вашего утверждения: {count}',
+    en: 'Waiting for your approval: {count}'
+  },
+  readyByApproval: {
+    ua: 'Готово, коли пастор затвердить матеріал',
+    ru: 'Готово, когда пастор утвердит материал',
+    en: 'Ready once a pastor approves a material'
+  },
   materialsGeneric: {
     ua: 'Матеріали',
     ru: 'Материалы',

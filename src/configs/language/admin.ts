@@ -1,4 +1,9 @@
 export const admin = {
+  rightApproveMaterials: {
+    ua: 'Затверджує матеріали служінь (пастор)',
+    ru: 'Утверждает материалы служений (пастор)',
+    en: 'Approves the materials of the services (a pastor)'
+  },
   title: {
     ua: 'Користувачі та статуси',
     ru: 'Пользователи и статусы',

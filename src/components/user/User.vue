@@ -98,6 +98,13 @@
           :title="groupsText.myGroup"
           @click="homeGroupDialog = true"
         />
+        <!-- a pastor away: the approvals go to other pastors -->
+        <v-list-item
+          v-if="worker.rights.approveMaterials"
+          prepend-icon="mdi-account-switch-outline"
+          :title="header.forwardMenu"
+          @click="forwardDialog = true"
+        />
         <v-list-item
           v-if="worker.canReceive"
           prepend-icon="mdi-cellphone"
@@ -137,6 +144,7 @@
 
     <PhoneDialog v-model="phoneDialog" :number="worker.phone" :submit="worker.setMyPhone" />
     <HomeGroupDialog v-model="homeGroupDialog" />
+    <ForwardDialog v-model="forwardDialog" />
     <InstallDialog v-model="installDialog" />
 
     <!-- ministers: the schedule of ministries -->
@@ -193,6 +201,7 @@ import { storeToRefs } from 'pinia'
 
 import PhoneDialog from '@/components/PhoneDialog.vue'
 import HomeGroupDialog from '@/components/groups/HomeGroupDialog.vue'
+import ForwardDialog from '@/components/user/ForwardDialog.vue'
 import InstallDialog from '@/components/user/InstallDialog.vue'
 import { usePostsStore } from '@/stores/posts'
 import { installed, onPhone } from '@/utils/install'
@@ -236,6 +245,7 @@ const failed = ref(false)
 /** a minister without a mobile number is asked for it once a session, the mark on the avatar stays */
 const phoneDialog = ref(false)
 const homeGroupDialog = ref(false)
+const forwardDialog = ref(false)
 const installDialog = ref(false)
 /** a phone: the app goes onto its home screen; a computer: into its own window */
 const phone = onPhone()

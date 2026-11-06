@@ -19,6 +19,8 @@ export interface RoleDef {
   publish: boolean
   /** decides whether a post may go to the channel (approves the posts sent for publication) */
   approvePosts?: boolean
+  /** a pastor: approves the materials of the services that need it, and stands in for other pastors */
+  approveMaterials?: boolean
   /** writes messages to colleagues */
   send: boolean
   /** the roles whose people it may write to */
@@ -97,6 +99,7 @@ export const DEFAULT_ROLES: RoleDef[] = [
     name: 'Супервайзер',
     publish: true,
     approvePosts: true,
+    approveMaterials: true,
     send: true,
     sendToRoles: ['servant', 'admin', SUPERVISOR],
     sendToPeople: true,
@@ -196,6 +199,7 @@ const isRoleDef = (value: unknown): value is RoleDef => {
     role.messageDays <= 30 &&
     (role.approve === undefined || typeof role.approve === 'boolean') &&
     (role.approvePosts === undefined || typeof role.approvePosts === 'boolean') &&
+    (role.approveMaterials === undefined || typeof role.approveMaterials === 'boolean') &&
     (role.invite === undefined ||
       (Array.isArray(role.invite) &&
         role.invite.length <= 100 &&
@@ -224,6 +228,7 @@ export function parseRoles(value: unknown): RoleDef[] | null {
     messageDays: role.messageDays,
     approve: role.approve ?? false,
     approvePosts: role.approvePosts ?? false,
+    approveMaterials: role.approveMaterials ?? false,
     // every ministry, or the chosen ones
     invite: role.invite?.includes(ANY_MINISTRY) ? [ANY_MINISTRY] : [...new Set(role.invite ?? [])],
     manage: [...new Set(role.manage)]

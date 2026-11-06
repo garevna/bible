@@ -12,6 +12,15 @@
           size="small"
         />
         <span class="flex-grow-1 material__title">{{ material.title || kindTitle }}</span>
+        <!-- where a pastor approves: the state of the material -->
+        <v-chip
+          v-if="occurrence.event.approverUid && material.status"
+          size="x-small"
+          variant="tonal"
+          :color="stateColor[material.status]"
+        >
+          {{ stateText(material.status) }}
+        </v-chip>
         <span class="by">{{ format(text.byName, { name: material.name }) }}</span>
         <ButtonTooltip
           v-if="mayChange(material) && editable(material) && editing !== material.id"
@@ -76,6 +85,60 @@
         class="picture"
       />
       <AttachmentView v-else-if="full[material.id]" :attachment="full[material.id]!" class="mt-1" />
+
+      <!-- returned: what the pastor asks to change -->
+      <p v-if="material.status === 'returned' && material.reviewNote" class="returned">
+        {{ format(text.returnedBy, { name: material.reviewedBy ?? '' }) }} {{ material.reviewNote }}
+      </p>
+      <!-- the pastor (or one standing in): approve, or return with a word -->
+      <div v-if="reviewer && material.status !== 'approved'" class="review">
+        <template v-if="returning === material.id">
+          <v-textarea
+            v-model="returnNote"
+            :label="text.returnNote"
+            rows="2"
+            auto-grow
+            density="compact"
+            hide-details
+            class="mb-2"
+          />
+          <div class="d-flex flex-wrap ga-2 justify-end">
+            <v-btn variant="text" class="text-none" @click="returning = null">{{ common.cancel }}</v-btn>
+            <v-btn
+              variant="flat"
+              color="delete"
+              class="text-none"
+              :disabled="busy || !returnNote.trim()"
+              @click="review(material, false)"
+            >
+              {{ text.returnToAuthor }}
+            </v-btn>
+          </div>
+        </template>
+        <div v-else class="d-flex flex-wrap ga-2">
+          <v-btn
+            variant="flat"
+            color="primary"
+            class="text-none"
+            prepend-icon="mdi-check"
+            :disabled="busy"
+            @click="review(material, true)"
+          >
+            {{ text.approveMaterial }}
+          </v-btn>
+          <v-btn
+            v-if="material.status === 'pending'"
+            variant="tonal"
+            color="delete"
+            class="text-none"
+            prepend-icon="mdi-undo"
+            :disabled="busy"
+            @click="startReturn(material)"
+          >
+            {{ text.returnMaterial }}
+          </v-btn>
+        </div>
+      </div>
     </article>
     <p v-if="!mine.length" class="muted">{{ text.noMaterials }}</p>
 
@@ -230,6 +293,27 @@ const full = ref<Record<string, Attachment>>({})
 
 const iconOf = (material: MaterialItem) =>
   ({ video: 'mdi-youtube', topic: '$topic', note: '$note', image: 'mdi-image-outline' })[material.kind]
+/** the user approves the materials of the event (its pastor, or one standing in) */
+const reviewer = computed(() => schedule.reviews(props.occurrence.event))
+const stateColor = { approved: 'primary', pending: 'calendar-orange', returned: 'delete' } as const
+const stateText = (state: 'approved' | 'pending' | 'returned') =>
+  ({
+    approved: text.value.statusApproved,
+    pending: text.value.statusPending,
+    returned: text.value.statusReturned
+  })[state]
+
+const returning = ref<string | null>(null)
+const returnNote = ref('')
+function startReturn(material: MaterialItem) {
+  returning.value = material.id
+  returnNote.value = ''
+}
+async function review(material: MaterialItem, approve: boolean) {
+  if (await run(() => schedule.reviewMaterial(material.id, approve, approve ? '' : returnNote.value.trim())))
+    returning.value = null
+}
+
 /** a participant changes only their own materials; the leaders and the administrators any */
 const mayChange = (material: MaterialItem) =>
   material.uid === user.uid || schedule.approves(props.occurrence.event)
@@ -414,6 +498,18 @@ async function saveEdit(material: MaterialItem) {
 /* the title of a note or a topic is in the header already */
 .material :deep(.attachment__kind) {
   display: none;
+}
+
+.returned {
+  color: rgb(var(--v-theme-delete));
+  font-size: 14px;
+  margin: 6px 0 0;
+}
+
+.review {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: solid 1px var(--app-border-light);
 }
 
 .picture {

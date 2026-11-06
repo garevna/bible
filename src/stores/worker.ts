@@ -25,6 +25,8 @@ export interface RoleDef {
   publish: boolean
   /** decides whether a post may go to the channel */
   approvePosts?: boolean
+  /** a pastor: approves the materials of the services that need it */
+  approveMaterials?: boolean
   send: boolean
   sendToRoles: string[]
   sendToPeople: boolean
@@ -94,6 +96,8 @@ export interface Rights {
   /** the ministries whose people the user writes to (by a role there) */
   sendToMinistries: string[]
   manage: Manage[]
+  /** a pastor: approves the materials of the services, forwards the approval when away */
+  approveMaterials?: boolean
 }
 
 const NO_RIGHTS: Rights = {

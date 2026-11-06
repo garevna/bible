@@ -86,6 +86,8 @@ export interface Profile {
   country?: string
   translation?: string
   lang?: Lang
+  /** a new mark at each change of the user's data (notes, topics…): another device sees it and pulls them */
+  dataVersion?: string
 }
 
 /** Signed in user: the profile plus the Firebase Auth uid and email */

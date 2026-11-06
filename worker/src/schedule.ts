@@ -33,6 +33,9 @@ export interface ScheduleEvent {
   responsibleName: string
   deputyUid: string | null
   deputyName: string | null
+  /** the pastor who approves its materials; null: they need no approval */
+  approverUid: string | null
+  approverName: string | null
   createdBy: string
   createdAt: number
 }
@@ -88,6 +91,12 @@ export interface Material {
   name: string
   /** a note or a topic of the app (its post), a video of YouTube (its url), a picture kept in Telegram ('tg:…') */
   kind: 'note' | 'topic' | 'video' | 'image'
+  /** approved by the pastor of the event (or needing no approval), waiting for it, or returned to its author */
+  status: MaterialStatus
+  /** the word of the pastor who returned it */
+  reviewNote: string | null
+  /** who approved or returned it */
+  reviewedBy: string | null
   /** the kind of the material: an id of the resources of a ministry, or null */
   resource: string | null
   url: string | null
@@ -95,6 +104,8 @@ export interface Material {
   post: TopicPost
   createdAt: number
 }
+
+export type MaterialStatus = 'approved' | 'pending' | 'returned'
 
 /** a material without its post: the list of the calendar */
 export type MaterialItem = Omit<Material, 'post'>
@@ -198,6 +209,8 @@ export interface EventDraft {
   applicants: Applicants
   responsibleUid: string
   deputyUid: string | null
+  /** the materials need the approval of this pastor */
+  approverUid: string | null
 }
 
 export function parseEvent(body: unknown): EventDraft | null {
@@ -224,6 +237,7 @@ export function parseEvent(body: unknown): EventDraft | null {
   if (!time || !Number.isInteger(needed) || needed < 1 || needed > 100) return null
   const mode = draft.mode === 'open' ? 'open' : 'invite'
   const deputyUid = typeof draft.deputyUid === 'string' && draft.deputyUid ? draft.deputyUid : null
+  const approverUid = typeof draft.approverUid === 'string' && draft.approverUid ? draft.approverUid : null
   const typeId = typeof draft.typeId === 'string' && draft.typeId ? draft.typeId : null
   const slots = parseSlots(draft.slots ?? [])
   if (!slots) return null
@@ -258,7 +272,8 @@ export function parseEvent(body: unknown): EventDraft | null {
     mode,
     applicants,
     responsibleUid,
-    deputyUid
+    deputyUid,
+    approverUid
   }
 }
 
@@ -344,6 +359,8 @@ interface EventRow {
   responsible_name: string
   deputy_uid: string | null
   deputy_name: string | null
+  approver_uid?: string | null
+  approver_name?: string | null
   created_by: string
   created_at: number
 }
@@ -374,6 +391,9 @@ interface MaterialRow {
   url?: string | null
   title: string
   post?: string
+  status?: string | null
+  review_note?: string | null
+  reviewed_by?: string | null
   created_at: number
 }
 
@@ -397,6 +417,8 @@ const eventOf = (row: EventRow): ScheduleEvent => ({
   responsibleName: row.responsible_name,
   deputyUid: row.deputy_uid,
   deputyName: row.deputy_name,
+  approverUid: row.approver_uid ?? null,
+  approverName: row.approver_name ?? null,
   createdBy: row.created_by,
   createdAt: row.created_at
 })
@@ -422,7 +444,10 @@ const materialItemOf = (row: MaterialRow): MaterialItem => ({
   role: row.role,
   uid: row.uid,
   name: row.name,
-  kind: row.kind === 'topic' ? 'topic' : row.kind === 'video' ? 'video' : 'note',
+  kind: row.kind === 'topic' || row.kind === 'video' || row.kind === 'image' ? row.kind : 'note',
+  status: row.status === 'pending' || row.status === 'returned' ? row.status : 'approved',
+  reviewNote: row.review_note ?? null,
+  reviewedBy: row.reviewed_by ?? null,
   resource: row.resource ?? null,
   url: row.url ?? null,
   title: row.title,
@@ -456,7 +481,8 @@ const changeOf = (row: ChangeRow): DayChange => ({
   slots: row.slots ? withKinds(JSON.parse(row.slots) as Slot[]) : null
 })
 
-const MATERIAL_ITEM = 'id, event_id, day, role, uid, name, kind, resource, url, title, created_at'
+const MATERIAL_ITEM =
+  'id, event_id, day, role, uid, name, kind, resource, url, title, status, review_note, reviewed_by, created_at'
 
 interface MarkRow {
   event_id: string
@@ -486,7 +512,7 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async putEvent(e) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO events (id, type_id, ministry, title, description, location, day, weekdays, time, until, needed, times, slots, mode, applicants, responsible_uid, responsible_name, deputy_uid, deputy_name, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO events (id, type_id, ministry, title, description, location, day, weekdays, time, until, needed, times, slots, mode, applicants, responsible_uid, responsible_name, deputy_uid, deputy_name, approver_uid, approver_name, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .bind(
           e.id,
@@ -508,6 +534,8 @@ export function d1Schedule(db: D1Database): ScheduleStore {
           e.responsibleName,
           e.deputyUid,
           e.deputyName,
+          e.approverUid,
+          e.approverName,
           e.createdBy,
           e.createdAt
         )
@@ -583,7 +611,7 @@ export function d1Schedule(db: D1Database): ScheduleStore {
     async putMaterial(m) {
       await db
         .prepare(
-          'INSERT OR REPLACE INTO materials (id, event_id, day, role, uid, name, kind, resource, url, title, post, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+          'INSERT OR REPLACE INTO materials (id, event_id, day, role, uid, name, kind, resource, url, title, post, status, review_note, reviewed_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         )
         .bind(
           m.id,
@@ -597,6 +625,9 @@ export function d1Schedule(db: D1Database): ScheduleStore {
           m.url,
           m.title,
           JSON.stringify(m.post),
+          m.status,
+          m.reviewNote,
+          m.reviewedBy,
           m.createdAt
         )
         .run()

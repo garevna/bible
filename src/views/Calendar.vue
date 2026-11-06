@@ -18,6 +18,7 @@
         <ButtonTooltip icon="mdi-refresh" :text="admin.reload" color="secondary" @click="load" />
       </div>
 
+      <PendingApprovals />
       <CalendarFilters />
 
       <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
@@ -89,6 +90,7 @@ import DayDialog from '@/components/calendar/DayDialog.vue'
 import EventDialog from '@/components/calendar/EventDialog.vue'
 import InvitationsDialog from '@/components/calendar/InvitationsDialog.vue'
 import MonthGrid from '@/components/calendar/MonthGrid.vue'
+import PendingApprovals from '@/components/calendar/PendingApprovals.vue'
 import OccurrenceCard from '@/components/calendar/OccurrenceCard.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore, type Occurrence, type Participant, type ScheduleEvent } from '@/stores/schedule'

@@ -1,3 +1,4 @@
+import { approversOf, reviewersOf, type ApprovalForwards } from './approvals'
 import type { CalendarSettings, EventType, Slot } from './eventTypes'
 import { isYouTube, type MaterialKind } from './materialKinds'
 import { MESSAGE_LIFE, type Message, type MessagesStore } from './messages'
@@ -70,6 +71,10 @@ export interface ScheduleContext {
   bot: ServiceBot
   /** the leaders of the ministries: they plan the events of their own ministry */
   leaders: Record<string, string[]>
+  /** the pastors: the people whose status approves the materials of the services */
+  pastors?: string[]
+  /** the pastors away, and who stands in for them */
+  forwards?: ApprovalForwards
   /** the places of the locations: a map opens them */
   addresses?: Addresses
   /** a reader (not a minister): sees and applies to the open events for everyone only */
@@ -160,6 +165,11 @@ export async function handleSchedule(
     leaders,
     now
   } = context
+  const pastors = context.pastors ?? []
+  const forwards = context.forwards ?? {}
+  /** who gets the materials of the event to approve, and who may approve them */
+  const approversFor = (event: ScheduleEvent) => approversOf(event.approverUid, forwards)
+  const reviews = (event: ScheduleEvent) => reviewersOf(event.approverUid, forwards).includes(me.uid)
   const url = new URL(request.url)
   const route = `${request.method} ${url.pathname}`
   const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>
@@ -179,6 +189,13 @@ export async function handleSchedule(
   const servant = (uid: unknown) =>
     typeof uid === 'string' ? servants.find((user) => user.uid === uid) : undefined
 
+  /** a material for the pastors of the event to approve (new, or changed) */
+  const notifyMaterial = (event: ScheduleEvent, material: Material, what: 'новий' | 'змінено') =>
+    notify(
+      approversFor(event),
+      `📝 На затвердження (${what}): «${material.title || 'матеріал'}» (${material.role}) від ${material.name} — ${eventLabel(event, material.day)}. Відкрийте календар служінь, щоб затвердити або повернути.`
+    )
+
   /**
    * The materials the user sees: all of an event they approve (the leaders, the administrators);
    * otherwise only the ones of the roles they take that day (their own, and what the leader sent them)
@@ -197,6 +214,7 @@ export async function handleSchedule(
       if (!event) return false
       return (
         approves(event) ||
+        reviews(event) ||
         team.some((own) => own.eventId === item.eventId && own.day === item.day && own.role === item.role)
       )
     })
@@ -311,7 +329,8 @@ export async function handleSchedule(
       .sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time))
       .map(({ eventId, day }) => ({ eventId, day }))
     return json({
-      events,
+      // who approves the materials of each event now (its pastor, or the ones standing in)
+      events: events.map((event) => ({ ...event, approvers: reviewersOf(event.approverUid, forwards) })),
       days,
       changes,
       participants: (await schedule.participants(from, to)).filter((item) => ids.has(item.eventId)),
@@ -335,7 +354,9 @@ export async function handleSchedule(
         ministries: user.ministries ?? [],
         // the phones only for the ones who plan
         phone: plans ? (user.phone ?? null) : null
-      }))
+      })),
+      // the people who may approve the materials of the services
+      pastors
     })
   }
 
@@ -357,13 +378,42 @@ export async function handleSchedule(
     const post = material.kind === 'note' || material.kind === 'topic' ? parsePost(body.post) : null
     if (!post) return json({ error: 'bad-request' }, 400)
     const { image: _image, ...withoutImage } = post
+    // changed by its author: it waits for the pastor again (a pastor's own change stands)
+    const again = Boolean(event.approverUid) && !reviewersOf(event.approverUid, forwards).includes(me.uid)
     const changed: Material = {
       ...material,
       post: withoutImage,
-      title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : '')
+      title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : ''),
+      ...(again ? { status: 'pending' as const, reviewNote: null, reviewedBy: null } : {})
     }
     await schedule.putMaterial(changed)
+    if (again && material.status !== 'pending') await notifyMaterial(event, changed, 'змінено')
     return json({ material: changed })
+  }
+
+  // a pastor approves a material, or returns it to its author with a word
+  const reviewId = url.pathname.match(/^\/schedule\/materials\/([^/]+)\/review$/)?.[1]
+  if (reviewId && request.method === 'POST') {
+    const material = await schedule.material(decodeURIComponent(reviewId))
+    const event = material ? await schedule.event(material.eventId) : null
+    if (!material || !event) return json({ error: 'not-found' }, 404)
+    if (!reviews(event)) return json({ error: 'forbidden' }, 403)
+    const approve = body.approve === true
+    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 500) : ''
+    if (!approve && !note) return json({ error: 'bad-request' }, 400)
+    const reviewed: Material = {
+      ...material,
+      status: approve ? 'approved' : 'returned',
+      reviewNote: approve ? null : note,
+      reviewedBy: nameOf(me)
+    }
+    await schedule.putMaterial(reviewed)
+    const what = `«${material.title || 'матеріал'}» (${material.role}): ${eventLabel(event, material.day)}`
+    await notify(
+      [material.uid],
+      approve ? `✅ Затверджено: ${what}.` : `↩️ Повернуто на доопрацювання: ${what}. ${nameOf(me)}: ${note}`
+    )
+    return json({ material: reviewed })
   }
   if (materialId && request.method === 'DELETE') {
     const material = await schedule.material(decodeURIComponent(materialId))
@@ -391,6 +441,10 @@ export async function handleSchedule(
       servant(draft.responsibleUid) ?? (draft.responsibleUid === me.uid ? { ...me, owner: false } : undefined)
     const deputy = draft.deputyUid ? servant(draft.deputyUid) : null
     if (!responsible || deputy === undefined) return json({ error: 'unknown-person' }, 400)
+    // the materials approved by a pastor: one of the pastors
+    const approver = draft.approverUid ? servant(draft.approverUid) : null
+    if (draft.approverUid && (!approver || !pastors.includes(approver.uid)))
+      return json({ error: 'unknown-person' }, 400)
     // the roles of a type with fixed roles are its own; a type without roles has none
     const slots = type?.roles === 'fixed' ? type.slots : type?.roles === 'none' ? [] : draft.slots
     const event: ScheduleEvent = {
@@ -402,6 +456,8 @@ export async function handleSchedule(
       responsibleName: nameOf(responsible),
       deputyUid: deputy?.uid ?? null,
       deputyName: deputy ? nameOf(deputy) : null,
+      approverUid: approver?.uid ?? null,
+      approverName: approver ? nameOf(approver) : null,
       createdBy: old?.createdBy ?? me.uid,
       createdAt: old?.createdAt ?? now
     }
@@ -732,19 +788,25 @@ export async function handleSchedule(
       url: kind === 'video' || kind === 'image' ? (body.url as string) : null,
       title: post.title || (post.items[0]?.kind === 'note' ? post.items[0].text.slice(0, 80) : ''),
       post: withoutImage,
+      // the materials of an event with a pastor wait for the pastor (a pastor's own do not)
+      status: event.approverUid && !reviews(event) ? 'pending' : 'approved',
+      reviewNote: null,
+      reviewedBy: null,
       createdAt: now
     }
     await schedule.putMaterial(material)
-    // a material of a kind: the kind is ready
-    await schedule.putMark({
-      eventId: event.id,
-      day,
-      role: slot.name,
-      resource: resource ?? '',
-      uid: me.uid,
-      name: nameOf(me),
-      updatedAt: now
-    })
+    if (material.status === 'pending') await notifyMaterial(event, material, 'новий')
+    // a material of a kind: the kind is ready (with a pastor: once it is approved)
+    if (!event.approverUid)
+      await schedule.putMark({
+        eventId: event.id,
+        day,
+        role: slot.name,
+        resource: resource ?? '',
+        uid: me.uid,
+        name: nameOf(me),
+        updatedAt: now
+      })
     ofTheRole &&
       (await notify(
         [event.responsibleUid, event.deputyUid],
@@ -762,6 +824,8 @@ export async function handleSchedule(
     const own = await schedule.participant(event.id, day, me.uid)
     const ofTheRole = own?.role === slot.name && own.status !== 'declined' && own.status !== 'applied'
     if (!ofTheRole && !approves(event)) return json({ error: 'forbidden' }, 403)
+    // where a pastor approves the materials, a kind is ready by an approved material only
+    if (event.approverUid) return json({ error: 'needs-approval' }, 409)
     if (body.done === true) {
       const mark = {
         eventId: event.id,

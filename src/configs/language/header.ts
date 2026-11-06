@@ -6,6 +6,71 @@ const [ohienko, asv] = [
 ]
 
 export const header = {
+  forwardMenu: {
+    ua: 'Переадресація затверджень',
+    ru: 'Переадресация утверждений',
+    en: 'Forward the approvals'
+  },
+  forwardTitle: {
+    ua: 'Переадресація затверджень',
+    ru: 'Переадресация утверждений',
+    en: 'Forward the approvals'
+  },
+  forwardHint: {
+    ua: 'Їдете чи не зможете затверджувати матеріали служінь? Виберіть пасторів, які вас підмінять: усі матеріали на затвердження надходитимуть їм, і затвердити може будь-хто з них. Їм прийде повідомлення.',
+    ru: 'Уезжаете или не сможете утверждать материалы служений? Выберите пасторов, которые вас подменят: все материалы на утверждение будут приходить им, и утвердить может любой из них. Им придёт уведомление.',
+    en: 'Away, or unable to approve the materials of the services? Choose the pastors who stand in for you: the materials go to them, and any of them approves. They are told.'
+  },
+  forwardOn: {
+    ua: 'Переадресувати затвердження',
+    ru: 'Переадресовать утверждения',
+    en: 'Forward the approvals'
+  },
+  forwardNoPastors: {
+    ua: 'Інших пасторів ще немає: супервайзер дає статус із правом «Затверджує матеріали служінь».',
+    ru: 'Других пасторов ещё нет: супервайзер даёт статус с правом «Утверждает материалы служений».',
+    en: 'There are no other pastors yet: a supervisor gives a status with the right to approve the materials.'
+  },
+  forwardPastors: {
+    ua: 'Пастори',
+    ru: 'Пасторы',
+    en: 'Pastors'
+  },
+  forwardChosen: {
+    ua: 'Підмінятимуть',
+    ru: 'Будут подменять',
+    en: 'Stand in'
+  },
+  forwardUntil: {
+    ua: 'До якого дня (необов’язково)',
+    ru: 'До какого дня (необязательно)',
+    en: 'Until (optional)'
+  },
+  forwardUntilDay: {
+    ua: ' до {day} включно',
+    ru: ' до {day} включительно',
+    en: ' until {day}'
+  },
+  forwardDone: {
+    ua: 'Матеріали на затвердження надходитимуть: {names}{until}. Їм надіслано повідомлення.',
+    ru: 'Материалы на утверждение будут приходить: {names}{until}. Им отправлено уведомление.',
+    en: 'The materials go to {names}{until}. They are told.'
+  },
+  forwardOff: {
+    ua: 'Переадресацію вимкнено: матеріали знову надходять вам.',
+    ru: 'Переадресация выключена: материалы снова приходят вам.',
+    en: 'The forward is off: the materials come to you again.'
+  },
+  forwardFailed: {
+    ua: 'Не вдалося зберегти: {name}',
+    ru: 'Не удалось сохранить: {name}',
+    en: 'Could not save: {name}'
+  },
+  ok: {
+    ua: 'Добре',
+    ru: 'Хорошо',
+    en: 'OK'
+  },
   installTitleDesktop: {
     ua: 'Встановити на комп’ютер',
     ru: 'Установить на компьютер',

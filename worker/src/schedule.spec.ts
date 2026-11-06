@@ -22,6 +22,8 @@ const event = (change: Partial<ScheduleEvent>): ScheduleEvent => ({
   responsibleName: 'U',
   deputyUid: null,
   deputyName: null,
+  approverUid: null,
+  approverName: null,
   createdBy: 'u',
   createdAt: 0,
   ...change
@@ -104,6 +106,9 @@ describe('the store keeps no past', () => {
       url: null,
       title: '',
       post: { title: '', items: [] },
+      status: 'approved' as const,
+      reviewNote: null,
+      reviewedBy: null,
       createdAt: 0
     }
     await store.putMaterial({ ...material, id: 'old', day: '2026-10-05' })

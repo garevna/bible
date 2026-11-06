@@ -213,6 +213,30 @@
       clearable
     />
 
+    <!-- the materials of the event approved by a pastor before they count -->
+    <v-switch
+      :model-value="needsApproval"
+      inset
+      :label="text.needsApproval"
+      color="secondary"
+      density="compact"
+      hide-details
+      @update:model-value="setApproval"
+    />
+    <template v-if="needsApproval">
+      <v-select
+        v-if="pastorItems.length"
+        v-model="draft.approverUid"
+        :items="pastorItems"
+        item-title="name"
+        item-value="uid"
+        :label="text.approverField"
+        density="compact"
+        class="mt-2"
+      />
+      <p v-else class="hint mt-1">{{ text.noPastors }}</p>
+    </template>
+
     <template #actions>
       <ConfirmButton v-if="event" icon="$delete" :text="text.removeEvent" class="mr-auto" @confirm="remove" />
       <DialogButtons
@@ -268,7 +292,8 @@ const empty = (): EventDraft => ({
   mode: 'invite',
   applicants: 'ministry',
   responsibleUid: user.uid ?? '',
-  deputyUid: null
+  deputyUid: null,
+  approverUid: null
 })
 
 const draft = ref<EventDraft>(empty())
@@ -282,6 +307,17 @@ const error = ref('')
 /** a different time on some weekdays, and those times by the weekday */
 const perDay = ref(false)
 const times = ref<Record<string, string>>({})
+
+/** the materials approved by a pastor: the switch, and the pastors to choose from */
+const needsApproval = ref(false)
+const pastorItems = computed(() => schedule.people.filter((person) => schedule.pastors.includes(person.uid)))
+function setApproval(on: boolean | null) {
+  needsApproval.value = Boolean(on)
+  // the user, when a pastor; otherwise the first of them
+  draft.value.approverUid = on
+    ? ((pastorItems.value.find((person) => person.uid === user.uid) ?? pastorItems.value[0])?.uid ?? null)
+    : null
+}
 
 /** a marathon: every hour from the time of the event to this one, so many people an hour */
 const hourly = ref(false)
@@ -350,6 +386,7 @@ watch(open, (value) => {
   day.value = event?.day ?? (event ? '' : (startDay.value ?? schedule.today))
   until.value = event?.until ?? null
   weekdays.value = event?.weekdays ? [...event.weekdays] : []
+  needsApproval.value = Boolean(event?.approverUid)
   perDay.value = Boolean(event?.times)
   times.value = { ...event?.times }
   const hours = event ? hourlyOf(event.slots) : null
@@ -364,6 +401,7 @@ const ready = computed(
     Boolean(draft.value.ministry && draft.value.time && draft.value.responsibleUid) &&
     (kind.value === 'single' ? Boolean(day.value) : weekdays.value.length > 0) &&
     (!hourly.value || draft.value.slots.length > 0) &&
+    (!needsApproval.value || Boolean(draft.value.approverUid)) &&
     draft.value.slots.every((slot) => slot.name.trim() && Number(slot.count) >= 1)
 )
 

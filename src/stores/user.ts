@@ -166,10 +166,12 @@ export const useUserStore = defineStore('user', () => {
     // the old session format (encrypted credentials) is not used any more
     ;['SI', 'avatar', 'location'].forEach((key) => localStorage.removeItem(key))
 
-    const authUser = await useFirebaseStore().waitForAuth()
+    const firebase = useFirebaseStore()
+    const authUser = await firebase.waitForAuth()
     if (!authUser) return
 
-    const userProfile = (await loadProfile(authUser.uid)) ?? newProfile(authUser)
+    const remote = await firebase.getProfile(authUser.uid).catch(() => null)
+    const userProfile = remote ?? (await loadProfile(authUser.uid)) ?? newProfile(authUser)
     setUser({
       lang: lang.value,
       translation: translation.value,
@@ -179,6 +181,9 @@ export const useUserStore = defineStore('user', () => {
       email: authUser.email
     })
     updateLocalStorage()
+
+    // notes, topics, keywords, highlights changed on another device: this one gets them
+    if (remote && firebase.changedElsewhere(remote)) await firebase.read(remote.dataVersion)
   }
 
   async function run(action: () => Promise<{ user: AuthUser; isNew: boolean }>, data?: Profile) {

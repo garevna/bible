@@ -158,6 +158,20 @@ export const useFirebaseStore = defineStore('firebase', () => {
     )
   }
 
+  /*
+   * The same data on several devices: each change leaves a new mark in the profile, and this device keeps
+   * the mark of the data it has. Another mark in the profile: the data changed on another device.
+   */
+  const VERSION_KEY = 'dataVersion'
+  function markChanged() {
+    const version = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+    localStorage.setItem(VERSION_KEY, version)
+    updateUserData({ dataVersion: version })
+  }
+  /** the user's data changed on another device since this one had it */
+  const changedElsewhere = (profile: Profile) =>
+    Boolean(profile.dataVersion) && profile.dataVersion !== localStorage.getItem(VERSION_KEY)
+
   function saveFirebaseDocument(collectionName: UserStoreName, data: DocumentData & { _id?: string }) {
     const collectionRef = getUserCollectionRef(collectionName)
     if (!collectionRef) return
@@ -165,6 +179,7 @@ export const useFirebaseStore = defineStore('firebase', () => {
     setDoc(doc(collectionRef, data._id ?? Date.now().toString()), data).catch((error) =>
       console.warn('Error writing document\n', error)
     )
+    markChanged()
   }
 
   function deleteDocument(collectionName: UserStoreName, docId: string) {
@@ -174,11 +189,17 @@ export const useFirebaseStore = defineStore('firebase', () => {
     deleteDoc(doc(collectionRef, docId)).catch((error) =>
       console.warn(`Failed to delete ${docId} from ${collectionName}:\n`, error)
     )
+    markChanged()
   }
 
-  /** Replaces the user's local data (keywords, topics, notes, highlights) with the Firestore copy */
-  async function read() {
+  /**
+   * Replaces the user's local data (keywords, topics, notes, highlights) with the Firestore copy;
+   * version: the mark of the data in the profile, kept by this device once it has them
+   */
+  async function read(version?: string) {
     if (!userRef.value) return
+    const uid = userRef.value.id
+    let done = false
 
     await useAppStore().withProgress(async () => {
       await Promise.all(
@@ -194,7 +215,11 @@ export const useFirebaseStore = defineStore('firebase', () => {
           await putRecords(storeName, records)
         })
       )
+      done = true
     })
+    if (!done) return
+    const mark = version ?? (await getProfile(uid).catch(() => null))?.dataVersion
+    if (mark) localStorage.setItem(VERSION_KEY, mark)
   }
 
   return {
@@ -206,6 +231,7 @@ export const useFirebaseStore = defineStore('firebase', () => {
     saveProfile,
     getProfile,
     signInWithPassword,
+    changedElsewhere,
     signUpWithPassword,
     signInWithGoogle,
     resetPassword,
