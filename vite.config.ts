@@ -28,8 +28,9 @@ export default defineConfig(({ command }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'safari-pinned-tab.svg'],
       manifest: {
-        name: 'ХХЦ',
-        // the name under the icon on the phone
+        // the name of the app: in the install prompt and the menus of the computer
+        name: 'Портал ХХЦ',
+        // the name under the icon on the phone (a short one fits)
         short_name: 'ХХЦ',
         theme_color: '#4caf50',
         background_color: '#4caf50',

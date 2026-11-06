@@ -22,9 +22,9 @@ export const header = {
     en: 'At the right of the address bar click the install icon (a screen with an arrow), or open the menu of the browser (three dots)'
   },
   installMenuItemDesktop: {
-    ua: 'Виберіть «Встановити ХХЦ» (у Edge: «Програми» → «Установити цей сайт як програму»)',
-    ru: 'Выберите «Установить ХХЦ» (в Edge: «Приложения» → «Установить этот сайт как приложение»)',
-    en: 'Choose “Install ХХЦ” (in Edge: “Apps” → “Install this site as an app”)'
+    ua: 'Виберіть «Встановити Портал ХХЦ» (у Edge: «Програми» → «Установити цей сайт як програму»)',
+    ru: 'Выберите «Установить Портал ХХЦ» (в Edge: «Приложения» → «Установить этот сайт как приложение»)',
+    en: 'Choose “Install Портал ХХЦ” (in Edge: “Apps” → “Install this site as an app”)'
   },
   installMacFile: {
     ua: 'У меню «Файл» вгорі екрана виберіть «Додати в Dock»',
@@ -37,9 +37,9 @@ export const header = {
     en: 'Firefox on a computer does not install apps. Open kcc-bible.pp.ua in Chrome or Edge and choose “Install on the computer” there.'
   },
   installAfterDesktop: {
-    ua: 'Після встановлення застосунок «ХХЦ» з’явиться в меню «Пуск» (на Mac — у Launchpad), і ви залишитеся в ньому з тим самим акаунтом. Ярлик можна закріпити на панелі завдань або перетягти на робочий стіл.',
-    ru: 'После установки приложение «ХХЦ» появится в меню «Пуск» (на Mac — в Launchpad), и вы останетесь в нём с тем же аккаунтом. Ярлык можно закрепить на панели задач или перетащить на рабочий стол.',
-    en: 'After installing, “ХХЦ” is in the Start menu (Launchpad on a Mac), signed in with the same account. Pin it to the taskbar or drag it to the desktop.'
+    ua: 'Після встановлення застосунок «Портал ХХЦ» з’явиться в меню «Пуск» (на Mac — у Launchpad), і ви залишитеся в ньому з тим самим акаунтом. Ярлик можна закріпити на панелі завдань або перетягти на робочий стіл.',
+    ru: 'После установки приложение «Портал ХХЦ» появится в меню «Пуск» (на Mac — в Launchpad), и вы останетесь в нём с тем же аккаунтом. Ярлык можно закрепить на панели задач или перетащить на рабочий стол.',
+    en: 'After installing, “Портал ХХЦ” is in the Start menu (Launchpad on a Mac), signed in with the same account. Pin it to the taskbar or drag it to the desktop.'
   },
   installTitle: {
     ua: 'Встановити на телефон',
