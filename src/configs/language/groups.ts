@@ -268,5 +268,155 @@ export const groups = {
     ua: 'Відкрити на Google Maps',
     ru: 'Открыть на Google Maps',
     en: 'Open in Google Maps'
+  },
+  tabTopics: {
+    ua: 'Теми',
+    ru: 'Темы',
+    en: 'Topics'
+  },
+  topicsHeading: {
+    ua: 'Теми зустрічей домашніх груп',
+    ru: 'Темы встреч домашних групп',
+    en: 'The topics of the meetings'
+  },
+  topicsMinistry: {
+    ua: 'Служіння, що готує й розсилає теми',
+    ru: 'Служение, которое готовит и рассылает темы',
+    en: 'The ministry that prepares and sends the topics'
+  },
+  topicsApprover: {
+    ua: 'Хто затверджує теми',
+    ru: 'Кто утверждает темы',
+    en: 'Who approves the topics'
+  },
+  topicsNoApproval: {
+    ua: 'Без затвердження',
+    ru: 'Без утверждения',
+    en: 'No approval'
+  },
+  topicsNotSet: {
+    ua: 'Адміністратор ще не вибрав служіння, яке готує теми зустрічей.',
+    ru: 'Администратор ещё не выбрал служение, которое готовит темы встреч.',
+    en: 'The administrators have not chosen the ministry that prepares the topics yet.'
+  },
+  newTopic: {
+    ua: 'Нова тема',
+    ru: 'Новая тема',
+    en: 'A new topic'
+  },
+  recommendTopic: {
+    ua: 'Рекомендувати тему',
+    ru: 'Рекомендовать тему',
+    en: 'Recommend a topic'
+  },
+  noTopics: {
+    ua: 'Тем ще немає',
+    ru: 'Тем ещё нет',
+    en: 'No topics yet'
+  },
+  recommended: {
+    ua: 'Рекомендація пастора',
+    ru: 'Рекомендация пастора',
+    en: 'Recommended by the pastor'
+  },
+  topicTitle: {
+    ua: 'Тема зустрічі',
+    ru: 'Тема встречи',
+    en: 'The topic of the meeting'
+  },
+  topicDay: {
+    ua: 'На який день (необов’язково)',
+    ru: 'На какой день (необязательно)',
+    en: 'For what day (optional)'
+  },
+  topicText: {
+    ua: 'Текст, питання для обговорення',
+    ru: 'Текст, вопросы для обсуждения',
+    en: 'The text, questions to talk over'
+  },
+  topicVerses: {
+    ua: 'Вірші з вибраної нотатки чи теми',
+    ru: 'Стихи из выбранной заметки или темы',
+    en: 'The verses of the chosen note or topic'
+  },
+  removeVideo: {
+    ua: 'Прибрати відео',
+    ru: 'Убрать видео',
+    en: 'Remove the video'
+  },
+  removePicture: {
+    ua: 'Прибрати картинку',
+    ru: 'Убрать картинку',
+    en: 'Remove the picture'
+  },
+  deleteTopic: {
+    ua: 'Видалити тему',
+    ru: 'Удалить тему',
+    en: 'Delete the topic'
+  },
+  sendHeading: {
+    ua: 'Розіслати лідерам груп',
+    ru: 'Разослать лидерам групп',
+    en: 'Send to the leaders of the groups'
+  },
+  sendButton: {
+    ua: 'Надіслати вибраним',
+    ru: 'Отправить выбранным',
+    en: 'Send to the chosen'
+  },
+  sendAfterApproval: {
+    ua: 'Розіслати тему можна після затвердження.',
+    ru: 'Разослать тему можно после утверждения.',
+    en: 'The topic is sent once it is approved.'
+  },
+  sentDone: {
+    ua: 'Тему надіслано лідерам груп: {count}. Вони отримали повідомлення.',
+    ru: 'Тема отправлена лидерам групп: {count}. Они получили сообщение.',
+    en: 'Sent to the leaders of {count} groups. They got a message.'
+  },
+  sentCount: {
+    ua: 'Надіслано групам: {count}',
+    ru: 'Отправлено группам: {count}',
+    en: 'Sent to groups: {count}'
+  },
+  doneCount: {
+    ua: 'Пройдено: {count}',
+    ru: 'Пройдено: {count}',
+    en: 'Done: {count}'
+  },
+  topicDone: {
+    ua: 'Тема пройдена',
+    ru: 'Тема пройдена',
+    en: 'The topic is done'
+  },
+  groupTopics: {
+    ua: 'Теми зустрічей',
+    ru: 'Темы встреч',
+    en: 'The topics of the meetings'
+  },
+  noGroupTopics: {
+    ua: 'Тем для вашої групи ще не надсилали.',
+    ru: 'Тем для вашей группы ещё не присылали.',
+    en: 'No topics were sent to your group yet.'
+  },
+  saveTopicToMine: {
+    ua: 'Зберегти собі в теми',
+    ru: 'Сохранить себе в темы',
+    en: 'Save it to my topics'
+  },
+  topicSaved: {
+    ua: 'Збережено у ваших темах',
+    ru: 'Сохранено в ваших темах',
+    en: 'Saved to your topics'
+  },
+  chooseGroups: {
+    ua: 'Групи',
+    ru: 'Группы',
+    en: 'Groups'
+  },
+  chosenGroups: {
+    ua: 'Отримають тему',
+    ru: 'Получат тему',
+    en: 'Will get the topic'
   }
 }

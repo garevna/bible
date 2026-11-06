@@ -56,6 +56,9 @@
       <v-tab value="map" prepend-icon="mdi-map-outline">{{ text.tabMap }}</v-tab>
       <v-tab value="search" prepend-icon="mdi-account-search-outline">{{ text.tabSearch }}</v-tab>
       <v-tab value="list" prepend-icon="mdi-format-list-bulleted">{{ text.tabList }}</v-tab>
+      <v-tab v-if="topicsShown" value="topics" prepend-icon="mdi-book-open-page-variant-outline">
+        {{ text.tabTopics }}
+      </v-tab>
     </v-tabs>
 
     <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
@@ -67,6 +70,7 @@
     <template v-else-if="tab === 'list'">
       <GroupRow v-for="group of sorted" :key="group.id" :group="group" with-day @open="openGroup" />
     </template>
+    <TopicsPanel v-else-if="tab === 'topics'" />
 
     <GroupDialog v-model="dialog" :group-id="openedId" />
     <NewGroupDialog v-model="newDialog" @created="openGroup" />
@@ -84,6 +88,8 @@ import GroupsMap from '@/components/groups/GroupsMap.vue'
 import GroupsSearch from '@/components/groups/GroupsSearch.vue'
 import GroupsWeek from '@/components/groups/GroupsWeek.vue'
 import NewGroupDialog from '@/components/groups/NewGroupDialog.vue'
+import TopicsPanel from '@/components/groups/TopicsPanel.vue'
+import { useGroupTopicsStore } from '@/stores/groupTopics'
 import { groupTitle, useGroupsStore, type GroupsVisibility, type HomeGroup } from '@/stores/groups'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore } from '@/stores/schedule'
@@ -98,11 +104,15 @@ const groups = useGroupsStore()
 const schedule = useScheduleStore()
 const { groups: text, publish } = storeToRefs(useLanguageStore())
 
-const tab = ref<'week' | 'map' | 'search' | 'list'>('week')
+const topics = useGroupTopicsStore()
+/** the topics of the meetings: the ministry of the groups, the pastors, the administrators */
+const topicsShown = computed(() => Object.values(topics.may).some(Boolean))
+
+const tab = ref<'week' | 'map' | 'search' | 'list' | 'topics'>('week')
 /** a swipe on a phone changes the tab; on the map it moves the map */
 const swipe = useSwipeTabs(
   tab,
-  () => ['week', 'map', 'search', 'list'],
+  () => ['week', 'map', 'search', 'list', ...(topicsShown.value ? ['topics' as const] : [])],
   () => tab.value === 'map'
 )
 const busy = ref(false)
@@ -150,6 +160,8 @@ onMounted(async () => {
     await groups.load()
     if (groups.manage) await schedule.loadChoices()
   })
+  // who may see the topics (an error here leaves the groups as they are)
+  topics.load().catch(() => undefined)
   busy.value = false
 })
 

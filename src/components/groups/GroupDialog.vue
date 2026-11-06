@@ -40,6 +40,28 @@
         <h4 class="label">{{ text.meetingNote }}</h4>
         <p class="description">{{ group.meetingNote }}</p>
       </template>
+
+      <!-- the leader: the topics of the meetings sent to the group -->
+      <template v-if="leads">
+        <h4 class="label">{{ text.groupTopics }}</h4>
+        <p v-if="!sentTopics.length" class="muted">{{ text.noGroupTopics }}</p>
+        <v-list v-else density="compact" class="pa-0 group-topics">
+          <v-list-item
+            v-for="topic of sentTopics"
+            :key="topic.id"
+            :title="topic.title"
+            :subtitle="topic.day ? formatDay(topic.day, locale) : ''"
+            @click="openTopic(topic.id)"
+          >
+            <template #prepend>
+              <v-icon
+                :icon="topic.done[group.id] ? 'mdi-check-circle' : 'mdi-book-open-page-variant-outline'"
+                :color="topic.done[group.id] ? 'primary' : undefined"
+              />
+            </template>
+          </v-list-item>
+        </v-list>
+      </template>
     </div>
 
     <!-- the leader keeps the group; the administrators give its name and its leader -->
@@ -161,6 +183,8 @@
       @picked="picked"
     />
   </AppDialog>
+
+  <TopicDialog v-if="group" v-model="topicOpen" :topic-id="topicId" :group-id="group.id" />
 </template>
 
 <script setup lang="ts">
@@ -174,6 +198,8 @@ import DateField from '@/components/DateField.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import PlacePicker from '@/components/admin/PlacePicker.vue'
 import LeaderField from '@/components/groups/LeaderField.vue'
+import TopicDialog from '@/components/groups/TopicDialog.vue'
+import { useGroupTopicsStore } from '@/stores/groupTopics'
 import TimeField from '@/components/TimeField.vue'
 import {
   groupTitle,
@@ -186,7 +212,7 @@ import { useLanguageStore } from '@/stores/language'
 import { mapUrl, useScheduleStore, type Place } from '@/stores/schedule'
 import { useUserStore } from '@/stores/user'
 import { WorkerError } from '@/stores/worker'
-import { localeOf } from '@/utils/dates'
+import { formatDay, localeOf } from '@/utils/dates'
 import { format } from '@/utils/format'
 
 /**
@@ -230,7 +256,20 @@ watch(open, (value) => {
   editing.value = false
   error.value = ''
   if (!value) picker.value = false
+  // the leader: the topics sent to the group
+  if (value && leads.value) topics.load().catch(() => undefined)
 })
+
+const topics = useGroupTopicsStore()
+/** the user leads this group */
+const leads = computed(() => Boolean(group.value?.leaderUid) && group.value?.leaderUid === user.uid)
+const sentTopics = computed(() => (group.value ? topics.sentTo(group.value.id) : []))
+const topicOpen = ref(false)
+const topicId = ref<string | null>(null)
+function openTopic(id: string) {
+  topicId.value = id
+  topicOpen.value = true
+}
 
 /** 0 Sunday … 6 Saturday, Monday first */
 const weekdayName = (day: number, style: 'long' | 'short' = 'long') =>

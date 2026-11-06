@@ -25,7 +25,8 @@ import {
 } from './roles'
 import { d1Schedule, localDay, type ScheduleStore } from './schedule'
 import { cached, remoteBooks, remoteChapter, REMOTE_BIBLES, RemoteError } from './remoteBible'
-import { handleSchedule, type ScheduleContext } from './scheduleRoutes'
+import { dateInWords, handleSchedule, type ScheduleContext } from './scheduleRoutes'
+import { d1Topics, getTopicsSettings, handleTopics, setTopicsSettings, type TopicsStore } from './groupTopics'
 import {
   type Ask,
   answered,
@@ -59,7 +60,7 @@ import {
 } from './groups'
 import { d1Posts, type PostsStore, type PostTask, type Submission } from './posts'
 import { getMaterialKinds, isYouTube, parseMaterialKinds, setMaterialKinds, videoOf } from './materialKinds'
-import { getForwards, setForwards } from './approvals'
+import { approversOf, getForwards, reviewersOf, setForwards } from './approvals'
 import { getHandovers, parseUntil, renameHandover, setHandovers, type Handovers } from './handovers'
 import {
   byLeader,
@@ -139,6 +140,13 @@ import {
  *   PUT    /groups/:id              its leader: the day, the place, the members…; directories: the name, the leader
  *   DELETE /groups/:id              removes it                                       directories
  *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
+ *   GET    /group-topics            the topics of the meetings (a leader of a group: the ones sent to it)
+ *   PUT    /group-topics/settings   { ministry, approverUid }: who prepares, who approves  directories
+ *   POST   /group-topics            { title, day, post, video }: the ministry of the groups, or a pastor
+ *   PUT    /group-topics/:id        changed (by another than the pastor: approved again); DELETE removes it
+ *   POST   /group-topics/:id/review { approve, note }: the pastor, or the pastors standing in
+ *   POST   /group-topics/:id/send   { groups }: to the leaders of the groups (an approved topic)
+ *   PUT    /group-topics/:id/mark   { group, done }: the leader of the group marks it done
  *   POST   /status-request          { note? }: a reader asks for the status of a servant (the administrators of users are told)
  *   GET    /posts                   the posts for the channel the user sees: their own, to approve, the queue (publish)
  *   POST   /posts                   { kind, post, approverUid?, taskId? }: sent for publication
@@ -198,6 +206,8 @@ export interface Deps {
   schedule?: ScheduleStore
   /** the posts sent for publication in the channel; D1 when not given */
   posts?: PostsStore
+  /** the topics of the meetings of the home groups; D1 when not given */
+  topics?: TopicsStore
   now?: () => number
 }
 
@@ -230,6 +240,11 @@ const ROUTES = [
   /^(GET|POST) \/groups$/,
   /^(PUT|DELETE) \/groups\/[^/]+$/,
   /^PUT \/groups-visibility$/,
+  /^(GET|POST) \/group-topics$/,
+  /^PUT \/group-topics\/settings$/,
+  /^(PUT|DELETE) \/group-topics\/[\w-]+$/,
+  /^POST \/group-topics\/[\w-]+\/(review|send)$/,
+  /^PUT \/group-topics\/[\w-]+\/mark$/,
   /^GET \/youtube$/,
   /^(GET|POST) \/posts$/,
   /^POST \/posts\/(upload|storage)$/,
@@ -1292,6 +1307,35 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
       const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
       return json({ error: 'telegram', message }, 502)
     }
+  }
+
+  // the topics of the meetings of the home groups: the ministry of the groups, a pastor, the leaders of the groups
+  if (pathname.startsWith('/group-topics')) {
+    const settings = await getTopicsSettings(env.USERS)
+    const forwards = await getForwards(env.USERS, today)
+    const users = await listUsers(env.USERS, env.OWNERS, true)
+    const response = await handleTopics(
+      request.method,
+      pathname,
+      request.method === 'GET' || request.method === 'DELETE' ? null : await body(),
+      {
+        me: { uid: me.uid, name: nameOf(me) },
+        admin: can('directories'),
+        settings,
+        curators: settings.ministry ? (leadersOf(ministryRoles, handovers)[settings.ministry] ?? []) : [],
+        pastors: pastorsOf(roles, users),
+        approvers: approversOf(settings.approverUid, forwards),
+        reviewers: reviewersOf(settings.approverUid, forwards),
+        groups: await getGroups(env.USERS),
+        store: deps.topics ?? d1Topics(env.DB),
+        saveSettings: (next) => setTopicsSettings(env.USERS, next),
+        tell: (uids, text) => tell(env, deps, me, uids, text),
+        dayInWords: dateInWords,
+        now: deps.now?.() ?? Date.now()
+      },
+      json
+    )
+    return response
   }
 
   if (pathname.startsWith('/groups')) {

@@ -44,6 +44,25 @@ const GROUPS = [
  */
 async function fakeWorker(page: Page, admin = false) {
   const requests: { method: string; path: string; body: unknown }[] = []
+  // the topics of the meetings: the administrator prepares, approves and sends them too
+  const topic = (id: string, title: string, status: string) => ({
+    id,
+    title,
+    day: null,
+    post: { title, items: [{ kind: 'note', text: `Про ${title.toLowerCase()}`, verses: [] }] },
+    video: null,
+    uid: 'author-uid',
+    name: 'Автор',
+    recommended: false,
+    status,
+    reviewNote: null,
+    reviewedBy: null,
+    sentTo: [] as string[],
+    sentAt: null,
+    done: {} as Record<string, number>,
+    createdAt: 1
+  })
+  const topics = [topic('t-approved', 'Молитва', 'approved'), topic('t-pending', 'Віра', 'pending')]
   await page.route('**/worker-test/**', async (route: Route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/worker-test', '')
@@ -105,6 +124,32 @@ async function fakeWorker(page: Page, admin = false) {
           }
         }
       })
+    }
+    if (path === '/group-topics' && request.method() === 'GET')
+      return route.fulfill({
+        json: admin
+          ? {
+              topics,
+              settings: { ministry: 'Домашні групи', approverUid: 'e2e-uid' },
+              may: { prepare: true, recommend: true, review: true, settings: true },
+              led: ['g-mine']
+            }
+          : { topics: [], settings: { ministry: null, approverUid: null }, may: {}, led: ['g-mine'] }
+      })
+    if (path.startsWith('/group-topics')) {
+      const body = request.postDataJSON()
+      requests.push({ method: request.method(), path, body })
+      const [, , id, action] = path.split('/')
+      if (!id) {
+        const created = { ...topic('t-new', body.title, 'pending'), ...body }
+        topics.unshift(created)
+        return route.fulfill({ json: { topic: created } })
+      }
+      const item = topics.find((each) => each.id === id)!
+      if (action === 'send') item.sentTo = body.groups
+      if (action === 'review') item.status = body.approve ? 'approved' : 'returned'
+      if (action === 'mark') item.done = body.done ? { [body.group]: 2 } : {}
+      return route.fulfill({ json: { topic: item } })
     }
     if (path.startsWith('/groups/')) {
       const body = request.postDataJSON()
@@ -349,4 +394,67 @@ test('my home group: chosen by the day and the time, by the leader or by the pla
   await dialog(page).getByRole('button', { name: 'Група, яку я веду' }).click()
   await expect(dialog(page)).toContainText('Тема: молитва')
   await expect(dialog(page).getByRole('button', { name: 'Змінити' })).toBeVisible()
+})
+
+test('the topics of the meetings: written, approved, sent to the leaders; the leader marks one done', async ({
+  page
+}) => {
+  const requests = await fakeWorker(page, true)
+  await openGroups(page)
+  await page.getByRole('tab', { name: 'Теми' }).click()
+  await expect(page.locator('.topic-row')).toHaveCount(2)
+
+  // a new topic: its title and words
+  await page.getByRole('button', { name: 'Нова тема' }).click()
+  const fresh = dialog(page)
+  await fresh.getByLabel('Тема зустрічі').fill('Прощення')
+  await fresh.getByLabel('Текст, питання для обговорення').fill('Мт 18:21-22')
+  await fresh.getByRole('button', { name: 'Зберегти' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.method === 'POST'))
+    .toMatchObject({
+      path: '/group-topics',
+      body: {
+        title: 'Прощення',
+        day: null,
+        video: null,
+        recommended: false,
+        post: { title: 'Прощення', items: [{ kind: 'note', text: 'Мт 18:21-22', verses: [] }] }
+      }
+    })
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.topic-row')).toHaveCount(3)
+
+  // the pastor approves one
+  await page.locator('.topic-row', { hasText: 'Віра' }).click()
+  await dialog(page).getByRole('button', { name: 'Затвердити' }).click()
+  await expect
+    .poll(() => requests.at(-1))
+    .toEqual({ method: 'POST', path: '/group-topics/t-pending/review', body: { approve: true, note: '' } })
+  await page.keyboard.press('Escape')
+
+  // an approved one goes to the leaders of the chosen groups (a leader not of the app is not offered)
+  await page.locator('.topic-row', { hasText: 'Молитва' }).click()
+  const sending = dialog(page)
+  await expect(sending.locator('.transfer .v-list-item')).toHaveCount(1)
+  await sending.locator('.transfer .v-list-item', { hasText: 'Салтівка' }).click()
+  await sending.getByRole('button', { name: 'Додати вибране' }).click()
+  await sending.getByRole('button', { name: 'Надіслати вибраним' }).click()
+  await expect
+    .poll(() => requests.at(-1))
+    .toEqual({ method: 'POST', path: '/group-topics/t-approved/send', body: { groups: ['g-mine'] } })
+  await expect(dialog(page)).toContainText('Тему надіслано лідерам груп: 1')
+  await dialog(page).getByRole('button', { name: 'OK' }).click()
+  await sending.getByRole('button', { name: 'Закрити' }).last().click()
+
+  // the leader of the group: the topic in the group, marked done
+  await page.getByRole('tab', { name: 'Список' }).click()
+  await page.locator('.group-row', { hasText: 'Салтівка' }).click()
+  const own = dialog(page)
+  await expect(own).toContainText('Теми зустрічей')
+  await own.locator('.group-topics .v-list-item', { hasText: 'Молитва' }).click()
+  await dialog(page).getByLabel('Тема пройдена').check()
+  await expect
+    .poll(() => requests.at(-1))
+    .toEqual({ method: 'PUT', path: '/group-topics/t-approved/mark', body: { group: 'g-mine', done: true } })
 })

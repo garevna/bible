@@ -1,3 +1,4 @@
+import { memoryTopics } from './groupTopics'
 import { memoryPosts } from './posts'
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
@@ -58,6 +59,7 @@ function setup() {
   const messages = memoryMessages()
   const schedule = memorySchedule()
   const posts = memoryPosts()
+  const topics = memoryTopics()
   const clock = { now: Date.now() }
   const env: Env = {
     TELEGRAM_BOT_TOKEN: 'TOKEN',
@@ -86,7 +88,15 @@ function setup() {
         body: body ? JSON.stringify(body) : undefined
       }),
       env,
-      { verify, fetcher: fetcher as unknown as typeof fetch, messages, schedule, posts, now: () => clock.now }
+      {
+        verify,
+        fetcher: fetcher as unknown as typeof fetch,
+        messages,
+        schedule,
+        posts,
+        topics,
+        now: () => clock.now
+      }
     )
     const answer = (await response.json().catch(() => null)) as Answer
     return { status: response.status, body: answer, headers: response.headers }
@@ -1242,6 +1252,100 @@ describe('home groups', () => {
     expect((await call('GET', '/groups', 'leader')).body.groups).toContainEqual(
       expect.objectContaining({ id, own: true, unregistered: false })
     )
+  })
+
+  it('the topics of the meetings: prepared by the ministry, approved by the pastor, sent to the leaders', async () => {
+    const { call } = await church()
+    const inbox = async (token: string) =>
+      ((await call('GET', '/messages', token)).body.messages as { text: string }[]).map((item) => item.text)
+    // the ministry of the groups, its leader; a pastor
+    await call('PUT', '/admin/directories/ministries', 'owner', { items: ['Домашні групи'] })
+    await call('PUT', `/ministry-roles/${encodeURIComponent('Домашні групи')}`, 'owner', {
+      roles: [ministryRole('r-lead', { lead: true }, ['musician-uid'])]
+    })
+    const roles = (await call('GET', '/admin/settings', 'owner')).body.roles as { id: string }[]
+    await call('PUT', '/admin/roles', 'owner', {
+      roles: [
+        ...roles,
+        {
+          id: 'status-pastor',
+          name: 'Пастор',
+          publish: false,
+          send: false,
+          sendToRoles: [],
+          sendToPeople: false,
+          messageDays: 1,
+          manage: [],
+          approveMaterials: true
+        }
+      ]
+    })
+    await call('PUT', '/admin/users/pastor-uid', 'owner', { role: 'status-pastor' })
+    const settings = { ministry: 'Домашні групи', approverUid: 'pastor-uid' }
+    expect((await call('PUT', '/group-topics/settings', 'musician', settings)).status).toBe(403)
+    expect((await call('PUT', '/group-topics/settings', 'owner', settings)).body.settings).toEqual(settings)
+    const group = (await call('POST', '/groups', 'owner', { leaderUid: 'leader-uid' })).body.group as {
+      id: string
+    }
+
+    // the leader of the ministry writes a topic: it waits for the pastor, who is told
+    const draft = {
+      title: 'Молитва',
+      day: '2026-11-12',
+      post: { items: [{ kind: 'note', text: 'Мт 6:9-13', verses: [] }] },
+      video: 'https://youtu.be/abcdefgh'
+    }
+    expect((await call('POST', '/group-topics', 'reader', draft)).status).toBe(403)
+    expect(
+      (await call('POST', '/group-topics', 'musician', { ...draft, video: 'https://x.test' })).status
+    ).toBe(400)
+    const topic = (await call('POST', '/group-topics', 'musician', draft)).body.topic as { id: string }
+    expect(topic).toMatchObject({ title: 'Молитва', status: 'pending', recommended: false, name: 'Музикант' })
+    expect(await inbox('pastor')).toContainEqual(expect.stringContaining('на затвердження: «Молитва»'))
+    const path = `/group-topics/${topic.id}`
+    // not sent before it is approved; the leader of a group does not see it yet
+    expect((await call('POST', `${path}/send`, 'musician', { groups: [group.id] })).status).toBe(409)
+    expect((await call('GET', '/group-topics', 'leader')).body.topics).toEqual([])
+
+    // returned with a word, changed, approved
+    expect((await call('POST', `${path}/review`, 'musician', { approve: true })).status).toBe(403)
+    expect((await call('POST', `${path}/review`, 'pastor', { approve: false })).status).toBe(400)
+    expect(
+      (await call('POST', `${path}/review`, 'pastor', { approve: false, note: 'Додайте питання' })).body.topic
+    ).toMatchObject({ status: 'returned', reviewNote: 'Додайте питання' })
+    expect(await inbox('musician')).toContainEqual(expect.stringContaining('Додайте питання'))
+    expect(
+      (await call('PUT', path, 'musician', { ...draft, title: 'Молитва Господня' })).body.topic
+    ).toMatchObject({ status: 'pending', title: 'Молитва Господня' })
+    expect((await call('POST', `${path}/review`, 'pastor', { approve: true })).body.topic).toMatchObject({
+      status: 'approved',
+      reviewedBy: 'pastor@example.com'
+    })
+
+    // sent to the leader of the group, who sees it and marks it done
+    expect((await call('POST', `${path}/send`, 'pastor', { groups: [group.id] })).status).toBe(403)
+    expect((await call('POST', `${path}/send`, 'musician', { groups: [group.id] })).body.topic).toMatchObject(
+      {
+        sentTo: [group.id]
+      }
+    )
+    expect(await inbox('leader')).toContainEqual(expect.stringContaining('🏠 Тема зустрічі домашньої групи'))
+    const seen = (await call('GET', '/group-topics', 'leader')).body
+    expect(seen).toMatchObject({ topics: [{ id: topic.id }], led: [group.id], may: { prepare: false } })
+    expect((await call('PUT', `${path}/mark`, 'musician', { group: group.id, done: true })).status).toBe(403)
+    const done = (await call('PUT', `${path}/mark`, 'leader', { group: group.id, done: true })).body
+      .topic as {
+      done: Record<string, number>
+    }
+    expect(Object.keys(done.done)).toEqual([group.id])
+
+    // the pastor's own topic: a recommendation, approved; the ministry is told
+    expect(
+      (await call('POST', '/group-topics', 'pastor', { title: 'Прощення', post: { items: [] } })).body.topic
+    ).toMatchObject({ recommended: true, status: 'approved' })
+    expect(await inbox('musician')).toContainEqual(expect.stringContaining('Рекомендація пастора'))
+    // a reader sees none
+    expect((await call('GET', '/group-topics', 'reader')).body.topics).toEqual([])
   })
 
   it('who sees the groups: the servants or the administrators only; a reader none', async () => {
