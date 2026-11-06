@@ -94,6 +94,11 @@ export const notes = {
     ru: 'Глава',
     en: 'Chapter'
   },
+  chooseChapter: {
+    ua: 'Вибрати розділ',
+    ru: 'Выбрать главу',
+    en: 'Choose a chapter'
+  },
   verse: {
     ua: 'Вірш',
     ru: 'Стих',

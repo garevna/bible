@@ -22,6 +22,18 @@ test.describe('reading the Bible', () => {
     await expect(verse(page, '1.000.001.000')).toBeVisible()
   })
 
+  test('a chapter chosen among all their numbers (the Psalms have 150)', async ({ page }) => {
+    await page.getByRole('button', { name: 'Новий заповіт' }).click()
+    await page.locator('.v-switch input').click()
+    await page.locator('.book-menu-item', { hasText: 'Псалтир' }).click()
+    await page.getByRole('button', { name: 'Вибрати розділ' }).click()
+    const numbers = page.locator('.chapters .chapter-number')
+    await expect(numbers).toHaveCount(150)
+    await numbers.filter({ hasText: /^\s*119\s*$/ }).click()
+    await expect(verse(page, '0.018.118.000')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Вибрати розділ' })).toContainText('Розділ 119')
+  })
+
   test('lists books and switches testaments', async ({ page }) => {
     await page.getByRole('button', { name: 'Новий заповіт' }).click()
     await expect(page.locator('.book-menu-item')).toHaveCount(27)
