@@ -661,6 +661,11 @@ describe('the posts of the channel', () => {
       title: 'Слово на тиждень'
     })
     expect(await told('pastor-uid', 'просить затвердити публікацію «Слово на тиждень»')).toBe(true)
+    // the notice shows what is to approve
+    expect(
+      (await messages.forUser('pastor-uid', clock.now)).find((message) => message.text.includes('просить'))
+        ?.attachment
+    ).toEqual({ kind: 'note', post: { ...note, title: 'Слово на тиждень' } })
 
     // the queue of the channel shows it, waiting; it is not published before the approval
     const queue = (await call('GET', '/posts', 'leader')).body

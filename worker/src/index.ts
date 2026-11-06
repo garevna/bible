@@ -7,7 +7,14 @@ import {
   setCalendar,
   setEventTypes
 } from './eventTypes'
-import { d1Store, HOURLY_LIMIT, parseDraft, type Message, type MessagesStore } from './messages'
+import {
+  d1Store,
+  HOURLY_LIMIT,
+  parseDraft,
+  type Attachment,
+  type Message,
+  type MessagesStore
+} from './messages'
 import { parsePost, type TopicPost } from './post'
 import {
   getRoles,
@@ -319,7 +326,9 @@ async function tell(
   text: string,
   asks?: Ask[],
   /** what the message of the app asks (e.g. a task answered by a reply), not the buttons of Telegram */
-  appAsks?: Ask[]
+  appAsks?: Ask[],
+  /** what it is about, seen in the message of the app (e.g. the picture to approve) */
+  attachment: Attachment | null = null
 ) {
   const to = [...new Set(uids)].filter((uid) => uid !== me.uid)
   if (!to.length) return
@@ -336,7 +345,7 @@ async function tell(
     toUid: uid,
     toName: nameOfUid(uid),
     text,
-    attachment: null,
+    attachment,
     replyTo: null,
     asks: appAsks ?? null,
     createdAt: now,
@@ -346,6 +355,12 @@ async function tell(
   await (deps.messages ?? d1Store(env.DB)).insert(list)
   const bot = botFor(env, deps, users)
   await Promise.all(to.map((uid) => bot.send(uid, escape(text), asks)))
+}
+
+/** a post sent for the channel, as the messages show it: a picture kept in Telegram, not a data URL */
+const attachmentOf = (item: Submission): Attachment => {
+  const { image, ...post } = item.post
+  return { kind: item.kind, post: image?.startsWith('tg:') ? { ...post, image } : post }
 }
 
 /**
@@ -388,7 +403,10 @@ async function answerTask(
     deps,
     me,
     [task.byUid],
-    `✅ ${nameOf(me)} виконав(ла) доручення «${task.text}». Розділ «Публікації».`
+    `✅ ${nameOf(me)} виконав(ла) доручення «${task.text}». Розділ «Публікації».`,
+    undefined,
+    undefined,
+    attachmentOf(item)
   )
   if (task.approverUid && task.approverUid !== task.byUid)
     await tell(
@@ -396,7 +414,10 @@ async function answerTask(
       deps,
       me,
       [task.approverUid],
-      `📝 ${nameOf(me)} просить затвердити публікацію «${title}». Розділ «Публікації».`
+      `📝 ${nameOf(me)} просить затвердити публікацію «${title}». Розділ «Публікації».`,
+      undefined,
+      undefined,
+      attachmentOf(item)
     )
   if (!task.approverUid) {
     // the administrators of the channel: it is in their queue
@@ -413,7 +434,10 @@ async function answerTask(
       deps,
       me,
       publishers,
-      `📝 Нова публікація для каналу: «${title}» (${nameOf(me)}). Розділ «Публікації».`
+      `📝 Нова публікація для каналу: «${title}» (${nameOf(me)}). Розділ «Публікації».`,
+      undefined,
+      undefined,
+      attachmentOf(item)
     )
   }
   return item
@@ -1215,7 +1239,10 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
           deps,
           me,
           [approver.uid],
-          `📝 ${nameOf(me)} просить затвердити публікацію «${titleOf(item)}». Розділ «Публікації».`
+          `📝 ${nameOf(me)} просить затвердити публікацію «${titleOf(item)}». Розділ «Публікації».`,
+          undefined,
+          undefined,
+          attachmentOf(item)
         )
       else
         await tell(
@@ -1223,7 +1250,10 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
           deps,
           me,
           publishers,
-          `📝 Нова публікація для каналу: «${titleOf(item)}» (${nameOf(me)}). Розділ «Публікації».`
+          `📝 Нова публікація для каналу: «${titleOf(item)}» (${nameOf(me)}). Розділ «Публікації».`,
+          undefined,
+          undefined,
+          attachmentOf(item)
         )
       return json({ submission: item })
     }

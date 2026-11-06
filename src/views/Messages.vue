@@ -96,8 +96,9 @@
           <div v-if="incoming(message)" class="d-flex flex-wrap ga-2">
             <!-- an invitation is answered by its buttons, not by a message -->
             <SendMessage v-if="!invitationsOf(message).length" :reply-to="message" />
+            <!-- a note or a topic is kept as one's own; a picture is not -->
             <v-btn
-              v-if="message.attachment"
+              v-if="message.attachment && message.attachment.kind !== 'image'"
               variant="text"
               color="buttons"
               size="small"
