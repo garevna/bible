@@ -28,6 +28,7 @@
         {{ text.tabTasks }}
         <v-badge v-if="posts.myTasks.length" :content="posts.myTasks.length" color="warning" inline />
       </v-tab>
+      <v-tab v-if="posts.storage" value="archive">{{ text.tabArchive }}</v-tab>
     </v-tabs>
     <v-progress-linear v-if="busy" indeterminate color="secondary" class="mb-2" />
 
@@ -90,6 +91,9 @@
       />
     </template>
 
+    <!-- the pictures kept in the private channel: found by the days and the words, removed -->
+    <PicturesArchive v-else-if="tab === 'archive'" />
+
     <template v-else>
       <!-- the tasks of the user: prepared as a note or a topic, then sent with this task chosen -->
       <p v-if="!posts.myTasks.length && !posts.canApprove" class="muted">{{ text.noneTasks }}</p>
@@ -115,6 +119,16 @@
             @click="pickPicture(task)"
           >
             {{ text.uploadPicture }}
+          </v-btn>
+          <v-btn
+            v-if="posts.storage"
+            variant="tonal"
+            color="buttons"
+            class="text-none"
+            prepend-icon="mdi-image-multiple-outline"
+            @click="pickKept(task)"
+          >
+            {{ text.archivePick }}
           </v-btn>
           <v-btn
             variant="tonal"
@@ -211,7 +225,7 @@
     <AppDialog v-model="pictureDialog" :title="text.uploadPicture" icon="mdi-image-plus" max-width="560">
       <template v-if="picturing">
         <p class="mb-2">«{{ picturing.text }}»</p>
-        <img v-if="picture" :src="picture" alt="" class="preview" />
+        <StoredImage v-if="picture" :src="picture" class="preview" />
         <v-btn
           variant="text"
           class="text-none mt-2"
@@ -292,6 +306,8 @@
       </template>
     </AppDialog>
 
+    <PicturePicker v-model="keptPicking" @picked="keptPicked" />
+
     <!-- the word that returns a post to its author -->
     <AppDialog v-model="returnDialog" :title="text.return" icon="mdi-undo" max-width="480">
       <v-textarea
@@ -319,7 +335,10 @@ import ConfirmButton from '@/components/ConfirmButton.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import DateField from '@/components/DateField.vue'
 import MaterialPicker from '@/components/calendar/MaterialPicker.vue'
+import PicturePicker from '@/components/posts/PicturePicker.vue'
+import PicturesArchive from '@/components/posts/PicturesArchive.vue'
 import PostCard from '@/components/posts/PostCard.vue'
+import StoredImage from '@/components/posts/StoredImage.vue'
 import { useLanguageStore } from '@/stores/language'
 import { usePostsStore, type PostTask, type Submission } from '@/stores/posts'
 import { useSwipeTabs } from '@/composables/useSwipeTabs'
@@ -338,13 +357,14 @@ const posts = usePostsStore()
 const worker = useWorkerStore()
 const { posts: text, publish: publishText } = storeToRefs(useLanguageStore())
 
-const tab = ref<'mine' | 'approve' | 'queue' | 'tasks'>('mine')
+const tab = ref<'mine' | 'approve' | 'queue' | 'tasks' | 'archive'>('mine')
 /** a swipe on a phone: the next tab or the one before (of the tabs the user has) */
 const swipe = useSwipeTabs(tab, () => [
   'mine',
   ...(posts.canApprove ? (['approve'] as const) : []),
   ...(posts.canPublish ? (['queue'] as const) : []),
-  'tasks'
+  'tasks',
+  ...(posts.storage ? (['archive'] as const) : [])
 ])
 const busy = ref(false)
 const error = ref('')
@@ -432,6 +452,16 @@ async function pickPicture(task: PostTask) {
   picture.value = null
   await choosePicture()
   if (picture.value) pictureDialog.value = true
+}
+/** a picture of the archive, for a task: not uploaded again */
+const keptPicking = ref(false)
+function pickKept(task: PostTask) {
+  picturing.value = task
+  keptPicking.value = true
+}
+function keptPicked(image: string) {
+  picture.value = image
+  pictureDialog.value = true
 }
 const pictureSentDialog = ref(false)
 const pictureSentText = ref('')

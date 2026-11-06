@@ -69,6 +69,46 @@ async function fakeWorker(
       })
     if (path === '/posts/storage') return route.fulfill({ json: { storage: { title: 'ХХЦ — файли' } } })
     if (path === '/posts/upload') return route.fulfill({ json: { image: 'tg:file-id-00001' } })
+    // the archive of the pictures: one kept by the user, one used already
+    if (path === '/pictures' && request.method() === 'GET') {
+      const query = new URL(request.url()).searchParams
+      const all = [
+        {
+          id: 'tg:archive-id-0001',
+          messageId: 5,
+          title: 'Різдво',
+          uid: 'e2e-uid',
+          name: 'E2E',
+          createdAt: Date.UTC(2026, 10, 1, 12),
+          removable: true
+        },
+        {
+          id: 'tg:archive-id-0002',
+          messageId: 6,
+          title: 'Пасха',
+          uid: 'e2e-uid',
+          name: 'E2E',
+          createdAt: Date.UTC(2026, 3, 1, 12),
+          removable: true
+        }
+      ]
+      const from = Number(query.get('from') ?? 0)
+      const words = (query.get('q') ?? '').toLowerCase()
+      return route.fulfill({
+        json: {
+          pictures: all.filter(
+            (item) => item.createdAt >= from && (!words || item.title.toLowerCase().includes(words))
+          ),
+          canImport: Boolean(who.publish)
+        }
+      })
+    }
+    if (path === '/pictures/import') return route.fulfill({ json: { added: 3 } })
+    if (path.startsWith('/pictures/')) {
+      if (path.includes('0002') && !request.url().includes('force=1'))
+        return route.fulfill({ status: 409, json: { error: 'in-use', uses: 2 } })
+      return route.fulfill({ json: { removed: decodeURIComponent(path.slice(10)), channel: true } })
+    }
     if (path.startsWith('/files/'))
       return route.fulfill({ body: Buffer.from(PNG, 'base64'), contentType: 'image/png' })
     if (path.endsWith('/approve'))
@@ -274,4 +314,70 @@ test('the pictures: the private channel connected, a picture asked, uploaded, ch
       post: { title: 'Картинка до анонсу', image: 'tg:file-id-00001' }
     }
   })
+})
+
+test('the archive of the pictures: found by the day and the words, deleted, chosen for a task', async ({
+  page
+}) => {
+  const requests = await fakeWorker(page, {
+    publish: true,
+    storage: true,
+    tasks: [
+      {
+        id: 't-picture',
+        byUid: 'pastor-uid',
+        byName: 'Пастор Іван',
+        assigneeUid: 'e2e-uid',
+        assigneeName: 'E2E',
+        kind: 'post',
+        text: 'Картинка до анонсу',
+        approverUid: null,
+        approverName: null,
+        due: null,
+        status: 'open',
+        createdAt: Date.now()
+      }
+    ]
+  })
+  await signIn(page)
+  await openPosts(page)
+  await page.getByRole('tab', { name: 'Архів картинок' }).click()
+  const archive = page.locator('.archive')
+  await expect(archive.locator('.picture')).toHaveCount(2)
+
+  // by the words, then all again
+  await archive.getByRole('textbox', { name: 'Назва або автор' }).fill('пасха')
+  await archive.getByRole('button', { name: 'Знайти' }).click()
+  await expect(archive.locator('.picture')).toHaveCount(1)
+  await archive.getByRole('textbox', { name: 'Назва або автор' }).fill('')
+  await archive.getByRole('button', { name: 'Знайти' }).click()
+  await expect(archive.locator('.picture')).toHaveCount(2)
+
+  // the pictures kept before the archive: brought in by a publisher
+  await archive.getByRole('button', { name: 'Додати картинки, завантажені раніше' }).click()
+  await expect(archive).toContainText('Додано до архіву: 3')
+
+  // a picture in use: asked again, then deleted from the channel too
+  await archive
+    .locator('.picture', { hasText: 'Пасха' })
+    .getByRole('button', { name: 'Видалити картинку' })
+    .click()
+  await page.locator('.v-overlay--active').getByRole('button', { name: 'Видалити' }).last().click()
+  await expect(dialog(page)).toContainText('Ця картинка використовується (2')
+  await dialog(page).getByRole('button', { name: 'Видалити' }).click()
+  await expect
+    .poll(() => requests.at(-1))
+    .toMatchObject({ method: 'DELETE', path: `/pictures/${encodeURIComponent('tg:archive-id-0002')}` })
+  await expect(archive).toContainText('Картинку видалено з архіву і з каналу.')
+  await expect(archive.locator('.picture')).toHaveCount(1)
+
+  // a picture of the archive for a task: not uploaded again
+  await page.getByRole('tab', { name: 'Доручення' }).click()
+  await page.getByRole('button', { name: 'Вибрати з архіву' }).click()
+  await dialog(page).locator('.picture', { hasText: 'Різдво' }).click()
+  await dialog(page).getByRole('button', { name: 'Надіслати' }).click()
+  await expect
+    .poll(() => requests.find((request) => request.path === '/posts'))
+    .toMatchObject({ body: { kind: 'image', post: { image: 'tg:archive-id-0001' }, taskId: 't-picture' } })
+  expect(requests.some((request) => request.path === '/posts/upload')).toBe(false)
 })

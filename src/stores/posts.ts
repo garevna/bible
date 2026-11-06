@@ -172,9 +172,11 @@ export const usePostsStore = defineStore('posts', () => {
     ).storage
   }
 
-  /** a picture asked by a task: kept in Telegram, then sent for the approval */
+  /** a picture asked by a task: kept in Telegram (unless it is there already), then sent for the approval */
   async function sendPicture(task: PostTask, image: string) {
-    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image })).image
+    const kept = image.startsWith('tg:')
+      ? image
+      : (await worker.request<{ image: string }>('POST', '/posts/upload', { image, title: task.text })).image
     return submit('image', { title: task.text, items: [], image: kept }, null, task.id)
   }
 

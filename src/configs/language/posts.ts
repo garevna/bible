@@ -368,5 +368,85 @@ export const posts = {
     ua: 'Скасувати доручення',
     ru: 'Отменить поручение',
     en: 'Cancel the task'
+  },
+  tabArchive: {
+    ua: 'Архів картинок',
+    ru: 'Архив картинок',
+    en: 'Pictures'
+  },
+  archiveHint: {
+    ua: 'Картинки зберігаються в закритому Telegram-каналі; тут — їхній перелік. Шукайте за датою, назвою або автором.',
+    ru: 'Картинки хранятся в закрытом Telegram-канале; здесь — их перечень. Ищите по дате, названию или автору.',
+    en: 'The pictures are kept in the private Telegram channel; here is their list. Find them by the date, the title or who kept them.'
+  },
+  archiveFrom: {
+    ua: 'З дня',
+    ru: 'С дня',
+    en: 'From'
+  },
+  archiveTo: {
+    ua: 'По день',
+    ru: 'По день',
+    en: 'To'
+  },
+  archiveSearch: {
+    ua: 'Назва або автор',
+    ru: 'Название или автор',
+    en: 'Title or keeper'
+  },
+  archiveFind: {
+    ua: 'Знайти',
+    ru: 'Найти',
+    en: 'Find'
+  },
+  archiveEmpty: {
+    ua: 'Картинок не знайдено',
+    ru: 'Картинок не найдено',
+    en: 'No pictures found'
+  },
+  archiveMore: {
+    ua: 'Показати ще',
+    ru: 'Показать ещё',
+    en: 'Show more'
+  },
+  archiveRemove: {
+    ua: 'Видалити картинку',
+    ru: 'Удалить картинку',
+    en: 'Delete the picture'
+  },
+  archiveInUse: {
+    ua: 'Ця картинка використовується ({count}: матеріали, публікації, теми, повідомлення). Там вона більше не відкриється. Все одно видалити?',
+    ru: 'Эта картинка используется ({count}: материалы, публикации, темы, сообщения). Там она больше не откроется. Всё равно удалить?',
+    en: 'The picture is in use ({count}: materials, posts, topics, messages). It will not open there any more. Delete it anyway?'
+  },
+  archiveRemoved: {
+    ua: 'Картинку видалено з архіву і з каналу.',
+    ru: 'Картинка удалена из архива и из канала.',
+    en: 'The picture is deleted from the archive and the channel.'
+  },
+  archiveRemovedHere: {
+    ua: 'Картинку видалено з архіву. Її завантажили раніше, ніж з’явився архів, тож у каналі її можна видалити вручну.',
+    ru: 'Картинка удалена из архива. Её загрузили раньше, чем появился архив, поэтому в канале её можно удалить вручную.',
+    en: 'Deleted from the archive. It was kept before the archive, so delete it in the channel by hand.'
+  },
+  archiveImport: {
+    ua: 'Додати картинки, завантажені раніше',
+    ru: 'Добавить картинки, загруженные раньше',
+    en: 'Add the pictures kept before'
+  },
+  archiveImported: {
+    ua: 'Додано до архіву: {count}',
+    ru: 'Добавлено в архив: {count}',
+    en: 'Added to the archive: {count}'
+  },
+  archivePick: {
+    ua: 'Вибрати з архіву',
+    ru: 'Выбрать из архива',
+    en: 'Choose from the archive'
+  },
+  archiveUntitled: {
+    ua: 'Без назви',
+    ru: 'Без названия',
+    en: 'Untitled'
   }
 }

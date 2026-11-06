@@ -88,6 +88,15 @@
       >
         {{ attachment?.kind === 'image' ? text.otherPicture : text.addPicture }}
       </v-btn>
+      <v-btn
+        variant="tonal"
+        color="buttons"
+        class="text-none"
+        prepend-icon="mdi-image-multiple-outline"
+        @click="pickingKept = true"
+      >
+        {{ posts.archivePick }}
+      </v-btn>
       <span v-if="isTask" class="text-medium-emphasis text-body-2">{{ text.taskAnswerHint }}</span>
     </div>
 
@@ -120,6 +129,11 @@
       }}</v-btn>
     </template>
   </AppDialog>
+
+  <PicturePicker
+    v-model="pickingKept"
+    @picked="(image: string) => (attachment = { kind: 'image', post: { title: '', items: [], image } })"
+  />
 </template>
 
 <script setup lang="ts">
@@ -131,6 +145,7 @@ import TransferList from '@/components/TransferList.vue'
 import ButtonTooltip from '@/components/ButtonTooltip.vue'
 import DialogButtons from '@/components/DialogButtons.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
+import PicturePicker from '@/components/posts/PicturePicker.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useWorkerStore, WorkerError, type Attachment, type Message, type Recipient } from '@/stores/worker'
 import { format } from '@/utils/format'
@@ -149,7 +164,9 @@ const props = defineProps<{
 const emit = defineEmits<{ sent: [] }>()
 
 const worker = useWorkerStore()
-const { messages: text, publish } = storeToRefs(useLanguageStore())
+const { messages: text, publish, posts } = storeToRefs(useLanguageStore())
+/** a picture of the archive: not uploaded again */
+const pickingKept = ref(false)
 
 const open = ref(false)
 const busy = ref(false)
@@ -181,7 +198,8 @@ async function addPicture() {
   error.value = ''
   try {
     const image = await resizeImage(file, { size: 1600 })
-    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image })).image
+    const title = file.name.replace(/\.[^.]+$/, '').slice(0, 120)
+    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image, title })).image
     attachment.value = { kind: 'image', post: { title: '', items: [], image: kept } }
   } catch (cause) {
     error.value =

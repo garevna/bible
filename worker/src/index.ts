@@ -26,6 +26,7 @@ import {
 import { d1Schedule, localDay, type ScheduleStore } from './schedule'
 import { cached, remoteBooks, remoteChapter, REMOTE_BIBLES, RemoteError } from './remoteBible'
 import { dateInWords, handleSchedule, type ScheduleContext } from './scheduleRoutes'
+import { d1Pictures, type PicturesStore } from './pictures'
 import { d1Topics, getTopicsSettings, handleTopics, setTopicsSettings, type TopicsStore } from './groupTopics'
 import {
   type Ask,
@@ -82,6 +83,7 @@ import {
   sendMessages,
   sendPhoto,
   storedPhoto,
+  deleteMessage,
   storePhoto,
   TelegramError,
   titleBlock
@@ -139,6 +141,9 @@ import {
  *   POST   /groups                  { name, leaderUid }: a new home group           directories
  *   PUT    /groups/:id              its leader: the day, the place, the members…; directories: the name, the leader
  *   DELETE /groups/:id              removes it                                       directories
+ *   GET    /pictures?from&to&q      the archive of the pictures kept in Telegram (from, to: ms)  servants
+ *   DELETE /pictures/:id?force=1    removed, from the channel too (in use: asked again)  its keeper, publishers
+ *   POST   /pictures/import         the pictures kept before the archive go into it      publishers
  *   PUT    /groups-visibility       { visibility: 'servants' | 'admins' }            directories
  *   GET    /group-topics            the topics of the meetings (a leader of a group: the ones sent to it)
  *   PUT    /group-topics/settings   { ministry, approverUid }: who prepares, who approves  directories
@@ -208,6 +213,8 @@ export interface Deps {
   posts?: PostsStore
   /** the topics of the meetings of the home groups; D1 when not given */
   topics?: TopicsStore
+  /** the archive of the pictures kept in Telegram; D1 when not given */
+  pictures?: PicturesStore
   now?: () => number
 }
 
@@ -249,6 +256,9 @@ const ROUTES = [
   /^(GET|POST) \/posts$/,
   /^POST \/posts\/(upload|storage)$/,
   /^GET \/files\/[^/]+$/,
+  /^GET \/pictures$/,
+  /^POST \/pictures\/import$/,
+  /^DELETE \/pictures\/[^/]+$/,
   /^POST \/posts\/[^/]+\/(approve|return|publish)$/,
   /^DELETE \/posts\/[^/]+$/,
   /^POST \/post-tasks$/,
@@ -1003,16 +1013,74 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     })
   }
 
+  // the archive of the pictures: seen by the servants, removed by the one who kept it or the publishers
+  if (pathname.startsWith('/pictures')) {
+    if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
+    const pictures = deps.pictures ?? d1Pictures(env.DB)
+    const removes = (picture: { uid: string }) => rights.publish || picture.uid === me.uid
+    if (route === 'GET /pictures') {
+      const query = new URL(request.url).searchParams
+      const number = (name: string) => {
+        const value = Number(query.get(name) ?? '')
+        return query.get(name) && Number.isFinite(value) ? value : undefined
+      }
+      const list = await pictures.list({
+        from: number('from'),
+        to: number('to'),
+        text: (query.get('q') ?? '').trim().slice(0, 100),
+        limit: Math.min(number('limit') ?? 24, 100)
+      })
+      return json({
+        pictures: list.map((picture) => ({ ...picture, removable: removes(picture) })),
+        canImport: rights.publish
+      })
+    }
+    if (route === 'POST /pictures/import') {
+      if (!rights.publish) return json({ error: 'forbidden' }, 403)
+      const found = await pictures.unlisted()
+      for (const picture of found) await pictures.add(picture)
+      return json({ added: found.length })
+    }
+    // DELETE /pictures/:id: not while it is in use, unless asked again
+    const id = decodeURIComponent(pathname.slice('/pictures/'.length))
+    const picture = await pictures.get(id)
+    if (!picture) return json({ error: 'not-found' }, 404)
+    if (!removes(picture)) return json({ error: 'forbidden' }, 403)
+    const uses = await pictures.uses(id)
+    if (uses && new URL(request.url).searchParams.get('force') !== '1')
+      return json({ error: 'in-use', uses }, 409)
+    const storage = await env.USERS.get<{ id: string; title: string }>('settings:storageChat', 'json')
+    // the message of the channel goes too; a picture kept before the archive stays there
+    const channel =
+      picture.messageId !== null && storage
+        ? await deleteMessage(env.TELEGRAM_BOT_TOKEN, storage.id, picture.messageId, deps.fetcher).then(
+            () => true,
+            () => false
+          )
+        : false
+    await pictures.remove(id)
+    return json({ removed: id, channel })
+  }
+
   // the posts of the channel: sent, approved, published; the posts asked of the servants
   if (pathname.startsWith('/posts') || pathname.startsWith('/post-tasks')) {
     if (!serves(roles, roleId)) return json({ error: 'forbidden' }, 403)
     /** the private channel of the pictures (the bot of the public channel is its administrator) */
     const storage = await env.USERS.get<{ id: string; title: string }>('settings:storageChat', 'json')
-    /** a picture of the device goes to the private channel: only its id is kept here */
-    const keep = async (image: string) =>
-      image.startsWith('data:') && storage
-        ? storePhoto(env.TELEGRAM_BOT_TOKEN, storage.id, image, deps.fetcher)
-        : image
+    /** a picture of the device goes to the private channel: only its id is kept here, and in the archive */
+    const keep = async (image: string, title = '') => {
+      if (!image.startsWith('data:') || !storage) return image
+      const kept = await storePhoto(env.TELEGRAM_BOT_TOKEN, storage.id, image, deps.fetcher)
+      await (deps.pictures ?? d1Pictures(env.DB)).add({
+        id: kept.image,
+        messageId: kept.messageId,
+        title,
+        uid: me.uid,
+        name: nameOf(me),
+        createdAt: deps.now?.() ?? Date.now()
+      })
+      return kept.image
+    }
     const store = deps.posts ?? d1Posts(env.DB)
     const now = deps.now?.() ?? Date.now()
     const everyone = await listUsers(env.USERS, env.OWNERS, true)
@@ -1074,11 +1142,13 @@ export async function handle(request: Request, env: Env, deps: Deps = defaultDep
     // a picture: kept in the private channel, its id comes back
     if (route === 'POST /posts/upload') {
       if (!storage) return json({ error: 'no-storage' }, 409)
-      const image = ((await body()) as { image?: unknown } | null)?.image
+      const { image, title } = ((await body()) ?? {}) as { image?: unknown; title?: unknown }
       const post = parsePost({ title: 'x', items: [], image })
       if (!post?.image?.startsWith('data:')) return json({ error: 'bad-request' }, 400)
       try {
-        return json({ image: await keep(post.image) })
+        return json({
+          image: await keep(post.image, typeof title === 'string' ? title.trim().slice(0, 120) : '')
+        })
       } catch (error) {
         const message = error instanceof TelegramError ? error.message : 'Telegram is unreachable'
         return json({ error: 'telegram', message }, 502)

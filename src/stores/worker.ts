@@ -187,7 +187,15 @@ export interface Recipient {
 const UNREAD_EVERY = 60_000
 
 /** the worker answered with an error: its code, e.g. 'owner', 'self', 'forbidden', or 'unreachable' */
-export class WorkerError extends Error {}
+export class WorkerError extends Error {
+  /** what the worker answered besides its error (e.g. how many times a picture is used) */
+  constructor(
+    message: string,
+    readonly data: Record<string, unknown> = {}
+  ) {
+    super(message)
+  }
+}
 
 /** The worker: roles, publishing to the Telegram channel, the dashboard of the roles */
 export const useWorkerStore = defineStore('worker', () => {
@@ -279,7 +287,7 @@ export const useWorkerStore = defineStore('worker', () => {
       throw new WorkerError('unreachable')
     }
     const data = await response.json().catch(() => ({}))
-    if (!response.ok) throw new WorkerError(data.message || data.error || String(response.status))
+    if (!response.ok) throw new WorkerError(data.message || data.error || String(response.status), data)
     // the notices of the calendar that went to the service channel
     if (data.posted?.texts?.length) channelPost.value = data.posted
     return data as T

@@ -1,4 +1,5 @@
 import { memoryTopics } from './groupTopics'
+import { memoryPictures, type Picture } from './pictures'
 import { memoryPosts } from './posts'
 import { createLocalJWKSet, exportJWK, generateKeyPair, SignJWT } from 'jose'
 import { describe, expect, it, vi } from 'vitest'
@@ -60,6 +61,10 @@ function setup() {
   const schedule = memorySchedule()
   const posts = memoryPosts()
   const topics = memoryTopics()
+  // the archive of the pictures: where a picture is used, and the pictures kept before it
+  const used: Record<string, number> = {}
+  const older: Picture[] = []
+  const pictures = memoryPictures(used, older)
   const clock = { now: Date.now() }
   const env: Env = {
     TELEGRAM_BOT_TOKEN: 'TOKEN',
@@ -95,13 +100,14 @@ function setup() {
         schedule,
         posts,
         topics,
+        pictures,
         now: () => clock.now
       }
     )
     const answer = (await response.json().catch(() => null)) as Answer
     return { status: response.status, body: answer, headers: response.headers }
   }
-  return { call, fetcher, env, clock, messages, schedule, posts }
+  return { call, fetcher, env, clock, messages, schedule, posts, used, older }
 }
 
 const topic = { title: 'Тема', items: [{ kind: 'verse', text: 'Вірш', ref: 'Від Матвія 1:1' }] }
@@ -685,6 +691,80 @@ describe('the posts of the channel', () => {
     const methods = fetcher.mock.calls.map(([url]) => String(url).split('/').at(-1))
     expect(methods).toEqual(expect.arrayContaining(['sendPhoto', 'sendMessage']))
     expect(await told('musician-uid', 'опубліковано в каналі')).toBe(true)
+  })
+
+  it('the archive of the pictures: what is known of them; removed from the channel too', async () => {
+    const { call, fetcher, used, older, clock } = await church()
+    fetcher.mockImplementation(async (url: unknown) => {
+      const method = String(url).split('/').at(-1)
+      if (method === 'getUpdates')
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            result: [{ channel_post: { chat: { id: -100555, type: 'channel', title: 'ХХЦ — файли' } } }]
+          })
+        )
+      if (method === 'sendPhoto')
+        return new Response(
+          JSON.stringify({ ok: true, result: { message_id: 77, photo: [{ file_id: 'kept-id-00001' }] } })
+        )
+      return new Response('{"ok":true}')
+    })
+    await call('POST', '/posts/storage', 'leader', {})
+    const jpeg = 'data:image/jpeg;base64,/9j/4AAQSkZJRg=='
+    clock.now = Date.UTC(2026, 10, 5, 12)
+    expect(
+      (await call('POST', '/posts/upload', 'musician', { image: jpeg, title: 'Заставка' })).body
+    ).toEqual({
+      image: 'tg:kept-id-00001'
+    })
+    const list = (await call('GET', '/pictures', 'musician')).body
+    expect(list).toEqual({
+      pictures: [
+        {
+          id: 'tg:kept-id-00001',
+          messageId: 77,
+          title: 'Заставка',
+          uid: 'musician-uid',
+          name: 'Музикант',
+          createdAt: clock.now,
+          removable: true
+        }
+      ],
+      canImport: false
+    })
+    // by the day it was kept, and by its title or keeper
+    const day = Date.UTC(2026, 10, 5)
+    expect((await call('GET', `/pictures?from=${day + 86_400_000}`, 'musician')).body.pictures).toEqual([])
+    expect(
+      (await call('GET', `/pictures?from=${day}&to=${day + 86_400_000}`, 'musician')).body.pictures
+    ).toHaveLength(1)
+    expect((await call('GET', '/pictures?q=заставка', 'musician')).body.pictures).toHaveLength(1)
+    expect((await call('GET', '/pictures?q=інше', 'musician')).body.pictures).toEqual([])
+    expect((await call('GET', '/pictures', 'reader')).status).toBe(403)
+
+    // the pictures kept before the archive: the publishers bring them in (they stay in the channel)
+    older.push({ id: 'tg:older-id-0001', messageId: null, title: '', uid: '', name: '', createdAt: 1 })
+    expect((await call('POST', '/pictures/import', 'musician')).status).toBe(403)
+    expect((await call('POST', '/pictures/import', 'leader')).body).toEqual({ added: 1 })
+    expect((await call('POST', '/pictures/import', 'leader')).body).toEqual({ added: 0 })
+
+    // removed: not by another; in use, asked again; the message of the channel goes too
+    const path = `/pictures/${encodeURIComponent('tg:kept-id-00001')}`
+    expect((await call('DELETE', path, 'pastor')).status).toBe(403)
+    used['tg:kept-id-00001'] = 2
+    expect((await call('DELETE', path, 'musician')).body).toEqual({ error: 'in-use', uses: 2 })
+    expect((await call('DELETE', `${path}?force=1`, 'musician')).body).toEqual({
+      removed: 'tg:kept-id-00001',
+      channel: true
+    })
+    const deleted = fetcher.mock.calls.find(([url]) => String(url).endsWith('/deleteMessage'))!
+    expect(JSON.parse(String(deleted[1]!.body))).toEqual({ chat_id: '-100555', message_id: 77 })
+    // a picture kept before: from the archive only
+    expect(
+      (await call('DELETE', `/pictures/${encodeURIComponent('tg:older-id-0001')}`, 'leader')).body
+    ).toEqual({ removed: 'tg:older-id-0001', channel: false })
+    expect((await call('GET', '/pictures', 'leader')).body.pictures).toEqual([])
   })
 
   it('a picture asked by a task: kept in the private channel of Telegram, approved, published with a post', async () => {

@@ -111,6 +111,17 @@ export async function sendPhoto(
   caption: string,
   fetcher: typeof fetch = fetch
 ): Promise<string | null> {
+  return (await sentPhoto(token, chatId, image, caption, fetcher)).fileId
+}
+
+/** the same: the id of the file sent, and the id of its message */
+async function sentPhoto(
+  token: string,
+  chatId: string,
+  image: string,
+  caption: string,
+  fetcher: typeof fetch
+): Promise<{ fileId: string | null; messageId: number | null }> {
   const kept = image.startsWith('tg:') ? image.slice(3) : null
   let body: FormData | string
   if (kept)
@@ -135,16 +146,20 @@ export async function sendPhoto(
   })
   const answer = (await response.json().catch(() => ({}))) as {
     description?: string
-    result?: { photo?: { file_id: string }[] }
+    result?: { message_id?: number; photo?: { file_id: string }[] }
   }
   if (!response.ok) throw new TelegramError(answer.description || `Telegram: ${response.status}`)
   // the largest size of the picture
-  return answer.result?.photo?.at(-1)?.file_id ?? null
+  return {
+    fileId: answer.result?.photo?.at(-1)?.file_id ?? null,
+    messageId: answer.result?.message_id ?? null
+  }
 }
 
 /**
  * The pictures of the posts are kept in a private channel of the bot of the public channel, not in our
  * databases: a picture sent there leaves the id of its file, and the channel gets it by the same id.
+ * The id of its message comes back too: the picture is removed from the channel by it.
  */
 export async function storePhoto(
   token: string,
@@ -152,9 +167,26 @@ export async function storePhoto(
   image: string,
   fetcher: typeof fetch = fetch
 ) {
-  const id = await sendPhoto(token, chatId, image, '', fetcher)
-  if (!id) throw new TelegramError('Telegram: no file')
-  return `tg:${id}`
+  const { fileId, messageId } = await sentPhoto(token, chatId, image, '', fetcher)
+  if (!fileId) throw new TelegramError('Telegram: no file')
+  return { image: `tg:${fileId}`, messageId }
+}
+
+/** A message of a channel removed (the bot is an administrator there, and may delete messages) */
+export async function deleteMessage(
+  token: string,
+  chatId: string,
+  messageId: number,
+  fetcher: typeof fetch = fetch
+) {
+  const response = await fetcher(`https://api.telegram.org/bot${token}/deleteMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId })
+  })
+  const answer = (await response.json().catch(() => ({}))) as { ok?: boolean; description?: string }
+  if (!response.ok || !answer.ok)
+    throw new TelegramError(answer.description || `Telegram: ${response.status}`)
 }
 
 /** The bytes of a picture kept in Telegram (up to 20 MB, as Telegram gives the files to the bots) */

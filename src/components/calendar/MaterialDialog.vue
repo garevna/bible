@@ -203,16 +203,27 @@
         </v-window-item>
         <v-window-item value="picture">
           <p class="muted">{{ text.pictureHint }}</p>
-          <v-btn
-            variant="flat"
-            color="primary"
-            class="text-none"
-            prepend-icon="mdi-image-plus"
-            :loading="busy"
-            @click="addPicture"
-          >
-            {{ text.choosePicture }}
-          </v-btn>
+          <div class="d-flex flex-wrap ga-2">
+            <v-btn
+              variant="flat"
+              color="primary"
+              class="text-none"
+              prepend-icon="mdi-image-plus"
+              :loading="busy"
+              @click="addPicture"
+            >
+              {{ text.choosePicture }}
+            </v-btn>
+            <v-btn
+              variant="tonal"
+              color="buttons"
+              class="text-none"
+              prepend-icon="mdi-image-multiple-outline"
+              @click="pickingKept = true"
+            >
+              {{ posts.archivePick }}
+            </v-btn>
+          </div>
         </v-window-item>
       </v-window>
     </template>
@@ -227,6 +238,7 @@
 
   <MaterialPicker v-model="picking" :kind="pickKind" @picked="(post: TopicPost) => add(pickKind, post)" />
   <VideoDialog v-model="pickingVideo" @picked="addVideo" />
+  <PicturePicker v-model="pickingKept" @picked="addKept" />
 </template>
 
 <script setup lang="ts">
@@ -239,6 +251,7 @@ import ConfirmButton from '@/components/ConfirmButton.vue'
 import MaterialPicker from '@/components/calendar/MaterialPicker.vue'
 import VideoDialog from '@/components/calendar/VideoDialog.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
+import PicturePicker from '@/components/posts/PicturePicker.vue'
 import StoredImage from '@/components/posts/StoredImage.vue'
 import { useLanguageStore } from '@/stores/language'
 import { useScheduleStore, youTubeId, type MaterialItem, type Occurrence } from '@/stores/schedule'
@@ -265,7 +278,7 @@ const props = defineProps<{
 const schedule = useScheduleStore()
 const user = useUserStore()
 const worker = useWorkerStore()
-const { calendar: text, common, publish } = storeToRefs(useLanguageStore())
+const { calendar: text, common, publish, posts } = storeToRefs(useLanguageStore())
 
 const kindTitle = computed(
   () => schedule.materialKinds.find((kind) => kind.id === props.resource)?.name ?? text.value.materialsGeneric
@@ -409,10 +422,15 @@ async function addPicture() {
   if (!file) return
   await run(async () => {
     const image = await resizeImage(file, { size: 1600 })
-    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image })).image
-    await schedule.addImage(...ids(), kept, file.name.replace(/\.[^.]+$/, '').slice(0, 120), resource())
+    const title = file.name.replace(/\.[^.]+$/, '').slice(0, 120)
+    const kept = (await worker.request<{ image: string }>('POST', '/posts/upload', { image, title })).image
+    await schedule.addImage(...ids(), kept, title, resource())
   })
 }
+
+/** a picture of the archive: not uploaded again */
+const pickingKept = ref(false)
+const addKept = (image: string) => run(() => schedule.addImage(...ids(), image, '', resource()))
 
 /* ---------- a note or a topic changed ---------- */
 

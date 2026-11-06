@@ -47,6 +47,16 @@
         >
           {{ calendar.choosePicture }}
         </v-btn>
+        <v-btn
+          v-if="!draft.image"
+          variant="tonal"
+          color="buttons"
+          class="text-none"
+          prepend-icon="mdi-image-multiple-outline"
+          @click="pickingKept = true"
+        >
+          {{ posts.archivePick }}
+        </v-btn>
       </div>
       <div v-if="draft.video" class="d-flex align-center ga-2">
         <VideoLink :url="draft.video" />
@@ -223,6 +233,7 @@
 
   <MaterialPicker v-model="picking" :kind="pickKind" @picked="picked" />
   <VideoDialog v-model="pickingVideo" @picked="(url: string) => (draft.video = url)" />
+  <PicturePicker v-model="pickingKept" @picked="(image: string) => (draft.image = image)" />
 </template>
 
 <script setup lang="ts">
@@ -239,6 +250,7 @@ import MaterialPicker from '@/components/calendar/MaterialPicker.vue'
 import VideoDialog from '@/components/calendar/VideoDialog.vue'
 import VideoLink from '@/components/groups/VideoLink.vue'
 import AttachmentView from '@/components/messages/AttachmentView.vue'
+import PicturePicker from '@/components/posts/PicturePicker.vue'
 import StoredImage from '@/components/posts/StoredImage.vue'
 import { useGroupTopicsStore, type GroupTopic, type TopicStatus } from '@/stores/groupTopics'
 import { groupTitle, useGroupsStore } from '@/stores/groups'
@@ -270,7 +282,7 @@ const topics = useGroupTopicsStore()
 const groups = useGroupsStore()
 const user = useUserStore()
 const worker = useWorkerStore()
-const { groups: text, calendar, common, publish } = storeToRefs(useLanguageStore())
+const { groups: text, calendar, common, publish, posts } = storeToRefs(useLanguageStore())
 const locale = computed(() => localeOf(user.lang))
 
 const topic = computed(() => topics.topics.find((item) => item.id === props.topicId) ?? null)
@@ -390,9 +402,11 @@ async function addPicture() {
   if (!file) return
   await run(async () => {
     const image = await resizeImage(file, { size: 1600 })
-    draft.image = (await worker.request<{ image: string }>('POST', '/posts/upload', { image })).image
+    const title = file.name.replace(/\.[^.]+$/, '').slice(0, 120)
+    draft.image = (await worker.request<{ image: string }>('POST', '/posts/upload', { image, title })).image
   })
 }
+const pickingKept = ref(false)
 
 async function save() {
   const words = draft.words.trim()
